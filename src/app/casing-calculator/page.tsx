@@ -8,9 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { NavBar } from "@/components/nav-bar"
-import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X } from "lucide-react"
+import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle } from "lucide-react"
 import { toast } from "sonner"
-import { Spinner } from "@/components/ui/spinner"
 import { SectionInput } from "@/utils/casingCalculations"
 import CasingResults from "@/components/casing-results"
 import HADResults from "@/components/had-results"
@@ -232,8 +231,8 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
             <Button onClick={calculate} disabled={isLoading} variant="default" className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary">
               {isLoading ? (
                 <>
-                  <Spinner size="sm" className="mr-2" />
-                  Calculating...
+                  <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
                 </>
               ) : (
                 <>
@@ -248,7 +247,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
         <ScrollArea className="h-[calc(100vh-200px)]">
           <div className="space-y-6 md:space-y-10 pb-10">
             <Card className="border-primary/20 shadow-md">
-              <CardHeader className="bg-muted/50 border-b border-border/50">
+              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
                 <CardTitle className="text-lg sm:text-xl text-primary/90">File Selection</CardTitle>
                 <CardDescription>
                   Select Excel file with casing data
@@ -304,7 +303,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
             </Card>
             
             <Card className="border-primary/20 shadow-md">
-              <CardHeader className="bg-muted/50 border-b border-border/50">
+              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
                 <CardTitle className="text-lg sm:text-xl text-primary/90">Calculation Parameters</CardTitle>
                 <CardDescription>
                   Enter basic calculation parameters
@@ -348,7 +347,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
             </Card>
             
             <Card className="border-primary/20 shadow-md">
-              <CardHeader className="bg-muted/50 border-b border-border/50">
+              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
                 <CardTitle className="text-lg sm:text-xl text-primary/90">Section Parameters</CardTitle>
                 <CardDescription>
                   Enter parameters for each section
@@ -434,7 +433,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
             {/* Results */}
             {casingResults.length > 0 && (
               <Card className="border-primary/20 shadow-md">
-                <CardHeader className="bg-muted/50 border-b border-border/50">
+                <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
                   <CardTitle className="text-lg sm:text-xl text-primary/90">Calculation Results</CardTitle>
                   <CardDescription>
                     Section by section details
@@ -449,7 +448,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
             {/* HAD Results */}
             {hadData && (
               <Card className="border-primary/20 shadow-md">
-                <CardHeader className="bg-muted/50 border-b border-border/50">
+                <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
                   <CardTitle className="text-lg sm:text-xl text-primary/90">HAD Results</CardTitle>
                   <CardDescription>
                     Hydraulic Analysis and Design results

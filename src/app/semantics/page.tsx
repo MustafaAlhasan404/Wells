@@ -310,8 +310,8 @@ export default function SemanticsPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Input Parameters</CardTitle>
+            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
+              <CardTitle className="text-lg sm:text-xl text-primary/90">Input Parameters</CardTitle>
               <CardDescription>Enter the required parameters for calculations</CardDescription>
             </CardHeader>
             <CardContent>
@@ -378,8 +378,8 @@ export default function SemanticsPage() {
           </Card>
           
           <Card>
-            <CardHeader>
-              <CardTitle>Constants from Data Input</CardTitle>
+            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
+              <CardTitle className="text-lg sm:text-xl text-primary/90">Constants from Data Input</CardTitle>
               <CardDescription>K1 and K2 values retrieved from Data Input page</CardDescription>
             </CardHeader>
             <CardContent>
@@ -410,8 +410,8 @@ export default function SemanticsPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="h-full">
-            <CardHeader>
-              <CardTitle>Equations</CardTitle>
+            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
+              <CardTitle className="text-lg sm:text-xl text-primary/90">Equations</CardTitle>
             </CardHeader>
             <CardContent className="h-[400px] overflow-auto">
               {equationHTML ? (
@@ -423,8 +423,8 @@ export default function SemanticsPage() {
           </Card>
           
           <Card className="h-full">
-            <CardHeader>
-              <CardTitle>Results</CardTitle>
+            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
+              <CardTitle className="text-lg sm:text-xl text-primary/90">Results</CardTitle>
             </CardHeader>
             <CardContent className="h-[400px] overflow-auto">
               {resultsHTML ? (

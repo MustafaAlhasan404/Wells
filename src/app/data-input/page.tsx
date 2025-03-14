@@ -256,7 +256,7 @@ export default function DataInput({}: DataInputProps) {
         <ScrollArea className="h-[calc(100vh-200px)]">
           <div className="space-y-6 md:space-y-10 pb-10">
             <Card className="border-primary/20 shadow-md">
-              <CardHeader className="bg-muted/50 border-b border-border/50">
+              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
                 <CardTitle className="text-lg sm:text-xl text-primary/90">Basic Parameters</CardTitle>
                 <CardDescription>
                   Enter the basic parameters for your well analysis
@@ -268,7 +268,7 @@ export default function DataInput({}: DataInputProps) {
             </Card>
             
             <Card className="border-primary/20 shadow-md">
-              <CardHeader className="bg-muted/50 border-b border-border/50">
+              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
                 <CardTitle className="text-lg sm:text-xl text-primary/90">Well Specifications</CardTitle>
                 <CardDescription>
                   Enter the specifications for your well
@@ -280,7 +280,7 @@ export default function DataInput({}: DataInputProps) {
             </Card>
             
             <Card className="border-primary/20 shadow-md">
-              <CardHeader className="bg-muted/50 border-b border-border/50">
+              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
                 <CardTitle className="text-lg sm:text-xl text-primary/90">Constants</CardTitle>
                 <CardDescription>
                   Enter the constant values for calculations

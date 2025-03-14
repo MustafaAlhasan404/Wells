@@ -93,8 +93,8 @@ export default function EquationsPage() {
         </div>
         
         <Card>
-          <CardHeader>
-            <CardTitle>Upload Drill Collar Table</CardTitle>
+          <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
+            <CardTitle className="text-lg sm:text-xl text-primary/90">Upload Drill Collar Table</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col space-y-2">
@@ -136,8 +136,8 @@ export default function EquationsPage() {
           <div className="space-y-6">
             {drillCollarCalculations.length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle>Calculations</CardTitle>
+                <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
+                  <CardTitle className="text-lg sm:text-xl text-primary/90">Calculations</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -155,8 +155,8 @@ export default function EquationsPage() {
             
             {drillCollarResults.length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle>Results</CardTitle>
+                <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
+                  <CardTitle className="text-lg sm:text-xl text-primary/90">Results</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
