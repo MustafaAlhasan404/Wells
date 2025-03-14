@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { NavBar } from "@/components/nav-bar"
-import { Save, CheckCircle, AlertCircle } from "lucide-react"
+import { Save, CheckCircle, AlertCircle, Copy } from "lucide-react"
 import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 
 interface DataInputProps {}
 
@@ -17,6 +18,8 @@ export default function DataInput({}: DataInputProps) {
   const [formData, setFormData] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
+  // Track which fields are using single input mode
+  const [singleInputFields, setSingleInputFields] = useState<Record<string, boolean>>({})
 
   // Load saved data on component mount
   useEffect(() => {
@@ -28,6 +31,12 @@ export default function DataInput({}: DataInputProps) {
         if (savedData) {
           const data = JSON.parse(savedData);
           setFormData(data);
+        }
+        
+        // Try to load the single input preferences
+        const savedInputPrefs = localStorage.getItem('wellsAnalyzerInputPrefs');
+        if (savedInputPrefs) {
+          setSingleInputFields(JSON.parse(savedInputPrefs));
         }
       } catch (error) {
         console.error('Failed to load data:', error)
@@ -48,6 +57,43 @@ export default function DataInput({}: DataInputProps) {
       ...prev,
       [field]: value
     }))
+  }
+  
+  // Handle single input toggle
+  const toggleSingleInput = (field: string) => {
+    setSingleInputFields(prev => {
+      const newState = {
+        ...prev,
+        [field]: !prev[field]
+      };
+      
+      // Save preferences to localStorage
+      localStorage.setItem('wellsAnalyzerInputPrefs', JSON.stringify(newState));
+      
+      return newState;
+    });
+    
+    // If toggling to single input mode, copy the first instance value to all instances
+    if (!singleInputFields[field]) {
+      const firstInstanceValue = formData[`${field}_1`] || '';
+      if (firstInstanceValue) {
+        setFormData(prev => ({
+          ...prev,
+          [`${field}_2`]: firstInstanceValue,
+          [`${field}_3`]: firstInstanceValue
+        }));
+      }
+    }
+  }
+  
+  // Handle single input change (propagate to all instances)
+  const handleSingleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [`${field}_1`]: value,
+      [`${field}_2`]: value,
+      [`${field}_3`]: value
+    }));
   }
 
   const saveData = async () => {
@@ -78,21 +124,52 @@ export default function DataInput({}: DataInputProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {fields.map(field => (
           <div key={field} className="space-y-4 bg-muted/30 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
-            <Label className="text-base font-medium text-primary">{field}</Label>
-            {[1, 2, 3].map(instance => (
-              <div key={`${field}_${instance}`} className="space-y-2">
-                <Label htmlFor={`${field}_${instance}`} className="text-sm text-muted-foreground">
-                  Instance {instance}
+            <div className="flex justify-between items-center">
+              <Label className="text-base font-medium text-primary">{field}</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor={`toggle-${field}`} className="text-xs text-muted-foreground">
+                  Single value
+                </Label>
+                <Switch 
+                  id={`toggle-${field}`} 
+                  checked={!!singleInputFields[field]} 
+                  onCheckedChange={() => toggleSingleInput(field)}
+                />
+              </div>
+            </div>
+            
+            {singleInputFields[field] ? (
+              // Single input mode
+              <div className="space-y-2">
+                <Label htmlFor={`${field}_single`} className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Copy className="h-3 w-3" />
+                  Applied to all instances
                 </Label>
                 <Input
-                  id={`${field}_${instance}`}
-                  placeholder={`Enter ${field} (${instance})`}
-                  value={formData[`${field}_${instance}`] || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${instance}`, e.target.value)}
+                  id={`${field}_single`}
+                  placeholder={`Enter ${field} (all instances)`}
+                  value={formData[`${field}_1`] || ''}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSingleInputChange(field, e.target.value)}
                   className="focus:ring-1 focus:ring-primary"
                 />
               </div>
-            ))}
+            ) : (
+              // Multiple inputs mode
+              [1, 2, 3].map(instance => (
+                <div key={`${field}_${instance}`} className="space-y-2">
+                  <Label htmlFor={`${field}_${instance}`} className="text-sm text-muted-foreground">
+                    Instance {instance}
+                  </Label>
+                  <Input
+                    id={`${field}_${instance}`}
+                    placeholder={`Enter ${field} (${instance})`}
+                    value={formData[`${field}_${instance}`] || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${instance}`, e.target.value)}
+                    className="focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              ))
+            )}
           </div>
         ))}
       </div>
