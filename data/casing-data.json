@@ -1,0 +1,22 @@
+{
+  "filePath": "FinalCasingTable.xlsx",
+  "initialDcsg": "177.8",
+  "iterations": "3",
+  "sectionInputs": [
+    {
+      "multiplier": "1.11",
+      "metalType": "N-80",
+      "depth": "3000"
+    },
+    {
+      "multiplier": "1.2",
+      "metalType": "P-110",
+      "depth": "2000"
+    },
+    {
+      "multiplier": "1.3",
+      "metalType": "K-55",
+      "depth": "700"
+    }
+  ]
+}
