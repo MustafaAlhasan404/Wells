@@ -23,10 +23,11 @@ export default function DataInput({}: DataInputProps) {
     const loadSavedData = async () => {
       setInitialLoading(true)
       try {
-        const response = await fetch('/api/data')
-        if (response.ok) {
-          const data = await response.json()
-          setFormData(data)
+        // Get data from localStorage instead of API
+        const savedData = localStorage.getItem('wellsAnalyzerData');
+        if (savedData) {
+          const data = JSON.parse(savedData);
+          setFormData(data);
         }
       } catch (error) {
         console.error('Failed to load data:', error)
@@ -52,25 +53,13 @@ export default function DataInput({}: DataInputProps) {
   const saveData = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
+      // Save to localStorage instead of API
+      localStorage.setItem('wellsAnalyzerData', JSON.stringify(formData));
       
-      if (response.ok) {
-        toast.success("Data saved successfully", {
-          icon: <CheckCircle className="h-4 w-4 text-green-500" />,
-          description: "Your well data has been saved to the server."
-        })
-      } else {
-        toast.error("Failed to save data", {
-          icon: <AlertCircle className="h-4 w-4 text-destructive" />,
-          description: "There was an error saving your data. Please try again."
-        })
-      }
+      toast.success("Data saved successfully", {
+        icon: <CheckCircle className="h-4 w-4 text-green-500" />,
+        description: "Your well data has been saved to your browser."
+      });
     } catch (error) {
       console.error('Failed to save data:', error)
       toast.error("Failed to save data", {

@@ -76,9 +76,10 @@ export default function SemanticsPage() {
   useEffect(() => {
     const loadDataInputValues = async () => {
       try {
-        const response = await fetch('/api/data');
-        if (response.ok) {
-          const data = await response.json();
+        // Load from localStorage instead of API
+        const savedData = localStorage.getItem('wellsAnalyzerData');
+        if (savedData) {
+          const data = JSON.parse(savedData);
           setDataInputValues(data);
         }
       } catch (error) {
