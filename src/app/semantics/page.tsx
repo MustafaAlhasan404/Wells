@@ -20,7 +20,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { NavBar } from "@/components/nav-bar"
-import { Calculator } from "lucide-react"
+import { Calculator, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import { useFileUpload } from "@/context/FileUploadContext"
 
@@ -36,12 +36,20 @@ interface VcfResult {
 interface GcResult {
   instance: number;
   vcf: number;
-  gc: number;  // Gc
+  gc: number;  // Gc in tons
+  nc: number;  // nc in Sk (sacks)
+  vw: number;  // Vw
+  vfd: number; // Vfd
+  pymax: number; // Pymax
+  pc: number;   // Pc
+  pfr: number;  // Pfr (constant)
+  ppmax: number; // Ppmax
 }
 
 interface DataInputValues {
   K1?: string;
   K2?: string;
+  K3?: string;
   [key: string]: string | undefined;
 }
 
@@ -51,6 +59,7 @@ export default function SemanticsPage() {
   const [gammaC, setGammaC] = useState<string>("");
   const [gammaW, setGammaW] = useState<string>("");
   const [gammaFC, setGammaFC] = useState<string>("");
+  const [gammaF, setGammaF] = useState<string>("");
   
   // Data Input values
   const [dataInputValues, setDataInputValues] = useState<DataInputValues>({});
@@ -63,14 +72,43 @@ export default function SemanticsPage() {
   const [equationHTML, setEquationHTML] = useState<string>("");
   const [resultsHTML, setResultsHTML] = useState<string>("");
   
-  // Loading state
+  // UI States
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [equationsMinimized, setEquationsMinimized] = useState<boolean>(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [equationsAnimationClass, setEquationsAnimationClass] = useState("");
+  const [resultsAnimationClass, setResultsAnimationClass] = useState("");
   
   // Access results from other pages
   const { 
     drillCollarResults,
     casingResults
   } = useFileUpload();
+
+  // Toggle minimized state for equations card with animation
+  const toggleEquationsMinimized = () => {
+    setIsTransitioning(true);
+    const newState = !equationsMinimized;
+    setEquationsMinimized(newState);
+    
+    // Add animation classes based on the state change
+    if (newState) {
+      // Hiding equations, results expand
+      setEquationsAnimationClass("animate-out fade-out slide-out-to-right duration-300");
+      setResultsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
+    } else {
+      // Showing equations, results contract
+      setEquationsAnimationClass("animate-in fade-in slide-in-from-right duration-500");
+      setResultsAnimationClass("animate-in fade-in slide-in-from-left duration-300");
+    }
+    
+    // Reset transition flag after animation completes
+    setTimeout(() => {
+      setIsTransitioning(false);
+      setEquationsAnimationClass("");
+      setResultsAnimationClass("");
+    }, 500);
+  };
 
   // Load data input values on component mount
   useEffect(() => {
@@ -84,7 +122,7 @@ export default function SemanticsPage() {
         }
       } catch (error) {
         console.error('Error loading data input values:', error);
-        toast.error("Failed to load K1 and K2 values from Data Input");
+        toast.error("Failed to load K1, K2, and K3 values from Data Input");
       }
     };
     
@@ -201,19 +239,35 @@ export default function SemanticsPage() {
   };
 
   const calculateGcGc = () => {
-    if (!gammaC || !gammaW || !gammaFC) {
-      toast.error("Please enter all γ values");
-      return;
-    }
-    
-    if (vcfResults.length === 0) {
-      toast.error("Please calculate Vcf values first");
+    if (!hcValue) {
+      toast.error("Please enter a value for Hc");
       return;
     }
 
-    // Check if K2 value is available
+    // First calculate Vcf if needed
+    if (vcfResults.length === 0) {
+      // Run the Vcf calculation first
+      calculateVcf();
+      
+      // If Vcf calculation fails, stop
+      if (vcfResults.length === 0) {
+        return;
+      }
+    }
+
+    if (!gammaC || !gammaW || !gammaFC || !gammaF) {
+      toast.error("Please enter all γ values");
+      return;
+    }
+
+    // Check if K2 and K3 values are available
     if (!dataInputValues.K2) {
       toast.error("K2 value not found. Please set it in the Data Input page.");
+      return;
+    }
+
+    if (!dataInputValues.K3) {
+      toast.error("K3 value not found. Please set it in the Data Input page.");
       return;
     }
     
@@ -221,9 +275,12 @@ export default function SemanticsPage() {
       const gamma_c = parseFloat(gammaC);
       const gamma_w = parseFloat(gammaW);
       const gamma_fc = parseFloat(gammaFC);
+      const gamma_f = parseFloat(gammaF);
+      const Hc = parseFloat(hcValue);
       
-      // Use K2 from data input values
+      // Use K2 and K3 from data input values
       const K2 = parseFloat(dataInputValues.K2);
+      const K3 = parseFloat(dataInputValues.K3);
       
       // Calculate m
       const m = (gamma_w * (gamma_c - gamma_fc)) / (gamma_c * (gamma_fc - gamma_w));
@@ -233,6 +290,9 @@ export default function SemanticsPage() {
       
       // Create results array
       const results: GcResult[] = [];
+      
+      // Calculate the gamma ratio for Vw formula
+      const gammaRatio = (gamma_c - gamma_fc) / (gamma_c - gamma_w);
       
       // Generate HTML for equations
       let equations = `<h3>gc and Gc Calculations:</h3>
@@ -244,27 +304,108 @@ export default function SemanticsPage() {
                        <p>gc = [${gamma_c}×${gamma_w}]/${m}.${gamma_c}+${gamma_w}</p>
                        <p>gc = ${gc.toFixed(4)}</p><br>
                        
-                       <p>Gc = K2×gc×Vcf</p>
-                       <p>Where K2 = ${K2}</p><br>`;
+                       <p>Gc = K2×gc×Vcf (tons)</p>
+                       <p>Where K2 = ${K2}</p><br>
+                       
+                       <p>nc = [Gc×1000]/50 (Sk)</p><br>
+                       
+                       <p>Vw = Vcf×K3×[(γc-γfc)/(γc-γw)]</p>
+                       <p>Where K3 = ${K3}</p>
+                       <p>Vw = Vcf×${K3}×[(${gamma_c}-${gamma_fc})/(${gamma_c}-${gamma_w})]</p>
+                       <p>Vw = Vcf×${K3}×[${(gamma_c-gamma_fc).toFixed(4)}/${(gamma_c-gamma_w).toFixed(4)}]</p>
+                       <p>Vw = Vcf×${K3}×${((gamma_c-gamma_fc)/(gamma_c-gamma_w)).toFixed(4)}</p><br>
+                       
+                       <h3>Additional Calculations:</h3>
+                       <p>Vfd = (π/4)×di²×(H-h)</p>
+                       <p>Where π = ${Math.PI.toFixed(4)}</p><br>
+                       
+                       <p>Ppmax = Pymax + Pc + Pfr</p>
+                       <p>Where:</p>
+                       <p>Pymax = 0.1×[(Hc-h)×(γfc-γf)]</p>
+                       <p>Pc = 0.02×H + 8 or 16 (8 if H < 2000m, 16 if H ≥ 2000m)</p>
+                       <p>Pfr = 5 (constant)</p><br>`;
       
-      // Calculate Gc for each instance
+      // Calculate values for each instance
       for (let i = 0; i < vcfResults.length; i++) {
         const vcf = vcfResults[i].vcf;
+        const di = vcfResults[i].di / 1000; // Convert back to meters
+        const h = vcfResults[i].h;
         
-        // Calculate Gc
+        // Get H (depth of section) from data inputs or estimated based on instance
+        let H = 0;
+        const HKey = `HD_${i + 1}`;
+        if (dataInputValues[HKey]) {
+          H = parseFloat(dataInputValues[HKey]);
+        } else {
+          // Estimate H based on instance
+          H = 1500 + (i * 1000); // Default depth estimation
+        }
+        
+        // Calculate Gc (in tons)
         const gc_value = K2 * gc * vcf;
+        
+        // Calculate nc = [Gc * 1000] / 50 (in Sk)
+        const nc_value = (gc_value * 1000) / 50;
+        
+        // Calculate Vw = Vcf * K3 * [(gammac - gammafc) / (gammac - gammaw)]
+        const vw_value = vcf * K3 * gammaRatio;
+        
+        // Calculate Vfd = (Pi/4) * di^2 * (H-h)
+        const vfd_value = (Math.PI / 4) * (di**2) * (H - h);
+        
+        // Calculate Pymax = 0.1 * [(Hc-h) * (gammafc-gammaf)]
+        const pymax_value = 0.1 * ((Hc - h) * (gamma_fc - gamma_f));
+        
+        // Calculate Pc = 0.02 * H + (8 or 16)
+        const pc_value = 0.02 * H + (H < 2000 ? 8 : 16);
+        
+        // Pfr is a constant
+        const pfr_value = 5;
+        
+        // Calculate Ppmax = Pymax + Pc + Pfr
+        const ppmax_value = pymax_value + pc_value + pfr_value;
         
         // Add to results
         results.push({
           instance: i + 1,
           vcf,
-          gc: gc_value
+          gc: gc_value,
+          nc: nc_value,
+          vw: vw_value,
+          vfd: vfd_value,
+          pymax: pymax_value,
+          pc: pc_value,
+          pfr: pfr_value,
+          ppmax: ppmax_value
         });
         
         // Add equation steps for this instance
         equations += `<h4>Instance ${i+1}:</h4>
                      <p>Gc = ${K2} × ${gc.toFixed(4)} × ${vcf.toFixed(4)}</p>
-                     <p>Gc = ${gc_value.toFixed(4)}</p><br>`;
+                     <p>Gc = ${gc_value.toFixed(4)} tons</p><br>
+                     
+                     <p>nc = [${gc_value.toFixed(4)} × 1000] / 50</p>
+                     <p>nc = ${nc_value.toFixed(1)} Sk</p><br>
+                     
+                     <p>Vw = ${vcf.toFixed(4)} × ${K3} × ${gammaRatio.toFixed(4)}</p>
+                     <p>Vw = ${vw_value.toFixed(4)}</p><br>
+                     
+                     <p>Vfd = (${Math.PI.toFixed(4)}/4) × (${di.toFixed(4)})² × (${H} - ${h})</p>
+                     <p>Vfd = (${Math.PI.toFixed(4)}/4) × ${(di**2).toFixed(4)} × ${(H-h).toFixed(4)}</p>
+                     <p>Vfd = ${vfd_value.toFixed(4)}</p><br>
+                     
+                     <p>Pymax = 0.1 × [(${Hc} - ${h}) × (${gamma_fc} - ${gamma_f})]</p>
+                     <p>Pymax = 0.1 × [${(Hc-h).toFixed(4)} × ${(gamma_fc-gamma_f).toFixed(4)}]</p>
+                     <p>Pymax = ${pymax_value.toFixed(4)}</p><br>
+                     
+                     <p>Pc = 0.02 × ${H} + ${H < 2000 ? '8' : '16'} (${H < 2000 ? 'H < 2000m' : 'H ≥ 2000m'})</p>
+                     <p>Pc = ${(0.02 * H).toFixed(4)} + ${H < 2000 ? '8' : '16'}</p>
+                     <p>Pc = ${pc_value.toFixed(4)}</p><br>
+                     
+                     <p>Pfr = 5 (constant)</p><br>
+                     
+                     <p>Ppmax = ${pymax_value.toFixed(4)} + ${pc_value.toFixed(4)} + ${pfr_value}</p>
+                     <p>Ppmax = ${ppmax_value.toFixed(4)}</p><br>`;
       }
       
       setGcResults(results);
@@ -277,7 +418,11 @@ export default function SemanticsPage() {
             <tr>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Instance</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Vcf</th>
-              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Gc</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Gc (tons)</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">nc (Sk)</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Vw</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Vfd</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Ppmax</th>
             </tr>
           </thead>
           <tbody>
@@ -286,6 +431,34 @@ export default function SemanticsPage() {
                 <td class="px-4 py-2 text-center">${r.instance}</td>
                 <td class="px-4 py-2 text-center">${r.vcf.toFixed(4)}</td>
                 <td class="px-4 py-2 text-center">${r.gc.toFixed(4)}</td>
+                <td class="px-4 py-2 text-center">${r.nc.toFixed(1)}</td>
+                <td class="px-4 py-2 text-center">${r.vw.toFixed(4)}</td>
+                <td class="px-4 py-2 text-center">${r.vfd.toFixed(4)}</td>
+                <td class="px-4 py-2 text-center">${r.ppmax.toFixed(4)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        
+        <h3 class="mt-6 mb-3 font-bold">Pressure Components Details</h3>
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead>
+            <tr>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Instance</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Pymax</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Pc</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Pfr</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Ppmax</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${results.map(r => `
+              <tr class="bg-transparent border-b border-gray-200 dark:border-gray-700">
+                <td class="px-4 py-2 text-center">${r.instance}</td>
+                <td class="px-4 py-2 text-center">${r.pymax.toFixed(4)}</td>
+                <td class="px-4 py-2 text-center">${r.pc.toFixed(4)}</td>
+                <td class="px-4 py-2 text-center">${r.pfr}</td>
+                <td class="px-4 py-2 text-center">${r.ppmax.toFixed(4)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -293,10 +466,10 @@ export default function SemanticsPage() {
       `;
       setResultsHTML(resultsTable);
       
-      toast.success("gc and Gc calculation completed");
+      toast.success("All calculations completed successfully");
     } catch (error) {
-      console.error('Error calculating gc and Gc:', error);
-      toast.error("Error calculating gc and Gc");
+      console.error('Error calculating values:', error);
+      toast.error("Error performing calculations");
     }
   };
 
@@ -355,23 +528,25 @@ export default function SemanticsPage() {
                     onChange={(e) => setGammaFC(e.target.value)}
                   />
                 </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="gamma-f" className="text-base">γf:</Label>
+                  <Input
+                    id="gamma-f"
+                    placeholder="Enter γf value"
+                    value={gammaF}
+                    onChange={(e) => setGammaF(e.target.value)}
+                  />
+                </div>
               </div>
               
               <div className="flex gap-4 mt-6">
-                <Button 
-                  onClick={calculateVcf}
-                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary gap-2"
-                >
-                  <Calculator className="h-4 w-4" />
-                  Calculate Vcf
-                </Button>
-                
                 <Button 
                   onClick={calculateGcGc}
                   className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary gap-2"
                 >
                   <Calculator className="h-4 w-4" />
-                  Calculate gc and Gc
+                  Calculate All
                 </Button>
               </div>
             </CardContent>
@@ -380,10 +555,10 @@ export default function SemanticsPage() {
           <Card>
             <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
               <CardTitle className="text-lg sm:text-xl text-primary/90">Constants from Data Input</CardTitle>
-              <CardDescription>K1 and K2 values retrieved from Data Input page</CardDescription>
+              <CardDescription>K1, K2, and K3 values retrieved from Data Input page</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2 p-4 bg-muted/30 rounded-lg border border-border/50">
                   <Label className="text-base font-medium text-primary">K1 Value:</Label>
                   <p className="text-lg font-mono">{dataInputValues.K1 || 'Not set'}</p>
@@ -403,28 +578,46 @@ export default function SemanticsPage() {
                     </p>
                   )}
                 </div>
+                
+                <div className="space-y-2 p-4 bg-muted/30 rounded-lg border border-border/50">
+                  <Label className="text-base font-medium text-primary">K3 Value:</Label>
+                  <p className="text-lg font-mono">{dataInputValues.K3 || 'Not set'}</p>
+                  {!dataInputValues.K3 && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Please set the K3 value in the <a href="/data-input" className="text-primary hover:underline">Data Input</a> page.
+                    </p>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="h-full">
-            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
-              <CardTitle className="text-lg sm:text-xl text-primary/90">Equations</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[400px] overflow-auto">
-              {equationHTML ? (
-                <div dangerouslySetInnerHTML={{ __html: equationHTML }} />
-              ) : (
-                <p className="text-muted-foreground">The equations will be calculated and displayed here</p>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card className="h-full">
-            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
+        {/* Results and Equations Section */}
+        <div className={`transition-all duration-300 ${equationsMinimized ? "" : "grid grid-cols-1 md:grid-cols-2 gap-6"}`}>
+          {/* Results Card - always visible */}
+          <Card className={`h-full transition-all duration-300 ${resultsAnimationClass}`}>
+            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center justify-between">
               <CardTitle className="text-lg sm:text-xl text-primary/90">Results</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleEquationsMinimized}
+                className="h-8 px-2 text-xs"
+                title={equationsMinimized ? "Show equations" : "Hide equations"}
+              >
+                {equationsMinimized ? (
+                  <>
+                    <Eye className="h-4 w-4 mr-1" />
+                    Show Equations
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="h-4 w-4 mr-1" />
+                    Hide Equations
+                  </>
+                )}
+              </Button>
             </CardHeader>
             <CardContent className="h-[400px] overflow-auto">
               {resultsHTML ? (
@@ -434,6 +627,22 @@ export default function SemanticsPage() {
               )}
             </CardContent>
           </Card>
+          
+          {/* Equations Card - only visible when not minimized */}
+          {(!equationsMinimized || isTransitioning) && (
+            <Card className={`h-full transition-opacity duration-300 ${equationsAnimationClass} ${equationsMinimized && !isTransitioning ? "hidden" : ""}`}>
+              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center justify-between">
+                <CardTitle className="text-lg sm:text-xl text-primary/90">Equations</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[400px] overflow-auto">
+                {equationHTML ? (
+                  <div dangerouslySetInnerHTML={{ __html: equationHTML }} />
+                ) : (
+                  <p className="text-muted-foreground">The equations will be calculated and displayed here</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
