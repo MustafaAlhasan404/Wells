@@ -117,6 +117,7 @@ export default function SemanticsPage() {
   // Save calculation results to localStorage
   const saveResultsToLocalStorage = () => {
     try {
+      // Get the current state values to ensure we're saving the most up-to-date data
       const resultsData = {
         vcfResults,
         gcResults,
@@ -153,7 +154,7 @@ export default function SemanticsPage() {
     // After updating all states, save everything to localStorage
     setTimeout(() => {
       saveResultsToLocalStorage();
-    }, 10); // Increased timeout to ensure state is updated
+    }, 100); // Increased timeout significantly to ensure React has time to update state
   };
 
   const saveInputsToLocalStorage = (inputs: {
@@ -338,15 +339,19 @@ export default function SemanticsPage() {
       return;
     }
 
-    // First calculate Vcf if needed
+    // First make sure Vcf is calculated
     if (vcfResults.length === 0) {
-      // Run the Vcf calculation first
       calculateVcf();
-      
-      // If Vcf calculation fails, stop
-      if (vcfResults.length === 0) {
-        return;
-      }
+      // We need to wait for calculateVcf to complete and update state
+      // Let's set a small timeout to wait for it
+      setTimeout(() => {
+        // Only continue if vcfResults was successfully populated
+        if (vcfResults.length > 0) {
+          // Call ourselves again now that Vcf is calculated
+          calculateGcGc();
+        }
+      }, 500); // Wait half a second for state to update
+      return; // Exit now, we'll continue after the timeout
     }
 
     if (!gammaC || !gammaW || !gammaFC || !gammaF) {
@@ -366,6 +371,8 @@ export default function SemanticsPage() {
     }
     
     try {
+      setIsLoading(true); // Set loading state
+      
       const gamma_c = parseFloat(gammaC);
       const gamma_w = parseFloat(gammaW);
       const gamma_fc = parseFloat(gammaFC);
@@ -501,13 +508,9 @@ export default function SemanticsPage() {
                      <p>Ppmax = ${pymax_value.toFixed(4)} + ${pc_value.toFixed(4)} + ${pfr_value}</p>
                      <p>Ppmax = ${ppmax_value.toFixed(4)}</p><br>`;
       }
-      
-      // Update results using the updated methods
-      updateGcResults(results);
-      updateEquationHTML(equations);
-      
-      // Build the full results HTML with both tables
-      let fullResultsHTML = `
+
+      // Create full HTML directly
+      const fullResultsHTML = `
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead>
             <tr>
@@ -534,10 +537,7 @@ export default function SemanticsPage() {
             `).join('')}
           </tbody>
         </table>
-      `;
-      
-      // Add the pressure components table
-      fullResultsHTML += `
+        
         <h3 class="mt-6 mb-3 font-bold">Pressure Components Details</h3>
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead>
@@ -562,12 +562,27 @@ export default function SemanticsPage() {
           </tbody>
         </table>
       `;
+
+      // Update state directly with everything
+      setGcResults(results);
+      setEquationHTML(equations);
       
-      // Update results HTML with the full content
-      updateResultsHTML(fullResultsHTML);
+      // Store and set the HTML result
+      setResultsHTML(fullResultsHTML);
       
+      // Directly save to localStorage as well
+      const resultsData = {
+        vcfResults,
+        gcResults: results,
+        equationHTML: equations,
+        resultsHTML: fullResultsHTML
+      };
+      localStorage.setItem('semanticsResults', JSON.stringify(resultsData));
+      
+      setIsLoading(false); // Clear loading state
       toast.success("All calculations completed successfully");
     } catch (error) {
+      setIsLoading(false); // Clear loading state on error
       console.error('Error calculating values:', error);
       toast.error("Error performing calculations");
     }

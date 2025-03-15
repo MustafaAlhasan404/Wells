@@ -55,12 +55,12 @@ export function NavBar() {
                 Casing Calculator
               </Link>
               <Link 
-                href="/equations" 
+                href="/drill-collar" 
                 className={cn("text-sm font-medium transition-colors hover:text-primary", 
-                  pathname === "/equations" ? "text-primary" : "text-muted-foreground"
+                  pathname === "/drill-collar" ? "text-primary" : "text-muted-foreground"
                 )}
               >
-                Equations
+                Drill Collar
               </Link>
               <Link 
                 href="/semantics" 
@@ -119,12 +119,12 @@ export function NavBar() {
               Casing Calculator
             </Link>
             <Link 
-              href="/equations" 
+              href="/drill-collar" 
               className={cn("text-sm font-medium transition-colors hover:text-primary", 
-                pathname === "/equations" ? "text-primary" : "text-muted-foreground"
+                pathname === "/drill-collar" ? "text-primary" : "text-muted-foreground"
               )}
             >
-              Equations
+              Drill Collar
             </Link>
             <Link 
               href="/semantics" 
