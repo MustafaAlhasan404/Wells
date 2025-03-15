@@ -75,9 +75,6 @@ export default function SemanticsPage() {
   // UI States
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [equationsMinimized, setEquationsMinimized] = useState<boolean>(true);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [equationsAnimationClass, setEquationsAnimationClass] = useState("");
-  const [resultsAnimationClass, setResultsAnimationClass] = useState("");
   
   // Access results from other pages
   const { 
@@ -85,36 +82,99 @@ export default function SemanticsPage() {
     casingResults
   } = useFileUpload();
 
-  // Toggle minimized state for equations card with animation
+  // Toggle minimized state for equations card
   const toggleEquationsMinimized = () => {
-    setIsTransitioning(true);
     const newState = !equationsMinimized;
     setEquationsMinimized(newState);
-    
-    // Add animation classes based on the state change
-    if (newState) {
-      // Hiding equations, results expand
-      setEquationsAnimationClass("animate-out fade-out slide-out-to-right duration-300");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
-    } else {
-      // Showing equations, results contract
-      setEquationsAnimationClass("animate-in fade-in slide-in-from-right duration-500");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-left duration-300");
-    }
-    
-    // Reset transition flag after animation completes
-    setTimeout(() => {
-      setIsTransitioning(false);
-      setEquationsAnimationClass("");
-      setResultsAnimationClass("");
-    }, 500);
   };
 
-  // Load data input values on component mount
+  // Save inputs to localStorage when they change
+  const updateHcValue = (value: string) => {
+    setHcValue(value);
+    saveInputsToLocalStorage({ hcValue: value, gammaC, gammaW, gammaFC, gammaF });
+  };
+
+  const updateGammaC = (value: string) => {
+    setGammaC(value);
+    saveInputsToLocalStorage({ hcValue, gammaC: value, gammaW, gammaFC, gammaF });
+  };
+
+  const updateGammaW = (value: string) => {
+    setGammaW(value);
+    saveInputsToLocalStorage({ hcValue, gammaC, gammaW: value, gammaFC, gammaF });
+  };
+
+  const updateGammaFC = (value: string) => {
+    setGammaFC(value);
+    saveInputsToLocalStorage({ hcValue, gammaC, gammaW, gammaFC: value, gammaF });
+  };
+
+  const updateGammaF = (value: string) => {
+    setGammaF(value);
+    saveInputsToLocalStorage({ hcValue, gammaC, gammaW, gammaFC, gammaF: value });
+  };
+
+  // Save calculation results to localStorage
+  const saveResultsToLocalStorage = () => {
+    try {
+      const resultsData = {
+        vcfResults,
+        gcResults,
+        equationHTML,
+        resultsHTML
+      };
+      localStorage.setItem('semanticsResults', JSON.stringify(resultsData));
+    } catch (error) {
+      console.error('Error saving semantics results to localStorage:', error);
+    }
+  };
+
+  // Update setVcfResults to also save to localStorage
+  const updateVcfResults = (results: VcfResult[]) => {
+    setVcfResults(results);
+    // We'll save the full results after updating all states
+  };
+
+  // Update setGcResults to also save to localStorage
+  const updateGcResults = (results: GcResult[]) => {
+    setGcResults(results);
+    // We'll save the full results after updating all states
+  };
+
+  // Update setEquationHTML to also save to localStorage
+  const updateEquationHTML = (html: string) => {
+    setEquationHTML(html);
+    // We'll save the full results after updating all states
+  };
+
+  // Update setResultsHTML to also save to localStorage
+  const updateResultsHTML = (html: string) => {
+    setResultsHTML(html);
+    // After updating all states, save everything to localStorage
+    setTimeout(() => {
+      saveResultsToLocalStorage();
+    }, 10); // Increased timeout to ensure state is updated
+  };
+
+  const saveInputsToLocalStorage = (inputs: {
+    hcValue: string;
+    gammaC: string;
+    gammaW: string;
+    gammaFC: string;
+    gammaF: string;
+  }) => {
+    try {
+      localStorage.setItem('semanticsInputs', JSON.stringify(inputs));
+    } catch (error) {
+      console.error('Error saving semantics inputs to localStorage:', error);
+    }
+  };
+
+  // Load data input values and saved inputs on component mount
   useEffect(() => {
     const loadDataInputValues = async () => {
       try {
-        // Load from localStorage instead of API
+        // Load general data from localStorage
         const savedData = localStorage.getItem('wellsAnalyzerData');
         if (savedData) {
           const data = JSON.parse(savedData);
@@ -126,7 +186,40 @@ export default function SemanticsPage() {
       }
     };
     
+    const loadSavedInputs = () => {
+      try {
+        const savedInputs = localStorage.getItem('semanticsInputs');
+        if (savedInputs) {
+          const inputs = JSON.parse(savedInputs);
+          setHcValue(inputs.hcValue || "");
+          setGammaC(inputs.gammaC || "");
+          setGammaW(inputs.gammaW || "");
+          setGammaFC(inputs.gammaFC || "");
+          setGammaF(inputs.gammaF || "");
+        }
+      } catch (error) {
+        console.error('Error loading saved semantics inputs:', error);
+      }
+    };
+
+    const loadSavedResults = () => {
+      try {
+        const savedResults = localStorage.getItem('semanticsResults');
+        if (savedResults) {
+          const results = JSON.parse(savedResults);
+          setVcfResults(results.vcfResults || []);
+          setGcResults(results.gcResults || []);
+          setEquationHTML(results.equationHTML || "");
+          setResultsHTML(results.resultsHTML || "");
+        }
+      } catch (error) {
+        console.error('Error loading saved semantics results:', error);
+      }
+    };
+    
     loadDataInputValues();
+    loadSavedInputs();
+    loadSavedResults();
   }, []);
 
   const calculateVcf = () => {
@@ -199,8 +292,9 @@ export default function SemanticsPage() {
                      <p>Vcf = ${vcf.toFixed(4)}</p><br>`;
       }
       
-      setVcfResults(results);
-      setEquationHTML(equations);
+      // Using the updated methods to persist results
+      updateVcfResults(results);
+      updateEquationHTML(equations);
       
       // Set results HTML
       const resultsTable = `
@@ -229,7 +323,7 @@ export default function SemanticsPage() {
           </tbody>
         </table>
       `;
-      setResultsHTML(resultsTable);
+      updateResultsHTML(resultsTable);
       
       toast.success("Vcf calculation completed");
     } catch (error) {
@@ -408,11 +502,12 @@ export default function SemanticsPage() {
                      <p>Ppmax = ${ppmax_value.toFixed(4)}</p><br>`;
       }
       
-      setGcResults(results);
-      setEquationHTML(equations);
+      // Update results using the updated methods
+      updateGcResults(results);
+      updateEquationHTML(equations);
       
-      // Set results HTML
-      const resultsTable = `
+      // Build the full results HTML with both tables
+      let fullResultsHTML = `
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead>
             <tr>
@@ -439,7 +534,10 @@ export default function SemanticsPage() {
             `).join('')}
           </tbody>
         </table>
-        
+      `;
+      
+      // Add the pressure components table
+      fullResultsHTML += `
         <h3 class="mt-6 mb-3 font-bold">Pressure Components Details</h3>
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead>
@@ -464,7 +562,9 @@ export default function SemanticsPage() {
           </tbody>
         </table>
       `;
-      setResultsHTML(resultsTable);
+      
+      // Update results HTML with the full content
+      updateResultsHTML(fullResultsHTML);
       
       toast.success("All calculations completed successfully");
     } catch (error) {
@@ -495,7 +595,7 @@ export default function SemanticsPage() {
                     id="hc-value"
                     placeholder="Enter Hc value"
                     value={hcValue}
-                    onChange={(e) => setHcValue(e.target.value)}
+                    onChange={(e) => updateHcValue(e.target.value)}
                   />
                 </div>
                 
@@ -505,7 +605,7 @@ export default function SemanticsPage() {
                     id="gamma-c"
                     placeholder="Enter γc value"
                     value={gammaC}
-                    onChange={(e) => setGammaC(e.target.value)}
+                    onChange={(e) => updateGammaC(e.target.value)}
                   />
                 </div>
                 
@@ -515,7 +615,7 @@ export default function SemanticsPage() {
                     id="gamma-w"
                     placeholder="Enter γw value"
                     value={gammaW}
-                    onChange={(e) => setGammaW(e.target.value)}
+                    onChange={(e) => updateGammaW(e.target.value)}
                   />
                 </div>
                 
@@ -525,7 +625,7 @@ export default function SemanticsPage() {
                     id="gamma-fc"
                     placeholder="Enter γfc value"
                     value={gammaFC}
-                    onChange={(e) => setGammaFC(e.target.value)}
+                    onChange={(e) => updateGammaFC(e.target.value)}
                   />
                 </div>
                 
@@ -535,7 +635,7 @@ export default function SemanticsPage() {
                     id="gamma-f"
                     placeholder="Enter γf value"
                     value={gammaF}
-                    onChange={(e) => setGammaF(e.target.value)}
+                    onChange={(e) => updateGammaF(e.target.value)}
                   />
                 </div>
               </div>
@@ -593,46 +693,21 @@ export default function SemanticsPage() {
           </Card>
         </div>
         
-        {/* Results and Equations Section */}
-        <div className={`transition-all duration-300 ${equationsMinimized ? "" : "grid grid-cols-1 md:grid-cols-2 gap-6"}`}>
-          {/* Results Card - always visible */}
-          <Card className={`h-full transition-all duration-300 ${resultsAnimationClass}`}>
-            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center justify-between">
-              <CardTitle className="text-lg sm:text-xl text-primary/90">Results</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleEquationsMinimized}
-                className="h-8 px-2 text-xs"
-                title={equationsMinimized ? "Show equations" : "Hide equations"}
-              >
-                {equationsMinimized ? (
-                  <>
-                    <Eye className="h-4 w-4 mr-1" />
-                    Show Equations
-                  </>
-                ) : (
-                  <>
-                    <EyeOff className="h-4 w-4 mr-1" />
-                    Hide Equations
-                  </>
-                )}
-              </Button>
-            </CardHeader>
-            <CardContent className="h-[400px] overflow-auto">
-              {resultsHTML ? (
-                <div dangerouslySetInnerHTML={{ __html: resultsHTML }} />
-              ) : (
-                <p className="text-muted-foreground">Results will appear here</p>
-              )}
-            </CardContent>
-          </Card>
-          
-          {/* Equations Card - only visible when not minimized */}
-          {(!equationsMinimized || isTransitioning) && (
-            <Card className={`h-full transition-opacity duration-300 ${equationsAnimationClass} ${equationsMinimized && !isTransitioning ? "hidden" : ""}`}>
+        <div className={`${equationsMinimized ? "" : "grid grid-cols-1 md:grid-cols-2"} gap-6`}>
+          {!equationsMinimized && (
+            <Card className="h-full">
               <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center justify-between">
                 <CardTitle className="text-lg sm:text-xl text-primary/90">Equations</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleEquationsMinimized}
+                  className="h-8 px-2 text-xs"
+                  title="Hide equations"
+                >
+                  <EyeOff className="h-4 w-4 mr-1" />
+                  Hide Equations
+                </Button>
               </CardHeader>
               <CardContent className="h-[400px] overflow-auto">
                 {equationHTML ? (
@@ -643,6 +718,35 @@ export default function SemanticsPage() {
               </CardContent>
             </Card>
           )}
+          
+          <div className="w-full">
+            {equationsMinimized && (
+              <div className="mb-3 flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={toggleEquationsMinimized}
+                  className="h-8 px-3 text-xs flex items-center justify-center gap-1"
+                  title="Show equations"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Show Equations
+                </Button>
+              </div>
+            )}
+            
+            <Card className="h-full">
+              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
+                <CardTitle className="text-lg sm:text-xl text-primary/90">Results</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[400px] overflow-auto">
+                {resultsHTML ? (
+                  <div dangerouslySetInnerHTML={{ __html: resultsHTML }} />
+                ) : (
+                  <p className="text-muted-foreground">Results will appear here</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
