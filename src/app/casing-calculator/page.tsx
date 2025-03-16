@@ -49,6 +49,13 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
   const [inputsAnimationClass, setInputsAnimationClass] = useState("");
   const [resultsAnimationClass, setResultsAnimationClass] = useState("");
 
+  // Auto-minimize inputs if results exist when component mounts or when results change
+  useEffect(() => {
+    if (casingResults && casingResults.length > 0) {
+      setInputsMinimized(true);
+    }
+  }, [casingResults]);
+
   // Update section inputs when iterations change
   useEffect(() => {
     const numIterations = parseInt(iterations);
@@ -241,6 +248,25 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     });
   };
 
+  // Function to clear all saved data
+  const clearSavedData = () => {
+    // Clear results
+    setCasingResults([]);
+    setHadData(null);
+    
+    // Clear file data
+    setCasingFile(null);
+    setCasingFileName("");
+    
+    // Reset UI state
+    setInputsMinimized(false);
+    
+    // Show toast notification
+    toast.success("Data cleared", {
+      description: "All casing calculation results have been reset."
+    });
+  };
+
   const loadSavedData = () => {
     const savedData = localStorage.getItem('casingCalculatorData');
     if (savedData) {
@@ -264,6 +290,25 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
   // Load saved data on component mount
   useEffect(() => {
     loadSavedData();
+    
+    // Add a LocalStorage persistence indicator if results are restored
+    if (casingResults && casingResults.length > 0) {
+      setInputsMinimized(true);
+      
+      // Only show the toast if it's the first time loading results
+      const hasShownToast = localStorage.getItem('casingResultsToastShown');
+      if (!hasShownToast) {
+        toast.info("Loaded saved casing results", {
+          description: "Previous calculation results have been restored."
+        });
+        localStorage.setItem('casingResultsToastShown', 'true');
+        
+        // Clear the flag after a while so it shows again if user refreshes
+        setTimeout(() => {
+          localStorage.removeItem('casingResultsToastShown');
+        }, 60000); // 1 minute
+      }
+    }
   }, []);
 
   return (
@@ -292,24 +337,34 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
             </Button>
             {/* Toggle button - changes between Minimize and Maximize based on current state */}
             {casingResults.length > 0 && (
-              <Button 
-                onClick={toggleMinimized} 
-                variant="outline" 
-                className="gap-2"
-                title={inputsMinimized ? "Maximize inputs" : "Minimize inputs"}
-              >
-                {inputsMinimized ? (
-                  <>
-                    <Maximize className="h-4 w-4" />
-                    Maximize
-                  </>
-                ) : (
-                  <>
-                    <Minimize className="h-4 w-4" />
-                    Minimize
-                  </>
-                )}
-              </Button>
+              <>
+                <Button 
+                  onClick={toggleMinimized} 
+                  variant="outline" 
+                  className="gap-2"
+                  title={inputsMinimized ? "Maximize inputs" : "Minimize inputs"}
+                >
+                  {inputsMinimized ? (
+                    <>
+                      <Maximize className="h-4 w-4" />
+                      Maximize
+                    </>
+                  ) : (
+                    <>
+                      <Minimize className="h-4 w-4" />
+                      Minimize
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  onClick={clearSavedData} 
+                  variant="outline" 
+                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  title="Clear all saved data"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -526,6 +581,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                     <CardTitle className="text-lg sm:text-xl text-primary/90">Calculation Results</CardTitle>
                     <CardDescription>
                       Section by section details
+                      <span className="ml-1 text-green-500">(saved)</span>
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-4 md:pt-6">
@@ -540,6 +596,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                       <CardTitle className="text-lg sm:text-xl text-primary/90">Hydraulics Analysis</CardTitle>
                       <CardDescription>
                         Detailed hydraulics data
+                        <span className="ml-1 text-green-500">(saved)</span>
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4 md:pt-6">

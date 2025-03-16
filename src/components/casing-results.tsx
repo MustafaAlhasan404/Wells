@@ -1,4 +1,5 @@
-import React from 'react';
+import React from "react";
+import { EnhancedTable } from "@/components/ui/enhanced-table";
 
 interface CasingResult {
   section: string;
@@ -18,33 +19,21 @@ const CasingResults: React.FC<CasingResultsProps> = ({ results }) => {
   }
 
   return (
-    <div className="overflow-auto">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-primary text-primary-foreground">
-            <th className="py-3 px-4 text-center border border-border/50">Section</th>
-            <th className="py-3 px-4 text-center border border-border/50">Nearest Bit Size</th>
-            <th className="py-3 px-4 text-center border border-border/50">DCSG</th>
-            <th className="py-3 px-4 text-center border border-border/50">DCSG'</th>
-            <th className="py-3 px-4 text-center border border-border/50">Internal Diameter</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((result, index) => (
-            <tr 
-              key={index} 
-              className={index % 2 === 0 ? "bg-background" : "bg-muted/30"}
-            >
-              <td className="py-3 px-4 text-center border border-border/50">{result.section}</td>
-              <td className="py-3 px-4 text-center border border-border/50">{result.nearestBitSize}</td>
-              <td className="py-3 px-4 text-center border border-border/50">{result.dcsg}</td>
-              <td className="py-3 px-4 text-center border border-border/50">{result.atBody}</td>
-              <td className="py-3 px-4 text-center border border-border/50">{result.internalDiameter}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <EnhancedTable
+      headers={["Section", "Nearest Bit Size", "DCSG", "DCSG'", "Internal Diameter"]}
+      rows={results.map(result => [
+        result.section,
+        result.nearestBitSize,
+        result.dcsg,
+        result.atBody,
+        result.internalDiameter
+      ])}
+      rounded={true}
+      highlightOnHover={true}
+      alternateRows={true}
+      showBorders={true}
+      className="shadow-sm"
+    />
   );
 };
 

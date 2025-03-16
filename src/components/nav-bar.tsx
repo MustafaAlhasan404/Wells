@@ -21,7 +21,7 @@ export function NavBar() {
     <header className="sticky top-0 z-40 border-b bg-background">
       <div className="container flex h-16 items-center px-4 sm:px-8">
         <div className="flex items-center">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/data-input" className="flex items-center space-x-2">
             <MountainIcon className="h-6 w-6 text-primary" />
             <span className="hidden font-bold sm:inline-block">Wells Analyzer</span>
           </Link>
@@ -30,14 +30,6 @@ export function NavBar() {
         <div className="flex flex-1 items-center justify-end space-x-4">
           <div className="hidden md:flex items-center space-x-4">
             <nav className="flex items-center space-x-4">
-              <Link 
-                href="/" 
-                className={cn("text-sm font-medium transition-colors hover:text-primary", 
-                  pathname === "/" ? "text-primary" : "text-muted-foreground"
-                )}
-              >
-                Home
-              </Link>
               <Link 
                 href="/data-input" 
                 className={cn("text-sm font-medium transition-colors hover:text-primary", 
@@ -94,14 +86,6 @@ export function NavBar() {
       {isMenuOpen && (
         <div className="container md:hidden">
           <nav className="flex flex-col space-y-4 p-4">
-            <Link 
-              href="/" 
-              className={cn("text-sm font-medium transition-colors hover:text-primary", 
-                pathname === "/" ? "text-primary" : "text-muted-foreground"
-              )}
-            >
-              Home
-            </Link>
             <Link 
               href="/data-input" 
               className={cn("text-sm font-medium transition-colors hover:text-primary", 
