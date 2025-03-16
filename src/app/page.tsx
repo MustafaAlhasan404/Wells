@@ -23,87 +23,50 @@ export default function SplashScreen() {
 
   return (
     <div className="relative h-screen overflow-hidden flex items-center justify-center bg-background">
-      {/* Background gradient effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-background z-0" />
+      {/* Animated grid background */}
+      <div className="absolute inset-0 bg-grid-pattern" style={{
+        backgroundSize: '50px 50px',
+        backgroundImage: `
+          linear-gradient(to right, var(--primary)/10% 1px, transparent 1px),
+          linear-gradient(to bottom, var(--primary)/10% 1px, transparent 1px)
+        `,
+      }} />
       
-      {/* Animated particles/dots */}
-      <div className="absolute inset-0 z-10 opacity-20">
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute rounded-full bg-primary"
-            initial={{
-              x: Math.random() * 100 - 50 + "%",
-              y: Math.random() * 100 - 50 + "%",
-              scale: Math.random() * 0.5 + 0.5,
-              opacity: Math.random() * 0.5 + 0.2,
-            }}
-            animate={{
-              x: Math.random() * 100 - 50 + "%", 
-              y: Math.random() * 100 - 50 + "%",
-              opacity: Math.random() * 0.5 + 0.2,
-            }}
-            transition={{
-              duration: 6 + Math.random() * 4,
-              ease: "easeInOut",
-              repeat: Infinity,
-              repeatType: "reverse",
-            }}
-            style={{
-              width: (Math.random() * 10 + 5) + "px",
-              height: (Math.random() * 10 + 5) + "px",
-            }}
-          />
-        ))}
-      </div>
+      {/* Animated gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-background via-transparent to-primary/5" />
 
       {/* Content wrapper */}
-      <div className="relative z-20 flex flex-col items-center">
-        {/* Logo Animation with glow effect */}
+      <div className="relative z-20 flex flex-col items-center max-w-lg mx-auto px-4">
+        {/* Title Animation */}
         <motion.div
-          initial={{ scale: 0.8, opacity: 0, y: 10 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-          className="relative mb-6"
+          initial={{ y: 30, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="text-center"
         >
-          <div className="absolute -inset-2 rounded-full bg-primary/20 blur-xl animate-pulse" />
-          <div className="relative bg-background rounded-full p-5 shadow-lg">
-            <MountainIcon className="h-16 w-16 text-primary" />
-          </div>
+          <h1 className="text-6xl sm:text-7xl font-bold tracking-tight bg-gradient-to-b from-primary to-primary/60 text-transparent bg-clip-text mb-6">
+            Wells Analyzer
+          </h1>
+          <p className="text-xl text-muted-foreground">
+            Advanced analytics for well engineering
+          </p>
         </motion.div>
 
-        {/* Title Animation */}
-        <motion.h1
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="text-5xl sm:text-6xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 text-transparent bg-clip-text text-center relative"
-        >
-          Wells Analyzer
-        </motion.h1>
-
-        {/* Subtitle Animation */}
-        <motion.p
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="mt-4 text-xl text-muted-foreground text-center"
-        >
-          Advanced analytics for well engineering
-        </motion.p>
-
-        {/* Loading Indicator */}
+        {/* Loading Bar */}
         <motion.div
-          className="relative mt-10 w-48 h-1.5 bg-muted rounded-full overflow-hidden"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.8 }}
+          className="relative mt-12 w-64 h-1 bg-muted/30 rounded-full overflow-hidden"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
         >
           <motion.div
-            className="absolute top-0 left-0 h-full bg-primary rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: "100%" }}
-            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="absolute top-0 left-0 h-full w-full bg-gradient-to-r from-primary/80 to-primary rounded-full"
+            initial={{ x: '-100%' }}
+            animate={{ x: '0%' }}
+            transition={{
+              duration: 1.5,
+              ease: "easeInOut"
+            }}
           />
         </motion.div>
       </div>

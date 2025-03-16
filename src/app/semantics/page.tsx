@@ -9,7 +9,8 @@ import {
   CardContent, 
   CardHeader, 
   CardTitle,
-  CardDescription 
+  CardDescription,
+  CardFooter
 } from "@/components/ui/card"
 import { 
   Table, 
@@ -20,9 +21,14 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { NavBar } from "@/components/nav-bar"
-import { Calculator, Eye, EyeOff } from "lucide-react"
+import { Calculator, Eye, EyeOff, ArrowRight, RefreshCcw, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { useFileUpload } from "@/context/FileUploadContext"
+import { cn } from "@/lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface VcfResult {
   instance: number;
@@ -611,178 +617,257 @@ export default function SemanticsPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-background">
+    <div className="min-h-screen flex flex-col bg-background/95 dark:bg-background">
       <NavBar />
-      <div className="px-4 sm:px-6 md:px-8 lg:px-10 max-w-7xl mx-auto w-full py-6 md:py-10 space-y-6 md:space-y-8 flex-1 overflow-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 text-transparent bg-clip-text">Semantics Analysis</h1>
+      <div className="flex-1 container mx-auto px-4 py-6 space-y-8">
+        {/* Header Section */}
+        <div className="flex flex-col space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">
+            Semantics Analysis
+          </h1>
+          <p className="text-muted-foreground">
+            Calculate and analyze semantic parameters for well construction
+          </p>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
-              <CardTitle className="text-lg sm:text-xl text-primary/90">Input Parameters</CardTitle>
-              <CardDescription>Enter the required parameters for calculations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="hc-value" className="text-base">Hc (Required):</Label>
-                  <Input
-                    id="hc-value"
-                    placeholder="Enter Hc value"
-                    value={hcValue}
-                    onChange={(e) => updateHcValue(e.target.value)}
-                  />
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column - Input Section */}
+          <div className="lg:col-span-5 space-y-6">
+            {/* Input Parameters Card */}
+            <Card className="border-border/40 shadow-sm">
+              <CardHeader className="bg-muted/30 border-b border-border/30">
+                <div className="flex items-center space-x-2">
+                  <div className="h-8 w-1 bg-primary rounded-full" />
+                  <div>
+                    <CardTitle>Input Parameters</CardTitle>
+                    <CardDescription>Enter values for calculation</CardDescription>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="gamma-c" className="text-base">γc:</Label>
-                  <Input
-                    id="gamma-c"
-                    placeholder="Enter γc value"
-                    value={gammaC}
-                    onChange={(e) => updateGammaC(e.target.value)}
-                  />
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="hc-value" className="text-sm font-medium">
+                      Hc Value <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="hc-value"
+                        placeholder="Enter Hc value"
+                        value={hcValue}
+                        onChange={(e) => updateHcValue(e.target.value)}
+                        className="pl-3 pr-12 h-10 border-border/50 focus:border-primary"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                        m
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="gamma-c" className="text-sm font-medium">γc</Label>
+                      <Input
+                        id="gamma-c"
+                        placeholder="Enter γc"
+                        value={gammaC}
+                        onChange={(e) => updateGammaC(e.target.value)}
+                        className="border-border/50 focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gamma-w" className="text-sm font-medium">γw</Label>
+                      <Input
+                        id="gamma-w"
+                        placeholder="Enter γw"
+                        value={gammaW}
+                        onChange={(e) => updateGammaW(e.target.value)}
+                        className="border-border/50 focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gamma-fc" className="text-sm font-medium">γfc</Label>
+                      <Input
+                        id="gamma-fc"
+                        placeholder="Enter γfc"
+                        value={gammaFC}
+                        onChange={(e) => updateGammaFC(e.target.value)}
+                        className="border-border/50 focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gamma-f" className="text-sm font-medium">γf</Label>
+                      <Input
+                        id="gamma-f"
+                        placeholder="Enter γf"
+                        value={gammaF}
+                        onChange={(e) => updateGammaF(e.target.value)}
+                        className="border-border/50 focus:border-primary"
+                      />
+                    </div>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="gamma-w" className="text-base">γw:</Label>
-                  <Input
-                    id="gamma-w"
-                    placeholder="Enter γw value"
-                    value={gammaW}
-                    onChange={(e) => updateGammaW(e.target.value)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="gamma-fc" className="text-base">γfc:</Label>
-                  <Input
-                    id="gamma-fc"
-                    placeholder="Enter γfc value"
-                    value={gammaFC}
-                    onChange={(e) => updateGammaFC(e.target.value)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="gamma-f" className="text-base">γf:</Label>
-                  <Input
-                    id="gamma-f"
-                    placeholder="Enter γf value"
-                    value={gammaF}
-                    onChange={(e) => updateGammaF(e.target.value)}
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-4 mt-6">
+              </CardContent>
+              <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30">
                 <Button 
                   onClick={calculateGcGc}
-                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary gap-2"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                  disabled={isLoading}
                 >
-                  <Calculator className="h-4 w-4" />
-                  Calculate All
+                  {isLoading ? (
+                    <>
+                      <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
+                      Calculating...
+                    </>
+                  ) : (
+                    <>
+                      <Calculator className="mr-2 h-4 w-4" />
+                      Calculate Parameters
+                    </>
+                  )}
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
-              <CardTitle className="text-lg sm:text-xl text-primary/90">Constants from Data Input</CardTitle>
-              <CardDescription>K1, K2, and K3 values retrieved from Data Input page</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2 p-4 bg-muted/30 rounded-lg border border-border/50">
-                  <Label className="text-base font-medium text-primary">K1 Value:</Label>
-                  <p className="text-lg font-mono">{dataInputValues.K1 || 'Not set'}</p>
-                  {!dataInputValues.K1 && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Please set the K1 value in the <a href="/data-input" className="text-primary hover:underline">Data Input</a> page.
-                    </p>
-                  )}
+              </CardFooter>
+            </Card>
+
+            {/* Constants Card */}
+            <Card className="border-border/40 shadow-sm">
+              <CardHeader className="bg-muted/30 border-b border-border/30">
+                <div className="flex items-center space-x-2">
+                  <div className="h-8 w-1 bg-primary/60 rounded-full" />
+                  <div>
+                    <CardTitle>Constants</CardTitle>
+                    <CardDescription>Values from Data Input</CardDescription>
+                  </div>
                 </div>
-                
-                <div className="space-y-2 p-4 bg-muted/30 rounded-lg border border-border/50">
-                  <Label className="text-base font-medium text-primary">K2 Value:</Label>
-                  <p className="text-lg font-mono">{dataInputValues.K2 || 'Not set'}</p>
-                  {!dataInputValues.K2 && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Please set the K2 value in the <a href="/data-input" className="text-primary hover:underline">Data Input</a> page.
-                    </p>
-                  )}
-                </div>
-                
-                <div className="space-y-2 p-4 bg-muted/30 rounded-lg border border-border/50">
-                  <Label className="text-base font-medium text-primary">K3 Value:</Label>
-                  <p className="text-lg font-mono">{dataInputValues.K3 || 'Not set'}</p>
-                  {!dataInputValues.K3 && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Please set the K3 value in the <a href="/data-input" className="text-primary hover:underline">Data Input</a> page.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <div className={`${equationsMinimized ? "" : "grid grid-cols-1 md:grid-cols-2"} gap-6`}>
-          {!equationsMinimized && (
-            <Card className="h-full">
-              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center justify-between">
-                <CardTitle className="text-lg sm:text-xl text-primary/90">Equations</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleEquationsMinimized}
-                  className="h-8 px-2 text-xs"
-                  title="Hide equations"
-                >
-                  <EyeOff className="h-4 w-4 mr-1" />
-                  Hide Equations
-                </Button>
               </CardHeader>
-              <CardContent className="h-[400px] overflow-auto">
-                {equationHTML ? (
-                  <div dangerouslySetInnerHTML={{ __html: equationHTML }} />
-                ) : (
-                  <p className="text-muted-foreground">The equations will be calculated and displayed here</p>
-                )}
+              <CardContent className="p-6">
+                <div className="grid grid-cols-3 gap-4">
+                  {['K1', 'K2', 'K3'].map((constant) => (
+                    <div
+                      key={constant}
+                      className="flex flex-col space-y-2 p-4 rounded-lg bg-muted/30 border border-border/40"
+                    >
+                      <Label className="text-sm font-medium text-primary/80">
+                        {constant}
+                      </Label>
+                      <div className="font-mono text-lg">
+                        {dataInputValues[constant] || (
+                          <Badge variant="outline" className="text-destructive border-destructive/30">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            Not Set
+                          </Badge>
+                        )}
+                      </div>
+                      {!dataInputValues[constant] && (
+                        <a
+                          href="/data-input"
+                          className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          Set in Data Input <ArrowRight className="inline h-3 w-3 ml-1" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
-          )}
-          
-          <div className="w-full">
-            {equationsMinimized && (
-              <div className="mb-3 flex justify-end">
-                <Button
-                  variant="outline"
-                  onClick={toggleEquationsMinimized}
-                  className="h-8 px-3 text-xs flex items-center justify-center gap-1"
-                  title="Show equations"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  Show Equations
-                </Button>
+          </div>
+
+          {/* Right Column - Results Section */}
+          <div className="lg:col-span-7 space-y-6">
+            <Tabs defaultValue="results" className="w-full">
+              <div className="flex items-center justify-between mb-6">
+                <TabsList className="inline-flex h-9 items-center justify-center rounded-full bg-background border border-border/50 p-0.5">
+                  <TabsTrigger 
+                    value="results" 
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
+                  >
+                    <Calculator className="mr-2 h-4 w-4" />
+                    Results
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="equations" 
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
+                  >
+                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M4 7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7C20 7.55228 19.5523 8 19 8H5C4.44772 8 4 7.55228 4 7Z" fill="currentColor"/>
+                      <path d="M4 12C4 11.4477 4.44772 11 5 11H19C19.5523 11 20 11.4477 20 12C20 12.5523 19.5523 13 19 13H5C4.44772 13 4 12.5523 4 12Z" fill="currentColor"/>
+                      <path d="M5 16C4.44772 16 4 16.4477 4 17C4 17.5523 4.44772 18 5 18H19C19.5523 18 20 17.5523 20 17C20 16.4477 19.5523 16 19 16H5Z" fill="currentColor"/>
+                    </svg>
+                    Equations
+                  </TabsTrigger>
+                </TabsList>
               </div>
-            )}
-            
-            <Card className="h-full">
-              <CardHeader className="bg-muted/50 border-b border-border/50 flex items-center">
-                <CardTitle className="text-lg sm:text-xl text-primary/90">Results</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[400px] overflow-auto">
-                {resultsHTML ? (
-                  <div dangerouslySetInnerHTML={{ __html: resultsHTML }} />
-                ) : (
-                  <p className="text-muted-foreground">Results will appear here</p>
-                )}
-              </CardContent>
-            </Card>
+
+              <TabsContent value="results" className="mt-0 space-y-4">
+                <Card className="border-border/40 shadow-sm">
+                  <CardHeader className="bg-muted/30 border-b border-border/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="h-8 w-1 bg-primary rounded-full" />
+                        <CardTitle>Calculation Results</CardTitle>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <ScrollArea className="h-[600px] w-full">
+                      <div className="p-6">
+                        {isLoading ? (
+                          <div className="space-y-4">
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-[90%]" />
+                            <Skeleton className="h-4 w-[95%]" />
+                          </div>
+                        ) : resultsHTML ? (
+                          <div 
+                            dangerouslySetInnerHTML={{ __html: resultsHTML }}
+                            className="prose prose-sm max-w-none dark:prose-invert"
+                          />
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p>Enter parameters and calculate to see results</p>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="equations" className="mt-0 space-y-4">
+                <Card className="border-border/40 shadow-sm">
+                  <CardHeader className="bg-muted/30 border-b border-border/30">
+                    <div className="flex items-center space-x-2">
+                      <div className="h-8 w-1 bg-primary/60 rounded-full" />
+                      <CardTitle>Calculation Equations</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <ScrollArea className="h-[600px] w-full">
+                      <div className="p-6">
+                        {equationHTML ? (
+                          <div 
+                            dangerouslySetInnerHTML={{ __html: equationHTML }}
+                            className="prose prose-sm max-w-none dark:prose-invert"
+                          />
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <svg className="h-12 w-12 mx-auto mb-4 opacity-50" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M4 7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7C20 7.55228 19.5523 8 19 8H5C4.44772 8 4 7.55228 4 7Z" fill="currentColor"/>
+                              <path d="M4 12C4 11.4477 4.44772 11 5 11H19C19.5523 11 20 11.4477 20 12C20 12.5523 19.5523 13 19 13H5C4.44772 13 4 12.5523 4 12Z" fill="currentColor"/>
+                              <path d="M5 16C4.44772 16 4 16.4477 4 17C4 17.5523 4.44772 18 5 18H19C19.5523 18 20 17.5523 20 17C20 16.4477 19.5523 16 19 16H5Z" fill="currentColor"/>
+                            </svg>
+                            <p>Equations will appear after calculation</p>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
