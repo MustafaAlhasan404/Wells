@@ -7,11 +7,11 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Minimize, Maximize } from "lucide-react"
-import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
 import { EnhancedTable } from "@/components/ui/enhanced-table"
+import { showToast } from "@/utils/toast-utils"
 
 interface DrillCollarCalculatorProps {}
 
@@ -124,7 +124,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         setInputsMinimized(true);
         
         // Show toast notification to inform user that data was loaded
-        toast.info("Loaded saved drill collar results", {
+        showToast('info', "Loaded saved drill collar results", {
           description: "Previous calculation results have been restored."
         });
       }
@@ -163,7 +163,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     setInputsMinimized(false);
     
     // Show toast notification
-    toast.success("Data cleared", {
+    showToast('success', "Data cleared", {
       description: "All drill collar data has been reset."
     });
   };
@@ -200,7 +200,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   // Extract casing values needed for calculations
   const extractCasingValues = () => {
     if (!casingResults || casingResults.length === 0) {
-      toast.error("No casing results found", {
+      showToast('error', "No casing results found", {
         icon: <AlertCircle className="h-4 w-4 text-destructive" />,
         description: "Please calculate casing values first."
       });
@@ -211,7 +211,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     const initialDcsg = getInitialDcsg();
     
     if (!initialDcsg) {
-      toast.error("Initial DCSG value not found", {
+      showToast('error', "Initial DCSG value not found", {
         icon: <AlertCircle className="h-4 w-4 text-destructive" />,
         description: "Please recalculate casing values first."
       });
@@ -280,7 +280,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   
   const calculateDrillCollar = async () => {
     if (!drillCollarFile) {
-      toast.error("Please select a file", {
+      showToast('error', "Please select a file", {
         icon: <AlertCircle className="h-4 w-4 text-destructive" />,
         description: "Please upload a drill collar table Excel file."
       });
@@ -294,7 +294,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     
     const formData = getCasingData();
     if (!formData) {
-      toast.error("No form data found", {
+      showToast('error', "No form data found", {
         icon: <AlertCircle className="h-4 w-4 text-destructive" />,
         description: "Please input well data first."
       });
@@ -344,7 +344,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
       setResultsAnimationClass("animate-in fade-in slide-in-from-right duration-500");
       
-      toast.success("Calculations completed", {
+      showToast('success', "Calculations completed", {
         icon: <CheckCircle className="h-4 w-4 text-green-500" />,
         description: "Drill collar calculations have been successfully processed."
       });
@@ -360,7 +360,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       console.error("Error in submission:", err);
       setError(err.message || "Failed to calculate drill collar values");
       
-      toast.error("Error in calculations", {
+      showToast('error', "Error in calculations", {
         icon: <AlertCircle className="h-4 w-4 text-red-500" />,
         description: err.message || "Failed to calculate drill collar values"
       });
@@ -472,7 +472,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                         setDrillCollarFileName("");
                         // Also clear from localStorage
                         localStorage.removeItem('drillCollarFileMetadata');
-                        toast.info("File removed", { 
+                        showToast('info', "File removed", { 
                           description: "The drill collar file has been removed." 
                         });
                       }}

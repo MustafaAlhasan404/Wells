@@ -8,13 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { NavBar } from "@/components/nav-bar"
-import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, ChevronRight, ChevronLeft, Minimize, Maximize } from "lucide-react"
-import { toast } from "sonner"
+import { FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, ChevronRight, ChevronLeft, Minimize, Maximize } from "lucide-react"
 import { SectionInput } from "@/utils/casingCalculations"
 import CasingResults from "@/components/casing-results"
 import HADResults from "@/components/had-results"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
+import { showToast } from "@/utils/toast-utils"
 
 interface CasingCalculatorProps {}
 
@@ -104,15 +104,15 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
 
   const calculate = async () => {
     if (!casingFile) {
-      toast.error("Please select a file", {
-        icon: <AlertCircle className="h-4 w-4 text-destructive" />,
+      showToast('error', "Please select a file", {
+        icon: <AlertCircle className="h-4 w-4 text-destructive" />
       });
       return;
     }
 
     if (!initialDcsgAmount) {
-      toast.error("Please enter initial DCSG amount", {
-        icon: <AlertCircle className="h-4 w-4 text-destructive" />,
+      showToast('error', "Please enter initial DCSG amount", {
+        icon: <AlertCircle className="h-4 w-4 text-destructive" />
       });
       return;
     }
@@ -121,20 +121,30 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     for (let i = 0; i < sectionInputs.length; i++) {
       const section = sectionInputs[i];
       if (!section.multiplier || !section.metalType || !section.depth) {
-        toast.error(`Please fill in all fields for section ${i+1}`, {
-          icon: <AlertCircle className="h-4 w-4 text-destructive" />,
+        showToast('error', `Please fill in all fields for section ${i+1}`, {
+          icon: <AlertCircle className="h-4 w-4 text-destructive" />
         });
         return;
       }
       
       if (isNaN(parseFloat(section.multiplier)) || isNaN(parseFloat(section.depth))) {
-        toast.error(`Invalid number format in section ${i+1}`, {
-          icon: <AlertCircle className="h-4 w-4 text-destructive" />,
+        showToast('error', `Invalid number format in section ${i+1}`, {
+          icon: <AlertCircle className="h-4 w-4 text-destructive" />
         });
         return;
       }
     }
-
+    
+    // Auto-save the inputs when calculating
+    const data = {
+      initialDcsgAmount,
+      iterations,
+      sectionInputs
+    };
+    
+    // Save to localStorage
+    localStorage.setItem('casingCalculatorData', JSON.stringify(data));
+    
     setIsLoading(true);
     setError(null);
     try {
@@ -180,7 +190,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
       setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
       setResultsAnimationClass("animate-in fade-in slide-in-from-right duration-500");
       
-      toast.success("Calculations completed", {
+      showToast('success', "Calculations completed", {
         icon: <CheckCircle className="h-4 w-4 text-green-500" />,
         description: "All calculations have been successfully processed."
       });
@@ -196,7 +206,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
       console.error("Error in submission:", err);
       setError(err.message || "Failed to calculate casing parameters");
       
-      toast.error("Error in calculations", {
+      showToast('error', "Error in calculations", {
         icon: <AlertCircle className="h-4 w-4 text-red-500" />,
         description: err.message || "Failed to calculate casing parameters"
       });
@@ -242,7 +252,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     // Save to localStorage
     localStorage.setItem('casingCalculatorData', JSON.stringify(data));
     
-    toast.success("Data saved", {
+    showToast('success', "Data saved", {
       icon: <CheckCircle className="h-4 w-4 text-green-500" />,
       description: "Your inputs have been saved."
     });
@@ -262,7 +272,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     setInputsMinimized(false);
     
     // Show toast notification
-    toast.success("Data cleared", {
+    showToast('success', "Data cleared", {
       description: "All casing calculation results have been reset."
     });
   };
@@ -298,7 +308,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
       // Only show the toast if it's the first time loading results
       const hasShownToast = localStorage.getItem('casingResultsToastShown');
       if (!hasShownToast) {
-        toast.info("Loaded saved casing results", {
+        showToast('info', "Loaded saved casing results", {
           description: "Previous calculation results have been restored."
         });
         localStorage.setItem('casingResultsToastShown', 'true');
@@ -318,10 +328,6 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 text-transparent bg-clip-text">Casing Calculator</h1>
           <div className="flex gap-2">
-            <Button onClick={saveData} className="gap-2">
-              <Save className="h-4 w-4" />
-              Save Inputs
-            </Button>
             <Button onClick={calculate} disabled={isLoading} variant="default" className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary">
               {isLoading ? (
                 <>

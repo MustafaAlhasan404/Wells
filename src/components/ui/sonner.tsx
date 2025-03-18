@@ -25,7 +25,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         duration: 4000,
       }}
       closeButton
-      position="top-right"
+      position="bottom-left"
       expand={false}
       visibleToasts={5}
       offset={16}
