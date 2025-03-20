@@ -132,10 +132,11 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                             }
                           </TableCell>
                           <TableCell>
-                            {item.L1 !== undefined || item.L2 !== undefined ? 
-                              (item.y1 !== undefined ? item.y1.toFixed(2) : 
-                               item.y2 !== undefined ? item.y2.toFixed(2) : '-') : 
-                              '-'}
+                            {item.L1 !== undefined ? 
+                              (item.y1 !== undefined ? item.y1.toFixed(2) : '-') : 
+                             item.L2 !== undefined ? 
+                              (item.y2 !== undefined ? item.y2.toFixed(2) : '-') : 
+                             '-'}
                             {showDebug && 
                               <div className="text-xs text-gray-500 mt-1">
                                 Row: {index}
@@ -143,10 +144,11 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                             }
                           </TableCell>
                           <TableCell>
-                            {item.L1 !== undefined || item.L2 !== undefined ? 
-                              (item.z1 !== undefined ? item.z1.toFixed(2) : 
-                               item.z2 !== undefined ? item.z2.toFixed(2) : '-') : 
-                              '-'}
+                            {item.L1 !== undefined ? 
+                              (item.z1 !== undefined ? item.z1.toFixed(2) : '-') : 
+                             item.L2 !== undefined ? 
+                              (item.z2 !== undefined ? item.z2.toFixed(2) : '-') : 
+                             '-'}
                           </TableCell>
                           <TableCell>
                             {(item.L1 !== undefined || item.L2 !== undefined) && item.conditionCheck !== undefined ? (

@@ -383,8 +383,8 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       // Only store the L2 value if we have at least 2 rows in the current section
       if (rows.length >= 2) {
         rows[1].L2 = L2;
-        rows[1].y1 = y2;
-        rows[1].z1 = z2;
+        rows[1].y2 = y2;
+        rows[1].z2 = z2;
         rows[1].conditionCheck = condition2;
         rows[1].conditionMet = condition2 >= 0.9 && condition2 <= 1.1;
         
