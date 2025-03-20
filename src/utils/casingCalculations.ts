@@ -101,6 +101,17 @@ export interface HADResults {
 }
 
 /**
+ * Interface for additional information extracted from Excel files
+ */
+export interface AdditionalInfo {
+  atHead: number;
+  externalPressure: number;
+  metalType: string;
+  tensileStrength: number;
+  unitWeight: number;
+}
+
+/**
  * Calculate HAD (Hydraulic Analysis Design) value
  * HAD = (100 * externalPressure) / (s * 1.08)
  * where s is a factor based on metal type
