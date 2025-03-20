@@ -115,8 +115,8 @@ const HADRowData: React.FC<HADRowDataProps> = ({ rowsData, section }) => {
   // Sort by HAD in descending order to match Python implementation
   const sortedData = [...rowsData].sort((a, b) => b.had - a.had);
   
-  // Filter to only show rows with L values assigned
-  const rowsWithLValues = sortedData.filter(item => item.lValue !== undefined);
+  // Filter to only show rows with L values assigned that are greater than 1
+  const rowsWithLValues = sortedData.filter(item => item.lValue !== undefined && item.lValue > 1);
   
   if (rowsWithLValues.length === 0) {
     return <TableRow><TableCell colSpan={7}>No L values calculated</TableCell></TableRow>;

@@ -21,7 +21,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { NavBar } from "@/components/nav-bar"
-import { Calculator, Eye, EyeOff, ArrowRight, RefreshCcw, AlertCircle, X, Minimize, Maximize } from "lucide-react"
+import { Calculator, Eye, EyeOff, ArrowRight, RefreshCcw, AlertCircle, X } from "lucide-react"
 import { toast } from "sonner"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
@@ -89,13 +89,7 @@ export default function SemanticsPage() {
   
   // UI States
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [inputsMinimized, setInputsMinimized] = useState<boolean>(false);
   const [equationsMinimized, setEquationsMinimized] = useState<boolean>(true);
-  
-  // Animation states
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [inputsAnimationClass, setInputsAnimationClass] = useState("");
-  const [resultsAnimationClass, setResultsAnimationClass] = useState("");
   
   // Access results from other pages
   const { 
@@ -107,33 +101,6 @@ export default function SemanticsPage() {
   const toggleEquationsMinimized = () => {
     const newState = !equationsMinimized;
     setEquationsMinimized(newState);
-  };
-
-  // Toggle minimized state for inputs with animation
-  const toggleInputsMinimized = () => {
-    if (!resultsHTML) return; // Only allow toggling when there are results
-    
-    setIsTransitioning(true);
-    const newState = !inputsMinimized;
-    setInputsMinimized(newState);
-    
-    // Add animation classes based on the state change
-    if (newState) {
-      // Minimizing - inputs slide to left, results slide from right
-      setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-right duration-500");
-    } else {
-      // Maximizing - inputs slide from left, results slide to right
-      setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-right-reverse duration-500");
-    }
-    
-    // Reset transition flag after animation completes
-    setTimeout(() => {
-      setIsTransitioning(false);
-      setInputsAnimationClass("");
-      setResultsAnimationClass("");
-    }, 600);
   };
 
   // Save inputs to localStorage when they change
@@ -372,13 +339,6 @@ export default function SemanticsPage() {
     loadSavedInputs();
     loadSavedResults();
   }, []);
-
-  // Auto-minimize inputs if results exist when component mounts or when results change
-  useEffect(() => {
-    if (resultsHTML && resultsHTML.length > 0) {
-      setInputsMinimized(true);
-    }
-  }, [resultsHTML]);
 
   const calculateVcf = () => {
     try {
@@ -850,9 +810,6 @@ export default function SemanticsPage() {
     setEquationHTML("");
     setResultsHTML("");
     
-    // Reset UI state
-    setInputsMinimized(false);
-    
     // Clear localStorage
     localStorage.removeItem('semanticsResults');
     
@@ -867,58 +824,19 @@ export default function SemanticsPage() {
       <NavBar />
       <div className="flex-1 container mx-auto px-4 py-6 space-y-8">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">
             Semantics Analysis
           </h1>
-          <div className="flex gap-2">
-            {resultsHTML && (
-              <>
-                <Button 
-                  onClick={toggleInputsMinimized} 
-                  variant="outline" 
-                  className="gap-2"
-                  title={inputsMinimized ? "Maximize inputs" : "Minimize inputs"}
-                >
-                  {inputsMinimized ? (
-                    <>
-                      <Maximize className="h-4 w-4" />
-                      Maximize
-                    </>
-                  ) : (
-                    <>
-                      <Minimize className="h-4 w-4" />
-                      Minimize
-                    </>
-                  )}
-                </Button>
-                <Button 
-                  onClick={clearSavedData} 
-                  variant="outline" 
-                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  title="Clear all saved data"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-          </div>
+          <p className="text-muted-foreground">
+            Calculate and analyze semantic parameters for well construction
+          </p>
         </div>
 
         {/* Main Content */}
-        <div className={cn(
-          "space-y-6",
-          "transition-all duration-500 ease-in-out",
-          isTransitioning && "opacity-90",
-          inputsMinimized && resultsHTML && "flex flex-col md:flex-row gap-6"
-        )}>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column - Input Section */}
-          <div className={cn(
-            "space-y-6 relative", 
-            "transition-all duration-500 ease-in-out",
-            inputsAnimationClass,
-            inputsMinimized && resultsHTML && "md:w-1/3"
-          )}>
+          <div className="lg:col-span-5 space-y-6 lg:hidden">
             {/* Input Parameters Card */}
             <Card className="border-border/40 shadow-sm">
               <CardHeader className="bg-muted/30 border-b border-border/30">
@@ -930,10 +848,7 @@ export default function SemanticsPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className={cn(
-                "p-6",
-                inputsMinimized && "hidden md:block"
-              )}>
+              <CardContent className="p-6">
                 <div className="grid gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="hc-value" className="text-sm font-medium">
@@ -1073,10 +988,7 @@ export default function SemanticsPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className={cn(
-                "bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col space-y-2",
-                inputsMinimized && "hidden md:flex"
-              )}>
+              <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col space-y-2">
                 <div className="flex gap-2 w-full">
                   <Button 
                     onClick={calculateVcf}
@@ -1119,385 +1031,314 @@ export default function SemanticsPage() {
           </div>
 
           {/* Right Column - Results Section */}
-          {resultsHTML && (
-            <div className={cn(
-              "transition-all duration-500 ease-in-out",
-              resultsAnimationClass,
-              inputsMinimized ? "md:w-2/3" : "w-full"
-            )}>
-              <Card className="border-border/40 shadow-sm">
-                <CardHeader className="bg-muted/30 border-b border-border/30">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="h-8 w-1 bg-primary rounded-full" />
-                      <CardTitle>Calculation Results</CardTitle>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[600px] w-full">
-                    <div className="p-6">
-                      {isLoading ? (
-                        <div className="space-y-4">
-                          <Skeleton className="h-4 w-full" />
-                          <Skeleton className="h-4 w-[90%]" />
-                          <Skeleton className="h-4 w-[95%]" />
-                        </div>
-                      ) : resultsHTML ? (
-                        <div 
-                          dangerouslySetInnerHTML={{ __html: resultsHTML }}
-                          className="prose prose-sm max-w-none dark:prose-invert"
-                        />
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>Enter parameters and calculate to see results</p>
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-              
-              {/* Equation Card */}
-              {equationHTML && (
-                <Card className="border-border/40 shadow-sm mt-6">
+          <div className="lg:col-span-12 space-y-6">
+            <Tabs defaultValue="inputs" className="w-full">
+              <div className="flex items-center justify-between mb-6">
+                <TabsList className="inline-flex h-9 items-center justify-center rounded-full bg-background border border-border/50 p-0.5">
+                  <TabsTrigger 
+                    value="inputs" 
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
+                  >
+                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    Inputs
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="results" 
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
+                  >
+                    <Calculator className="mr-2 h-4 w-4" />
+                    Results
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="equations" 
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
+                  >
+                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M4 7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7C20 7.55228 19.5523 8 19 8H5C4.44772 8 4 7.55228 4 7Z" fill="currentColor"/>
+                      <path d="M4 12C4 11.4477 4.44772 11 5 11H19C19.5523 11 20 11.4477 20 12C20 12.5523 19.5523 13 19 13H5C4.44772 13 4 12.5523 4 12Z" fill="currentColor"/>
+                      <path d="M5 16C4.44772 16 4 16.4477 4 17C4 17.5523 4.44772 18 5 18H19C19.5523 18 20 17.5523 20 17C20 16.4477 19.5523 16 19 16H5Z" fill="currentColor"/>
+                    </svg>
+                    Equations
+                  </TabsTrigger>
+                </TabsList>
+                
+                {(vcfResults.length > 0 || gcResults.length > 0) && (
+                  <Button 
+                    onClick={clearSavedData} 
+                    variant="outline" 
+                    className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    title="Clear all saved data"
+                  >
+                    <X className="h-4 w-4" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+
+              <TabsContent value="inputs" className="mt-0 space-y-4">
+                <Card className="border-border/40 shadow-sm">
                   <CardHeader className="bg-muted/30 border-b border-border/30">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <div className="h-8 w-1 bg-primary/60 rounded-full" />
-                        <CardTitle>Calculation Equations</CardTitle>
+                        <div className="h-8 w-1 bg-primary rounded-full" />
+                        <CardTitle>Input Parameters</CardTitle>
                       </div>
-                      <Button 
-                        onClick={toggleEquationsMinimized} 
-                        variant="ghost" 
-                        size="sm"
-                        className="h-8 w-8 p-0 rounded-full"
-                      >
-                        {equationsMinimized ? (
-                          <Eye className="h-4 w-4" />
-                        ) : (
-                          <EyeOff className="h-4 w-4" />
-                        )}
-                      </Button>
                     </div>
                   </CardHeader>
-                  {!equationsMinimized && (
-                    <CardContent className="p-0">
-                      <ScrollArea className="h-[400px] w-full">
-                        <div className="p-6">
-                          <div 
-                            dangerouslySetInnerHTML={{ __html: equationHTML }}
-                            className="prose prose-sm max-w-none dark:prose-invert"
+                  <CardContent className="p-6">
+                    <div className="grid gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="tab-hc-value" className="text-sm font-medium">
+                          Hc Value <span className="text-destructive">*</span>
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="tab-hc-value"
+                            placeholder="Enter Hc value"
+                            value={hcValue}
+                            onChange={(e) => updateHcValue(e.target.value)}
+                            className="pl-3 pr-12 h-10 border-border/50 focus:border-primary"
                           />
-                        </div>
-                      </ScrollArea>
-                    </CardContent>
-                  )}
-                </Card>
-              )}
-            </div>
-          )}
-          
-          {/* Show Tabs UI only when there are no results or inputs are not minimized */}
-          {(!resultsHTML || !inputsMinimized) && (
-            <div className="lg:col-span-12 space-y-6">
-              <Tabs defaultValue="inputs" className="w-full">
-                <div className="flex items-center justify-between mb-6">
-                  <TabsList className="inline-flex h-9 items-center justify-center rounded-full bg-background border border-border/50 p-0.5">
-                    <TabsTrigger 
-                      value="inputs" 
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
-                    >
-                      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
-                      Inputs
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="results" 
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
-                    >
-                      <Calculator className="mr-2 h-4 w-4" />
-                      Results
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="equations" 
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
-                    >
-                      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M4 7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7C20 7.55228 19.5523 8 19 8H5C4.44772 8 4 7.55228 4 7Z" fill="currentColor"/>
-                        <path d="M4 12C4 11.4477 4.44772 11 5 11H19C19.5523 11 20 11.4477 20 12C20 12.5523 19.5523 13 19 13H5C4.44772 13 4 12.5523 4 12Z" fill="currentColor"/>
-                        <path d="M5 16C4.44772 16 4 16.4477 4 17C4 17.5523 4.44772 18 5 18H19C19.5523 18 20 17.5523 20 17C20 16.4477 19.5523 16 19 16H5Z" fill="currentColor"/>
-                      </svg>
-                      Equations
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
-                
-                <TabsContent value="inputs" className="mt-0 space-y-4">
-                  <Card className="border-border/40 shadow-sm">
-                    <CardHeader className="bg-muted/30 border-b border-border/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className="h-8 w-1 bg-primary rounded-full" />
-                          <CardTitle>Input Parameters</CardTitle>
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                            m
+                          </span>
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <div className="grid gap-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="tab-hc-value" className="text-sm font-medium">
-                            Hc Value <span className="text-destructive">*</span>
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="tab-hc-value"
-                              placeholder="Enter Hc value"
-                              value={hcValue}
-                              onChange={(e) => updateHcValue(e.target.value)}
-                              className="pl-3 pr-12 h-10 border-border/50 focus:border-primary"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                              m
-                            </span>
-                          </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-gamma-c" className="text-sm font-medium">γc</Label>
-                            <Input
-                              id="tab-gamma-c"
-                              placeholder="Enter γc"
-                              value={gammaC}
-                              onChange={(e) => updateGammaC(e.target.value)}
-                              className="border-border/50 focus:border-primary"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-gamma-w" className="text-sm font-medium">γw (fixed at 1)</Label>
-                            <Input
-                              id="tab-gamma-w"
-                              value="1"
-                              disabled
-                              className="border-border/50 focus:border-primary bg-muted"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-gamma-fc" className="text-sm font-medium">γfc</Label>
-                            <Input
-                              id="tab-gamma-fc"
-                              placeholder="Enter γfc"
-                              value={gammaFC}
-                              onChange={(e) => updateGammaFC(e.target.value)}
-                              className="border-border/50 focus:border-primary"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-gamma-f" className="text-sm font-medium">γf</Label>
-                            <Input
-                              id="tab-gamma-f"
-                              placeholder="Enter γf"
-                              value={gammaF}
-                              onChange={(e) => updateGammaF(e.target.value)}
-                              className="border-border/50 focus:border-primary"
-                            />
-                          </div>
-                        </div>
-
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="tab-m-value" className="text-sm font-medium">m value (for gc only)</Label>
+                          <Label htmlFor="tab-gamma-c" className="text-sm font-medium">γc</Label>
                           <Input
-                            id="tab-m-value"
-                            placeholder="Enter m value for gc"
-                            value={mValue}
-                            onChange={(e) => updateMValue(e.target.value)}
+                            id="tab-gamma-c"
+                            placeholder="Enter γc"
+                            value={gammaC}
+                            onChange={(e) => updateGammaC(e.target.value)}
                             className="border-border/50 focus:border-primary"
                           />
                         </div>
-
-                        <div className="grid grid-cols-3 gap-4 mt-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-tfc-value" className="text-sm font-medium">tfc</Label>
-                            <Input
-                              id="tab-tfc-value"
-                              placeholder="Enter tfc"
-                              value={tfcValue}
-                              onChange={(e) => updateTfcValue(e.target.value)}
-                              className="border-border/50 focus:border-primary"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-tfd-value" className="text-sm font-medium">tfd</Label>
-                            <Input
-                              id="tab-tfd-value"
-                              placeholder="Enter tfd"
-                              value={tfdValue}
-                              onChange={(e) => updateTfdValue(e.target.value)}
-                              className="border-border/50 focus:border-primary"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-td-value" className="text-sm font-medium">td</Label>
-                            <Input
-                              id="tab-td-value"
-                              placeholder="Enter td"
-                              value={tdValue}
-                              onChange={(e) => updateTdValue(e.target.value)}
-                              className="border-border/50 focus:border-primary"
-                            />
-                          </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-gamma-w" className="text-sm font-medium">γw (fixed at 1)</Label>
+                          <Input
+                            id="tab-gamma-w"
+                            value="1"
+                            disabled
+                            className="border-border/50 focus:border-primary bg-muted"
+                          />
                         </div>
-
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-k1-value" className="text-sm font-medium">K1</Label>
-                            <Input
-                              id="tab-k1-value"
-                              placeholder="Enter K1"
-                              value={k1Value}
-                              onChange={(e) => updateK1Value(e.target.value)}
-                              className="border-border/50 focus:border-primary"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-k2-value" className="text-sm font-medium">K2</Label>
-                            <Input
-                              id="tab-k2-value"
-                              placeholder="Enter K2"
-                              value={k2Value}
-                              onChange={(e) => updateK2Value(e.target.value)}
-                              className="border-border/50 focus:border-primary"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="tab-k3-value" className="text-sm font-medium">K3</Label>
-                            <Input
-                              id="tab-k3-value"
-                              placeholder="Enter K3"
-                              value={k3Value}
-                              onChange={(e) => updateK3Value(e.target.value)}
-                              className="border-border/50 focus:border-primary"
-                            />
-                          </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-gamma-fc" className="text-sm font-medium">γfc</Label>
+                          <Input
+                            id="tab-gamma-fc"
+                            placeholder="Enter γfc"
+                            value={gammaFC}
+                            onChange={(e) => updateGammaFC(e.target.value)}
+                            className="border-border/50 focus:border-primary"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-gamma-f" className="text-sm font-medium">γf</Label>
+                          <Input
+                            id="tab-gamma-f"
+                            placeholder="Enter γf"
+                            value={gammaF}
+                            onChange={(e) => updateGammaF(e.target.value)}
+                            className="border-border/50 focus:border-primary"
+                          />
                         </div>
                       </div>
-                    </CardContent>
-                    <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col space-y-2">
-                      <div className="flex gap-2 w-full">
-                        <Button 
-                          onClick={calculateVcf}
-                          className="flex-1 bg-primary/80 hover:bg-primary/90 text-primary-foreground shadow-sm"
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <>
-                              <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
-                              Calculating Vcf...
-                            </>
-                          ) : (
-                            <>
-                              <Calculator className="mr-2 h-4 w-4" />
-                              Calculate Vcf
-                            </>
-                          )}
-                        </Button>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="tab-m-value" className="text-sm font-medium">m value (for gc only)</Label>
+                        <Input
+                          id="tab-m-value"
+                          placeholder="Enter m value for gc"
+                          value={mValue}
+                          onChange={(e) => updateMValue(e.target.value)}
+                          className="border-border/50 focus:border-primary"
+                        />
                       </div>
-                      
+
+                      <div className="grid grid-cols-3 gap-4 mt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-tfc-value" className="text-sm font-medium">tfc</Label>
+                          <Input
+                            id="tab-tfc-value"
+                            placeholder="Enter tfc"
+                            value={tfcValue}
+                            onChange={(e) => updateTfcValue(e.target.value)}
+                            className="border-border/50 focus:border-primary"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-tfd-value" className="text-sm font-medium">tfd</Label>
+                          <Input
+                            id="tab-tfd-value"
+                            placeholder="Enter tfd"
+                            value={tfdValue}
+                            onChange={(e) => updateTfdValue(e.target.value)}
+                            className="border-border/50 focus:border-primary"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-td-value" className="text-sm font-medium">td</Label>
+                          <Input
+                            id="tab-td-value"
+                            placeholder="Enter td"
+                            value={tdValue}
+                            onChange={(e) => updateTdValue(e.target.value)}
+                            className="border-border/50 focus:border-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-k1-value" className="text-sm font-medium">K1</Label>
+                          <Input
+                            id="tab-k1-value"
+                            placeholder="Enter K1"
+                            value={k1Value}
+                            onChange={(e) => updateK1Value(e.target.value)}
+                            className="border-border/50 focus:border-primary"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-k2-value" className="text-sm font-medium">K2</Label>
+                          <Input
+                            id="tab-k2-value"
+                            placeholder="Enter K2"
+                            value={k2Value}
+                            onChange={(e) => updateK2Value(e.target.value)}
+                            className="border-border/50 focus:border-primary"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-k3-value" className="text-sm font-medium">K3</Label>
+                          <Input
+                            id="tab-k3-value"
+                            placeholder="Enter K3"
+                            value={k3Value}
+                            onChange={(e) => updateK3Value(e.target.value)}
+                            className="border-border/50 focus:border-primary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col space-y-2">
+                    <div className="flex gap-2 w-full">
                       <Button 
-                        onClick={calculateGcGc}
-                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                        onClick={calculateVcf}
+                        className="flex-1 bg-primary/80 hover:bg-primary/90 text-primary-foreground shadow-sm"
                         disabled={isLoading}
                       >
                         {isLoading ? (
                           <>
                             <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
-                            Calculating All Parameters...
+                            Calculating Vcf...
                           </>
                         ) : (
                           <>
                             <Calculator className="mr-2 h-4 w-4" />
-                            Calculate All Parameters
+                            Calculate Vcf
                           </>
                         )}
                       </Button>
-                    </CardFooter>
-                  </Card>
-                </TabsContent>
+                    </div>
+                    
+                    <Button 
+                      onClick={calculateGcGc}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
+                          Calculating All Parameters...
+                        </>
+                      ) : (
+                        <>
+                          <Calculator className="mr-2 h-4 w-4" />
+                          Calculate All Parameters
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </TabsContent>
 
-                <TabsContent value="results" className="mt-0 space-y-4">
-                  <Card className="border-border/40 shadow-sm">
-                    <CardHeader className="bg-muted/30 border-b border-border/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className="h-8 w-1 bg-primary rounded-full" />
-                          <CardTitle>Calculation Results</CardTitle>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <ScrollArea className="h-[600px] w-full">
-                        <div className="p-6">
-                          {isLoading ? (
-                            <div className="space-y-4">
-                              <Skeleton className="h-4 w-full" />
-                              <Skeleton className="h-4 w-[90%]" />
-                              <Skeleton className="h-4 w-[95%]" />
-                            </div>
-                          ) : resultsHTML ? (
-                            <div 
-                              dangerouslySetInnerHTML={{ __html: resultsHTML }}
-                              className="prose prose-sm max-w-none dark:prose-invert"
-                            />
-                          ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                              <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                              <p>Enter parameters and calculate to see results</p>
-                            </div>
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="equations" className="mt-0 space-y-4">
-                  <Card className="border-border/40 shadow-sm">
-                    <CardHeader className="bg-muted/30 border-b border-border/30">
+              <TabsContent value="results" className="mt-0 space-y-4">
+                <Card className="border-border/40 shadow-sm">
+                  <CardHeader className="bg-muted/30 border-b border-border/30">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <div className="h-8 w-1 bg-primary/60 rounded-full" />
-                        <CardTitle>Calculation Equations</CardTitle>
+                        <div className="h-8 w-1 bg-primary rounded-full" />
+                        <CardTitle>Calculation Results</CardTitle>
                       </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <ScrollArea className="h-[600px] w-full">
-                        <div className="p-6">
-                          {equationHTML ? (
-                            <div 
-                              dangerouslySetInnerHTML={{ __html: equationHTML }}
-                              className="prose prose-sm max-w-none dark:prose-invert"
-                            />
-                          ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                              <svg className="h-12 w-12 mx-auto mb-4 opacity-50" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M4 7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7C20 7.55228 19.5523 8 19 8H5C4.44772 8 4 7.55228 4 7Z" fill="currentColor"/>
-                                <path d="M4 12C4 11.4477 4.44772 11 5 11H19C19.5523 11 20 11.4477 20 12C20 12.5523 19.5523 13 19 13H5C4.44772 13 4 12.5523 4 12Z" fill="currentColor"/>
-                                <path d="M5 16C4.44772 16 4 16.4477 4 17C4 17.5523 4.44772 18 5 18H19C19.5523 18 20 17.5523 20 17C20 16.4477 19.5523 16 19 16H5Z" fill="currentColor"/>
-                              </svg>
-                              <p>Equations will appear after calculation</p>
-                            </div>
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </div>
-          )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <ScrollArea className="h-[600px] w-full">
+                      <div className="p-6">
+                        {isLoading ? (
+                          <div className="space-y-4">
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-[90%]" />
+                            <Skeleton className="h-4 w-[95%]" />
+                          </div>
+                        ) : resultsHTML ? (
+                          <div 
+                            dangerouslySetInnerHTML={{ __html: resultsHTML }}
+                            className="prose prose-sm max-w-none dark:prose-invert"
+                          />
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p>Enter parameters and calculate to see results</p>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="equations" className="mt-0 space-y-4">
+                <Card className="border-border/40 shadow-sm">
+                  <CardHeader className="bg-muted/30 border-b border-border/30">
+                    <div className="flex items-center space-x-2">
+                      <div className="h-8 w-1 bg-primary/60 rounded-full" />
+                      <CardTitle>Calculation Equations</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <ScrollArea className="h-[600px] w-full">
+                      <div className="p-6">
+                        {equationHTML ? (
+                          <div 
+                            dangerouslySetInnerHTML={{ __html: equationHTML }}
+                            className="prose prose-sm max-w-none dark:prose-invert"
+                          />
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <svg className="h-12 w-12 mx-auto mb-4 opacity-50" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M4 7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7C20 7.55228 19.5523 8 19 8H5C4.44772 8 4 7.55228 4 7Z" fill="currentColor"/>
+                              <path d="M4 12C4 11.4477 4.44772 11 5 11H19C19.5523 11 20 11.4477 20 12C20 12.5523 19.5523 13 19 13H5C4.44772 13 4 12.5523 4 12Z" fill="currentColor"/>
+                              <path d="M5 16C4.44772 16 4 16.4477 4 17C4 17.5523 4.44772 18 5 18H19C19.5523 18 20 17.5523 20 17C20 16.4477 19.5523 16 19 16H5Z" fill="currentColor"/>
+                            </svg>
+                            <p>Equations will appear after calculation</p>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
       </div>
     </div>

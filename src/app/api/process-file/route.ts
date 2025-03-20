@@ -275,22 +275,37 @@ export async function POST(req: NextRequest) {
                 
                 // Assign L values to HAD data
                 if (hadDataList.length === 1) {
-                  hadDataList[0].lValue = lValues.l1;
+                  // Only add L value if it's greater than 1 and positive
+                  if (lValues.l1 > 1) {
+                    hadDataList[0].lValue = lValues.l1;
+                  }
                 } else if (hadDataList.length === 2) {
                   // For 2 rows case, Python assigns l1 to first row and l2 to second row
-                  hadDataList[0].lValue = lValues.l1;
-                  hadDataList[1].lValue = lValues.l2;
+                  // Only add L values if they're greater than 1 and positive
+                  if (lValues.l1 > 1) {
+                    hadDataList[0].lValue = lValues.l1;
+                  }
+                  if (lValues.l2 !== undefined && lValues.l2 > 1) {
+                    hadDataList[1].lValue = lValues.l2;
+                  }
                 } else {
                   // For 3+ rows case, Python assigns L values to the last 3 rows (lowest HAD values)
                   const lastIndex = hadDataList.length - 1;
                   
                   // Assign L values to the last 3 rows in order (L1 to third-last, L2 to second-last, L3 to last)
-                  if ('l1' in lValues) hadDataList[lastIndex - 2].lValue = lValues.l1;
-                  if ('l2' in lValues) hadDataList[lastIndex - 1].lValue = lValues.l2;
-                  if ('l3' in lValues) hadDataList[lastIndex].lValue = lValues.l3;
+                  // Only add L values if they're greater than 1 and positive
+                  if ('l1' in lValues && lValues.l1 > 1) {
+                    hadDataList[lastIndex - 2].lValue = lValues.l1;
+                  }
+                  if ('l2' in lValues && lValues.l2 !== undefined && lValues.l2 > 1) {
+                    hadDataList[lastIndex - 1].lValue = lValues.l2;
+                  }
+                  if ('l3' in lValues && lValues.l3 !== undefined && lValues.l3 > 1) {
+                    hadDataList[lastIndex].lValue = lValues.l3;
+                  }
                   
                   // If we have more than 3 rows and l4 value
-                  if (hadDataList.length > 3 && 'l4' in lValues) {
+                  if (hadDataList.length > 3 && 'l4' in lValues && lValues.l4 !== undefined && lValues.l4 > 1) {
                     hadDataList[lastIndex - 3].lValue = lValues.l4;
                   }
                 }
