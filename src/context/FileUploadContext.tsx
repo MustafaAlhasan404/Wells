@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode } from 'react';
+import { HADResults } from '@/utils/casingCalculations';
 
 // Define types for calculation results
 interface DrillCollarResult {
@@ -35,9 +36,9 @@ interface FileUploadContextType {
   
   // Casing calculator results
   casingResults: any[];
-  hadData: any;
+  hadData: HADResults | null;
   setCasingResults: (results: any[]) => void;
-  setHadData: (data: any) => void;
+  setHadData: (data: HADResults | null) => void;
 }
 
 const FileUploadContext = createContext<FileUploadContextType | undefined>(undefined);
@@ -55,7 +56,7 @@ export function FileUploadProvider({ children }: { children: ReactNode }) {
   
   // Casing calculator results
   const [casingResults, setCasingResults] = useState<any[]>([]);
-  const [hadData, setHadData] = useState<any>(null);
+  const [hadData, setHadData] = useState<HADResults | null>(null);
 
   return (
     <FileUploadContext.Provider

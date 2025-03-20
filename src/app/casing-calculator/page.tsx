@@ -584,9 +584,9 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
               )}>
                 <Card className="border-primary/20 shadow-md">
                   <CardHeader className="bg-muted/50 border-b border-border/50">
-                    <CardTitle className="text-lg sm:text-xl text-primary/90">Calculation Results</CardTitle>
+                    <CardTitle className="text-lg sm:text-xl text-primary/90">Casing Results</CardTitle>
                     <CardDescription>
-                      Section by section details
+                      Detailed casing data
                       <span className="ml-1 text-green-500">(saved)</span>
                     </CardDescription>
                   </CardHeader>
@@ -594,7 +594,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                     <CasingResults results={casingResults} />
                   </CardContent>
                 </Card>
-              
+
                 {/* HAD Results */}
                 {hadData && (
                   <Card className="border-primary/20 shadow-md mt-6">

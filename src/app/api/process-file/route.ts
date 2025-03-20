@@ -10,7 +10,6 @@ import {
   extractAdditionalInfo
 } from '@/utils/fileProcessing';
 import { formatMmWithInches, calculateHAD, HADData } from '@/utils/casingCalculations';
-import { calculateLValues } from '@/utils/hadCalculations';
 
 export const config = {
   api: {
@@ -228,93 +227,62 @@ export async function POST(req: NextRequest) {
             
             // Calculate HAD
             if (matchingRows.length > 0) {
-              // Convert matching rows to HAD data format
-              const hadDataList: HADData[] = matchingRows.map(row => ({
-                had: calculateHAD(row.externalPressure, row.metalType),
-                externalPressure: row.externalPressure,
-                metalType: row.metalType,
-                tensileStrength: row.tensileStrength,
-                unitWeight: row.unitWeight
-              }));
+              // First sort the matching rows by external pressure (which should correlate with HAD)
+              matchingRows.sort((a, b) => a.externalPressure - b.externalPressure);
               
-              // Sort by HAD in descending order
-              hadDataList.sort((a, b) => b.had - a.had);
+              // Convert matching rows to HAD data format, but stop once we find a sufficient HAD
+              const hadDataList: HADData[] = [];
+              let hadSufficient = false;
+              
+              for (const row of matchingRows) {
+                const hadValue = calculateHAD(row.externalPressure, row.metalType);
+                const hadData: HADData = {
+                  had: hadValue,
+                  externalPressure: row.externalPressure,
+                  metalType: row.metalType,
+                  tensileStrength: row.tensileStrength,
+                  unitWeight: row.unitWeight
+                };
+                
+                // For Surface Section, cap HAD at inputted depth
+                if (sectionName === "Surface Section") {
+                  hadData.depth = depth;
+                  if (hadData.had > depth) {
+                    hadData.had = depth;
+                  }
+                }
+                
+                hadDataList.push(hadData);
+                
+                // Check if this HAD is sufficient
+                if (hadValue >= depth) {
+                  hadSufficient = true;
+                  // Set the HAD value equal to the depth
+                  hadData.had = depth;
+                  hadData.depth = depth;
+                  break; // Stop once we find a sufficient HAD
+                }
+              }
+              
+              // Sort by HAD in ascending order
+              hadDataList.sort((a, b) => a.had - b.had);
               
               // Add to HAD data
               const roundedAtHead = Math.round(atHeadValue * 100) / 100;
-              
-              // For Surface Section, add depth to each row and cap HAD at inputted depth
-              if (sectionName === "Surface Section") {
-                // Add depth to each row
-                hadDataList.forEach(row => {
-                  row.depth = depth;
-                  // Cap HAD at depth for Surface Section
-                  if (row.had > depth) {
-                    row.had = depth;
-                  }
-                });
-              }
-              
               hadData[sectionName][roundedAtHead] = hadDataList;
               
               // Check if HAD is sufficient for depth
-              const hadSufficient = hadDataList.some(data => data.had >= depth);
-              
               if (!hadSufficient) {
                 console.error(`No suitable HAD value found for depth: ${depth} in ${sectionName}`);
                 return NextResponse.json({ 
                   error: `No suitable HAD value found for depth: ${depth} in ${sectionName}. Consider using a different metal type or casing size.` 
                 }, { status: 400 });
               }
-              
-              // Calculate L values if we have enough data
-              if (hadDataList.length >= 1) {
-                console.log(`Calculating L values for depth: ${depth} with ${hadDataList.length} rows`);
-                const lValues = calculateLValues(hadDataList, depth);
-                console.log(`Calculated L values:`, lValues);
-                
-                // Assign L values to HAD data
-                if (hadDataList.length === 1) {
-                  // Only add L value if it's greater than 1 and positive
-                  if (lValues.l1 > 1) {
-                    hadDataList[0].lValue = lValues.l1;
-                  }
-                } else if (hadDataList.length === 2) {
-                  // For 2 rows case, Python assigns l1 to first row and l2 to second row
-                  // Only add L values if they're greater than 1 and positive
-                  if (lValues.l1 > 1) {
-                    hadDataList[0].lValue = lValues.l1;
-                  }
-                  if (lValues.l2 !== undefined && lValues.l2 > 1) {
-                    hadDataList[1].lValue = lValues.l2;
-                  }
-                } else {
-                  // For 3+ rows case, Python assigns L values to the last 3 rows (lowest HAD values)
-                  const lastIndex = hadDataList.length - 1;
-                  
-                  // Assign L values to the last 3 rows in order (L1 to third-last, L2 to second-last, L3 to last)
-                  // Only add L values if they're greater than 1 and positive
-                  if ('l1' in lValues && lValues.l1 > 1) {
-                    hadDataList[lastIndex - 2].lValue = lValues.l1;
-                  }
-                  if ('l2' in lValues && lValues.l2 !== undefined && lValues.l2 > 1) {
-                    hadDataList[lastIndex - 1].lValue = lValues.l2;
-                  }
-                  if ('l3' in lValues && lValues.l3 !== undefined && lValues.l3 > 1) {
-                    hadDataList[lastIndex].lValue = lValues.l3;
-                  }
-                  
-                  // If we have more than 3 rows and l4 value
-                  if (hadDataList.length > 3 && 'l4' in lValues && lValues.l4 !== undefined && lValues.l4 > 1) {
-                    hadDataList[lastIndex - 3].lValue = lValues.l4;
-                  }
-                }
-              } else {
-                console.error(`No matching rows found for at_head: ${atHeadValue}, metal_type: ${metalType}`);
-                return NextResponse.json({ 
-                  error: `No matching data found for outer diameter: ${atHeadValue} with metal type: ${metalType}. Please check your Excel file data.` 
-                }, { status: 400 });
-              }
+            } else {
+              console.error(`No matching rows found for at_head: ${atHeadValue}, metal_type: ${metalType}`);
+              return NextResponse.json({ 
+                error: `No matching data found for outer diameter: ${atHeadValue} with metal type: ${metalType}. Please check your Excel file data.` 
+              }, { status: 400 });
             }
             
             // Prepare for next iteration if not the last
