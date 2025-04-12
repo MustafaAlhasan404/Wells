@@ -17,16 +17,32 @@ interface CalculationInstance {
   lmax: number;
 }
 
+// Define types for pump results
+interface PumpResult {
+  type: string;
+  diameter: number;
+  pressure: number;
+  flow: number;
+  price: number;
+  isRecommended: boolean;
+  instance: number;
+  ppmax: number;
+}
+
 interface FileUploadContextType {
   // File state
   drillCollarFile: File | null;
   drillCollarFileName: string;
   casingFile: File | null;
   casingFileName: string;
+  pumpFile: File | null;
+  pumpFileName: string;
   setDrillCollarFile: (file: File | null) => void;
   setDrillCollarFileName: (name: string) => void;
   setCasingFile: (file: File | null) => void;
   setCasingFileName: (name: string) => void;
+  setPumpFile: (file: File | null) => void;
+  setPumpFileName: (name: string) => void;
   
   // Equation page results
   drillCollarResults: DrillCollarResult[];
@@ -39,6 +55,10 @@ interface FileUploadContextType {
   hadData: HADResults | null;
   setCasingResults: (results: any[]) => void;
   setHadData: (data: HADResults | null) => void;
+  
+  // Pump selection results
+  pumpResults: PumpResult[];
+  setPumpResults: (results: PumpResult[]) => void;
 }
 
 const FileUploadContext = createContext<FileUploadContextType | undefined>(undefined);
@@ -49,6 +69,8 @@ export function FileUploadProvider({ children }: { children: ReactNode }) {
   const [drillCollarFileName, setDrillCollarFileName] = useState<string>('');
   const [casingFile, setCasingFile] = useState<File | null>(null);
   const [casingFileName, setCasingFileName] = useState<string>('');
+  const [pumpFile, setPumpFile] = useState<File | null>(null);
+  const [pumpFileName, setPumpFileName] = useState<string>('');
   
   // Equation page results
   const [drillCollarResults, setDrillCollarResults] = useState<DrillCollarResult[]>([]);
@@ -57,6 +79,9 @@ export function FileUploadProvider({ children }: { children: ReactNode }) {
   // Casing calculator results
   const [casingResults, setCasingResults] = useState<any[]>([]);
   const [hadData, setHadData] = useState<HADResults | null>(null);
+  
+  // Pump selection results
+  const [pumpResults, setPumpResults] = useState<PumpResult[]>([]);
 
   return (
     <FileUploadContext.Provider
@@ -66,10 +91,14 @@ export function FileUploadProvider({ children }: { children: ReactNode }) {
         drillCollarFileName,
         casingFile,
         casingFileName,
+        pumpFile,
+        pumpFileName,
         setDrillCollarFile,
         setDrillCollarFileName,
         setCasingFile,
         setCasingFileName,
+        setPumpFile,
+        setPumpFileName,
         
         // Equation page results
         drillCollarResults,
@@ -81,7 +110,11 @@ export function FileUploadProvider({ children }: { children: ReactNode }) {
         casingResults,
         hadData,
         setCasingResults,
-        setHadData
+        setHadData,
+        
+        // Pump selection results
+        pumpResults,
+        setPumpResults
       }}
     >
       {children}

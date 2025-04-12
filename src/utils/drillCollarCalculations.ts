@@ -27,6 +27,7 @@ export interface DrillCollarResult {
   atHead: number;
   bitSize: number;
   drillCollar: number;
+  numberOfColumns: number;
 }
 
 /**
@@ -101,7 +102,8 @@ export function calculateDrillCollar(
       section: sectionName,
       atHead: atHead,
       bitSize: bitSize,
-      drillCollar: nearestDrillCollarDiameter || 0
+      drillCollar: nearestDrillCollarDiameter || 0,
+      numberOfColumns: 0
     });
   }
   

@@ -23,7 +23,7 @@ export function NavBar() {
         <div className="flex items-center">
           <Link href="/data-input" className="flex items-center space-x-2">
             <MountainIcon className="h-6 w-6 text-primary" />
-            <span className="hidden font-bold sm:inline-block">Wells Analyzer</span>
+            <span className="hidden font-bold sm:inline-block">Deep Drill</span>
           </Link>
         </div>
 

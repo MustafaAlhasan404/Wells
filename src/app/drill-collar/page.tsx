@@ -2,7 +2,7 @@ import { NavBar } from "@/components/nav-bar";
 import DrillCollarCalculator from "@/components/drill-collar-calculator";
 
 export const metadata = {
-  title: "Drill Collar Calculator | Wells Analyzer",
+  title: "Drill Collar Calculator | Deep Drill",
   description: "Calculate drill collar values and pipe data based on well parameters",
 };
 

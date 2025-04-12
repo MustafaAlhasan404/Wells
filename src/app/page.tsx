@@ -45,7 +45,7 @@ export default function SplashScreen() {
           className="text-center"
         >
           <h1 className="text-6xl sm:text-7xl font-bold tracking-tight bg-gradient-to-b from-primary to-primary/60 text-transparent bg-clip-text mb-6">
-            Wells Analyzer
+            Deep Drill
           </h1>
           <p className="text-xl text-muted-foreground">
             Advanced analytics for well engineering

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Wells Analyzer",
+  title: "Deep Drill",
   description: "Advanced analytics for well engineering",
 };
 

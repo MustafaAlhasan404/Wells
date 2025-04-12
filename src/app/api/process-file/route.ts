@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
             const formattedAtBody = atBodyValue ? `${atBodyValue} mm (${formatMmWithInches(parseFloat(atBodyValue))})` : "-";
             const formattedInternalDiameter = internalDiameter !== null ? `${internalDiameter.toFixed(2)}` : "-";
             
-            // Add to result data
+            // Add to result data with internal diameter
             resultData.push({
               section: sectionNames[i],
               nearestBitSize: formattedBitSize,
@@ -319,6 +319,23 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("All sections processed successfully");
+    
+    // Fix internal diameter display in results - shift internal diameters between sections
+    if (resultData.length > 0) {
+      // Store the internal diameters
+      const internalDiameters = resultData.map(r => r.internalDiameter);
+      
+      // Set Production (index 0) to "--"
+      if (resultData[0]) {
+        resultData[0].internalDiameter = "--";
+      }
+      
+      // Shift internal diameters for other sections
+      for (let i = 1; i < resultData.length; i++) {
+        resultData[i].internalDiameter = internalDiameters[i-1];
+      }
+    }
+    
     return NextResponse.json({ results: resultData, hadData });
   } catch (error) {
     console.error('Processing error:', error);

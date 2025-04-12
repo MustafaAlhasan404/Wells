@@ -12,6 +12,7 @@ import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
 import { EnhancedTable } from "@/components/ui/enhanced-table"
 import { showToast } from "@/utils/toast-utils"
+import { formatMmWithInches } from "@/utils/casingCalculations"
 
 interface DrillCollarCalculatorProps {}
 
@@ -34,8 +35,15 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   const [localDrillCollarResults, setLocalDrillCollarResults] = useState<any[]>([]);
   const [calculations, setCalculations] = useState<any[]>([]);
   const [drillCollarData, setDrillCollarData] = useState<any>(null);
+  const [bValueDebugInfo, setBValueDebugInfo] = useState<{
+    instance: number;
+    gamma: number;
+    bValue: number;
+    section: string;
+  }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
   // State for input minimization
   const [inputsMinimized, setInputsMinimized] = useState(false);
   // Animation state
@@ -334,6 +342,11 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       setCalculations(calculationsData);
       setDrillCollarData(data.drillCollarData || null);
       
+      // Save debug info with b values
+      if (data.debugInfo && data.debugInfo.bValues) {
+        setBValueDebugInfo(data.debugInfo.bValues);
+      }
+      
       // Update context for persistence across tab changes
       setContextDrillCollarResults(drillCollarResultsData);
       setDrillCollarCalculations(calculationsData);
@@ -515,18 +528,118 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                 <CardContent className="pt-3 pb-3">
                   <div className="overflow-auto">
                     <EnhancedTable
-                      headers={["Section", "At Head (Dcsg)", "Nearest Bit Size", "Drill Collars"]}
+                      headers={["Section", "Drill Collars", "Number of Columns"]}
                       rows={localDrillCollarResults.map(result => [
                         `${result.section} Section`,
-                        `${result.atHead.toFixed(1)} mm`,
-                        `${result.bitSize.toFixed(2)} mm`,
-                        `${result.drillCollar.toFixed(2)} mm`
+                        formatMmWithInches(result.drillCollar.toFixed(2)),
+                        result.numberOfColumns || "N/A"
                       ])}
                       rounded={true}
                       highlightOnHover={true}
                       alternateRows={true}
                     />
                   </div>
+                  
+                  {/* Debug Toggle Button */}
+                  <div className="mt-6 flex justify-end">
+                    <Button 
+                      onClick={() => setShowDebugInfo(!showDebugInfo)} 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs"
+                    >
+                      {showDebugInfo ? "Hide Debug Info" : "Show Debug Info"}
+                    </Button>
+                  </div>
+                  
+                  {/* Debug Calculation Information - only shown when toggled */}
+                  {showDebugInfo && (
+                    <div className="mt-3 border border-border/40 rounded-md p-4 bg-muted/10">
+                      <h3 className="text-base font-semibold mb-3 text-primary">Debug Calculation Information</h3>
+                      <p className="text-sm mb-3">This shows how the Number of Columns is calculated (L0c / 9):</p>
+                      
+                      <div className="space-y-4">
+                        {localDrillCollarResults.map((result, index) => {
+                          const instanceNum = index + 1;
+                          const formData = getCasingData();
+                          const correspondingCalc = calculations.find(c => 
+                            (c.instance === instanceNum && result.section === (
+                              instanceNum === 1 ? "Production" : 
+                              instanceNum === 2 ? "Intermediate" : "Surface"))
+                          );
+                          
+                          // Find b value from debug info
+                          const debugBValue = bValueDebugInfo && bValueDebugInfo.length > 0 
+                            ? bValueDebugInfo.find(info => 
+                                info && info.section === result.section
+                              )
+                            : null;
+                          
+                          return (
+                            <div key={index} className="border border-border/30 rounded-md p-3 bg-background/50">
+                              <h4 className="font-medium mb-2 text-sm">{result.section} Section Calculation:</h4>
+                              
+                              <div className="grid grid-cols-2 gap-3 text-xs">
+                                <div className="bg-muted/20 p-2 rounded border border-border/20">
+                                  <span className="font-semibold">Input Values:</span>
+                                  {formData && (
+                                    <div className="mt-1 space-y-1">
+                                      <div>WOB_{instanceNum}: {formData[`WOB_${instanceNum}`] || "Not found"}</div>
+                                      <div>C_{instanceNum}: {formData[`C_${instanceNum}`] || "Not found"}</div>
+                                      <div>qc_{instanceNum}: {formData[`qc_${instanceNum}`] || "Not found"}</div>
+                                      <div>γ_{instanceNum}: {formData[`γ_${instanceNum}`] || "Not found"}</div>
+                                      <div>
+                                        b_{instanceNum}: {debugBValue && typeof debugBValue.bValue === 'number' 
+                                          ? debugBValue.bValue.toFixed(4) 
+                                          : "Not found"} {debugBValue && debugBValue.gamma && (
+                                            <span className="text-green-500">
+                                              (derived from Excel based on γ={debugBValue.gamma})
+                                            </span>
+                                          )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="bg-muted/20 p-2 rounded border border-border/20">
+                                  <span className="font-semibold">Calculation:</span>
+                                  <div className="mt-1 space-y-1">
+                                    <div>Drill Collar: {formatMmWithInches(result.drillCollar.toFixed(2))}</div>
+                                    
+                                    {(typeof result.numberOfColumns === 'undefined' || result.numberOfColumns === null) && (
+                                      <div className="text-amber-500">
+                                        No L0c data available for this section. This could happen if:
+                                        <ul className="list-disc list-inside mt-1">
+                                          <li>Missing corresponding calculation instance</li>
+                                          <li>Required input values were not found</li>
+                                          <li>Instance/section mapping mismatch</li>
+                                        </ul>
+                                      </div>
+                                    )}
+                                    
+                                    {typeof result.numberOfColumns !== 'undefined' && result.numberOfColumns !== null && (
+                                      <>
+                                        <div className="mt-1">L0c: WOB / (C * qc * b) ≈ {(result.numberOfColumns * 9).toFixed(2)}</div>
+                                        <div>Number of Columns: L0c / 9 = {result.numberOfColumns}</div>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="mt-3 text-xs">
+                                <span className="font-semibold">Matching Calculation Instance:</span> {
+                                  correspondingCalc 
+                                    ? `Instance ${correspondingCalc.instance}`
+                                    : "No matching calculation found"
+                                }
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               
