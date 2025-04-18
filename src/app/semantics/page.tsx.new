@@ -21,7 +21,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { NavBar } from "@/components/nav-bar"
-import { Calculator, Eye, EyeOff, ArrowRight, RefreshCcw, AlertCircle, X, CheckCircle, Save, Info, AlertTriangle, Loader2, Maximize, Minimize } from "lucide-react"
+import { Calculator, Eye, EyeOff, ArrowRight, RefreshCcw, AlertCircle, X, CheckCircle, Save } from "lucide-react"
 import { toast } from "sonner"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
@@ -32,11 +32,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { showToast } from "@/utils/toast-utils"
 import { Switch } from "@/components/ui/switch"
 import { Copy } from "lucide-react"
-import { Select, SelectTrigger, SelectValue, SelectItem, SelectContent } from "@/components/ui/select"
-import { GanttChart, Trash2, Check, FileText, LayoutGrid, Table as TableIcon } from "lucide-react"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Slider } from "@/components/ui/slider"
-// import { useToast } from "@/components/ui/use-toast"
 
 interface VcfResult {
   instance: number;
@@ -59,219 +54,7 @@ interface GcResult {
   pfr: number;          // Friction pressure (MPa)
   ppmax: number | null; // Maximum pump pressure (MPa/10)
   n: number | null;     // Number of pumps
-  tfc: number | null;   // Cement filling time
-  tfd: number | null;   // Displacement time
-  tc: number | null;    // Total pumping time
-  td: number | null;    // Additional time
-  tp: number;           // Constant time (60)
-  tad: number;          // Additional time (75% of tp)
 }
-
-// Define type for pump data
-interface PumpData {
-  type: string;
-  speed: number;
-  pressures: {
-    "3.5": number | null;
-    "4": number | null;
-    "4.5": number | null;
-  };
-  flows: {
-    "3.5": number | null;
-    "4": number | null;
-    "4.5": number | null;
-  };
-}
-
-// Define type for pump results
-interface PumpResult {
-  type: string;
-  diameter: number;
-  pressure: number;
-  flow: number;
-  speed: number | null;
-  price: number;
-  isRecommended: boolean;
-  instance: number;
-  ppmax: number;
-  // Time factor fields
-  tfc: number | null;
-  tfd: number | null;
-  tc: number | null;
-  tad: number;
-  isTimeAllowed: boolean | null;
-  // New fields
-  isAlternative?: boolean;
-}
-
-// Define the hardcoded pump data based on the provided table
-const PUMP_DATA: PumpData[] = [
-  // AC-300
-  { 
-    type: "AC-300", 
-    speed: 1, 
-    pressures: { "3.5": null, "4": 30, "4.5": null }, 
-    flows: { "3.5": null, "4": 100, "4.5": null } 
-  },
-  { 
-    type: "AC-300", 
-    speed: 2, 
-    pressures: { "3.5": null, "4": 22, "4.5": null }, 
-    flows: { "3.5": null, "4": 250, "4.5": null } 
-  },
-  { 
-    type: "AC-300", 
-    speed: 3, 
-    pressures: { "3.5": null, "4": 10, "4.5": null }, 
-    flows: { "3.5": null, "4": 450, "4.5": null } 
-  },
-  { 
-    type: "AC-300", 
-    speed: 4, 
-    pressures: { "3.5": null, "4": 6, "4.5": null }, 
-    flows: { "3.5": null, "4": 635, "4.5": null } 
-  },
-  
-  // AC-400.B
-  { 
-    type: "AC-400.B", 
-    speed: 1, 
-    pressures: { "3.5": 40, "4": 32, "4.5": 24 }, 
-    flows: { "3.5": 243, "4": 300, "4.5": 397 } 
-  },
-  { 
-    type: "AC-400.B", 
-    speed: 2, 
-    pressures: { "3.5": 21.5, "4": 17.5, "4.5": 13 }, 
-    flows: { "3.5": 444, "4": 549, "4.5": 724 } 
-  },
-  { 
-    type: "AC-400.B", 
-    speed: 3, 
-    pressures: { "3.5": 13, "4": 10.8, "4.5": 8.2 }, 
-    flows: { "3.5": 717, "4": 885, "4.5": 1171 } 
-  },
-  
-  // AC-500
-  { 
-    type: "AC-500", 
-    speed: 1, 
-    pressures: { "3.5": 50, "4": 35.5, "4.5": 27 }, 
-    flows: { "3.5": 250, "4": 308, "4.5": 409 } 
-  },
-  { 
-    type: "AC-500", 
-    speed: 2, 
-    pressures: { "3.5": 24, "4": 19.5, "4.5": 14.8 }, 
-    flows: { "3.5": 459, "4": 569, "4.5": 750 } 
-  },
-  { 
-    type: "AC-500", 
-    speed: 3, 
-    pressures: { "3.5": 15.5, "4": 12.5, "4.5": 9.5 }, 
-    flows: { "3.5": 717, "4": 885, "4.5": 1171 } 
-  },
-  
-  // ACF-700
-  { 
-    type: "ACF-700", 
-    speed: 1, 
-    pressures: { "3.5": null, "4": 70, "4.5": 55 }, 
-    flows: { "3.5": null, "4": 158, "4.5": 208 } 
-  },
-  { 
-    type: "ACF-700", 
-    speed: 2, 
-    pressures: { "3.5": null, "4": 52, "4.5": 40 }, 
-    flows: { "3.5": null, "4": 217, "4.5": 287 } 
-  },
-  { 
-    type: "ACF-700", 
-    speed: 3, 
-    pressures: { "3.5": null, "4": 40, "4.5": 30 }, 
-    flows: { "3.5": null, "4": 284, "4.5": 275 } 
-  },
-  { 
-    type: "ACF-700", 
-    speed: 4, 
-    pressures: { "3.5": null, "4": 30, "4.5": 24 }, 
-    flows: { "3.5": null, "4": 391, "4.5": 518 } 
-  },
-  { 
-    type: "ACF-700", 
-    speed: 5, 
-    pressures: { "3.5": null, "4": 27, "4.5": 20 }, 
-    flows: { "3.5": null, "4": 416, "4.5": 550 } 
-  },
-  { 
-    type: "ACF-700", 
-    speed: 6, 
-    pressures: { "3.5": null, "4": 21, "4.5": 15 }, 
-    flows: { "3.5": null, "4": 544, "4.5": 720 } 
-  },
-  { 
-    type: "ACF-700", 
-    speed: 7, 
-    pressures: { "3.5": null, "4": 15, "4.5": 11 }, 
-    flows: { "3.5": null, "4": 749, "4.5": 990 } 
-  },
-  { 
-    type: "ACF-700", 
-    speed: 8, 
-    pressures: { "3.5": null, "4": 12, "4.5": 9 }, 
-    flows: { "3.5": null, "4": 981, "4.5": 1297 } 
-  },
-  
-  // T-10
-  { 
-    type: "T-10", 
-    speed: 1, 
-    pressures: { "3.5": null, "4": null, "4.5": 63 }, 
-    flows: { "3.5": null, "4": null, "4.5": 175 } 
-  },
-  { 
-    type: "T-10", 
-    speed: 2, 
-    pressures: { "3.5": null, "4": null, "4.5": 53 }, 
-    flows: { "3.5": null, "4": null, "4.5": 225 } 
-  },
-  { 
-    type: "T-10", 
-    speed: 3, 
-    pressures: { "3.5": null, "4": null, "4.5": 39.2 }, 
-    flows: { "3.5": null, "4": null, "4.5": 303 } 
-  },
-  { 
-    type: "T-10", 
-    speed: 4, 
-    pressures: { "3.5": null, "4": null, "4.5": 28 }, 
-    flows: { "3.5": null, "4": null, "4.5": 428 } 
-  },
-  { 
-    type: "T-10", 
-    speed: 5, 
-    pressures: { "3.5": null, "4": null, "4.5": 20.3 }, 
-    flows: { "3.5": null, "4": null, "4.5": 588 } 
-  },
-  { 
-    type: "T-10", 
-    speed: 6, 
-    pressures: { "3.5": null, "4": null, "4.5": 15.4 }, 
-    flows: { "3.5": null, "4": null, "4.5": 781 } 
-  },
-  { 
-    type: "T-10", 
-    speed: 7, 
-    pressures: { "3.5": null, "4": null, "4.5": 11 }, 
-    flows: { "3.5": null, "4": null, "4.5": 1125 } 
-  },
-  { 
-    type: "T-10", 
-    speed: 8, 
-    pressures: { "3.5": null, "4": null, "4.5": 7.7 }, 
-    flows: { "3.5": null, "4": null, "4.5": 1520 } 
-  },
-];
 
 interface DataInputValues {
   K1?: string;
@@ -282,17 +65,17 @@ interface DataInputValues {
 
 export default function SemanticsPage() {
   // Input parameters
-  const [hcValue, setHcValue] = useState<string>("");  // Hc state variable
-  const [gammaC, setGammaC] = useState<string>("");    // gammaC state variable
-  const [gammaW, setGammaW] = useState<string>("1");   // gammaW state variable with default of 1
-  const [gammaFC, setGammaFC] = useState<string>("");  // gammaFC state variable
-  const [gammaF, setGammaF] = useState<string>("");    // gammaF state variable
+  const [hcValue, setHcValue] = useState<string>("");
+  const [gammaC, setGammaC] = useState<string>("");
+  const [gammaW, setGammaW] = useState<string>("1"); // Default to 1
+  const [gammaFC, setGammaFC] = useState<string>("");
+  const [gammaF, setGammaF] = useState<string>("");
   const [k1Value, setK1Value] = useState<string>("");  // K1 state variable
   const [k2Value, setK2Value] = useState<string>("");  // K2 state variable
   const [k3Value, setK3Value] = useState<string>("");  // K3 state variable
   const [mValue, setMValue] = useState<string>("");    // m value for gc calculation
-  const [tfcValue, setTfcValue] = useState<string>(""); // tfc value (for compatibility only)
-  const [tfdValue, setTfdValue] = useState<string>(""); // tfd value (for compatibility only)
+  const [tfcValue, setTfcValue] = useState<string>(""); // tfc value
+  const [tfdValue, setTfdValue] = useState<string>(""); // tfd value
   const [tdValue, setTdValue] = useState<string>("");   // td value
   const [hValue, setHValue] = useState<string>("");     // h value for Vcf calculation
   
@@ -324,7 +107,6 @@ export default function SemanticsPage() {
   // UI States
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [equationsMinimized, setEquationsMinimized] = useState<boolean>(true);
-  const [pumpDataTableMinimized, setPumpDataTableMinimized] = useState<boolean>(true);
   
   // Access results from other pages
   const { 
@@ -338,62 +120,49 @@ export default function SemanticsPage() {
     setPumpResults
   } = useFileUpload();
 
-  // Add to state declarations near the top of the component
-  const [instanceDiameters, setInstanceDiameters] = useState<Record<number, number>>({
-    1: 4,   // Default to 4" for all instances
-    2: 4,
-    3: 4
-  });
-
-  // Added state for toggling between single or instance-specific diameters
-  const [useSingleDiameter, setUseSingleDiameter] = useState<boolean>(true);
-
-  // ... add new function to update instance diameter
-  const updateInstanceDiameter = (instance: number, diameter: number) => {
-    setInstanceDiameters(prev => ({
-      ...prev,
-      [instance]: diameter
-    }));
-  };
-
   // Toggle minimized state for equations card
   const toggleEquationsMinimized = () => {
     const newState = !equationsMinimized;
     setEquationsMinimized(newState);
   };
 
-  // Toggle minimized state for pump data table
-  const togglePumpDataTableMinimized = () => {
-    const newState = !pumpDataTableMinimized;
-    setPumpDataTableMinimized(newState);
-  };
-
-  // Save input data to localStorage
+  // Save all input data explicitly to localStorage
   const saveInputData = () => {
-    if (!initialLoadComplete) {
-      console.log("Skipping save during initial load");
-      return;
+    try {
+      // Save all form values
+      const dataToSave = {
+        hc: hcValue,
+        gammaC,
+        gammaW,
+        gammaFC,
+        gammaF,
+        k1: k1Value,
+        k2: k2Value,
+        k3: k3Value,
+        m: mValue,
+        tfc: tfcValue,
+        tfd: tfdValue,
+        td: tdValue,
+        h: hValue,
+        // Also save instance values
+        instanceValues,
+      };
+      
+      console.log("Saving data to localStorage:", dataToSave);
+      
+      // Save to localStorage
+      localStorage.setItem('wellsAnalyzerSemanticData', JSON.stringify(dataToSave));
+      console.log("Data saved to localStorage - wellsAnalyzerSemanticData");
+      
+      // Save input preferences separately
+      localStorage.setItem('wellsAnalyzerSemanticInputPrefs', JSON.stringify(singleInputFields));
+      console.log("Input prefs saved to localStorage - wellsAnalyzerSemanticInputPrefs");
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to save data:', error);
+      return false;
     }
-    
-    const data = {
-      hc: hcValue,
-      gammaC: gammaC,
-      gammaW: gammaW,
-      gammaFC: gammaFC,
-      gammaF: gammaF,
-      k1: k1Value,
-      k2: k2Value,
-      k3: k3Value,
-      m: mValue,
-      td: tdValue,
-      h: hValue,
-      instanceValues: instanceValues,
-      singleInputFields: singleInputFields
-    };
-    
-    const dataStr = JSON.stringify(data);
-    console.log("Saving input data:", data);
-    localStorage.setItem('wellsAnalyzerSemanticData', dataStr);
   };
 
   // Manual save function with feedback for save button
@@ -428,43 +197,85 @@ export default function SemanticsPage() {
     }
   };
   
-  // Load input data from localStorage
+  // Load all saved input data from localStorage
   const loadInputData = () => {
     try {
-      const dataStr = localStorage.getItem('wellsAnalyzerSemanticData');
-      if (!dataStr) {
-        console.log("No saved data found in localStorage");
-        return;
+      console.log("Loading data from localStorage...");
+      
+      // Get data from localStorage
+      const savedData = localStorage.getItem('wellsAnalyzerSemanticData');
+      console.log("Loaded wellsAnalyzerSemanticData:", savedData);
+      
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        console.log("Parsed data:", data);
+        
+        // Set values from saved data
+        if (data.hc) setHcValue(data.hc);
+        if (data.gammaC) setGammaC(data.gammaC);
+        if (data.gammaW) setGammaW(data.gammaW);
+        if (data.gammaFC) setGammaFC(data.gammaFC);
+        if (data.gammaF) setGammaF(data.gammaF);
+        if (data.k1) setK1Value(data.k1);
+        if (data.k2) setK2Value(data.k2);
+        if (data.k3) setK3Value(data.k3);
+        if (data.m) setMValue(data.m);
+        if (data.tfc) setTfcValue(data.tfc);
+        if (data.tfd) setTfdValue(data.tfd);
+        if (data.td) setTdValue(data.td);
+        if (data.h) setHValue(data.h);
+        
+        // Load instance values if available
+        if (data.instanceValues) {
+          setInstanceValues(data.instanceValues);
+        }
       }
       
-      console.log("Loading input data from localStorage");
-      const data = JSON.parse(dataStr);
+      // Try to load the single input preferences
+      const savedInputPrefs = localStorage.getItem('wellsAnalyzerSemanticInputPrefs');
+      console.log("Loaded wellsAnalyzerSemanticInputPrefs:", savedInputPrefs);
       
-      // Load form values
-      if (data.hc) setHcValue(data.hc);
-      if (data.gammaC) setGammaC(data.gammaC);
-      if (data.gammaW) setGammaW(data.gammaW);
-      if (data.gammaFC) setGammaFC(data.gammaFC);
-      if (data.gammaF) setGammaF(data.gammaF);
-      if (data.k1) setK1Value(data.k1);
-      if (data.k2) setK2Value(data.k2);
-      if (data.k3) setK3Value(data.k3);
-      if (data.m) setMValue(data.m);
-      // Skip tfc and tfd - no longer used
-      if (data.td) setTdValue(data.td);
-      if (data.h) setHValue(data.h);
-      
-      // Load instance values
-      if (data.instanceValues) {
-        setInstanceValues(data.instanceValues);
+      if (savedInputPrefs) {
+        setSingleInputFields(JSON.parse(savedInputPrefs));
       }
       
-      // Load single input preferences
-      if (data.singleInputFields) {
-        setSingleInputFields(data.singleInputFields);
+      // Also load calculation results if available
+      try {
+        // Load Vcf results
+        const savedVcfResults = localStorage.getItem('wellsAnalyzerVcfResults');
+        console.log("Loaded wellsAnalyzerVcfResults:", savedVcfResults);
+        
+        if (savedVcfResults) {
+          setVcfResults(JSON.parse(savedVcfResults));
+        }
+        
+        // Load Gc results
+        const savedGcResults = localStorage.getItem('wellsAnalyzerGcResults');
+        console.log("Loaded wellsAnalyzerGcResults:", savedGcResults);
+        
+        if (savedGcResults) {
+          setGcResults(JSON.parse(savedGcResults));
+        }
+        
+        // Load equation HTML
+        const savedEquationHTML = localStorage.getItem('wellsAnalyzerEquationHTML');
+        console.log("Loaded wellsAnalyzerEquationHTML:", savedEquationHTML ? "Found" : "Not found");
+        
+        if (savedEquationHTML) {
+          setEquationHTML(savedEquationHTML);
+        }
+        
+        // Load results HTML
+        const savedResultsHTML = localStorage.getItem('wellsAnalyzerResultsHTML');
+        console.log("Loaded wellsAnalyzerResultsHTML:", savedResultsHTML ? "Found" : "Not found");
+        
+        if (savedResultsHTML) {
+          setResultsHTML(savedResultsHTML);
+        }
+      } catch (error) {
+        console.error('Failed to load calculation results:', error);
       }
       
-      console.log("Data loaded from localStorage:", data);
       return true;
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -480,14 +291,10 @@ export default function SemanticsPage() {
       if (legacyData) {
         const data = JSON.parse(legacyData);
         
-        // Only set K values from legacy data if we don't already have semantics data
-        const semanticsData = localStorage.getItem('wellsAnalyzerSemanticData');
-        if (!semanticsData) {
-          // Only set K values if they're not already set
-          if (data.K1 && !k1Value) setK1Value(data.K1);
-          if (data.K2 && !k2Value) setK2Value(data.K2);
-          if (data.K3 && !k3Value) setK3Value(data.K3);
-        }
+        // Set K values from legacy data if available
+        if (data.K1) setK1Value(data.K1);
+        if (data.K2) setK2Value(data.K2);
+        if (data.K3) setK3Value(data.K3);
         
         // Copy legacy data to dataInputValues state for reference
         setDataInputValues(data);
@@ -726,7 +533,7 @@ export default function SemanticsPage() {
                         <h3 class="text-xl font-bold text-primary">Vcf Equations</h3>
                         <div class="bg-muted/30 p-4 rounded-md border border-border/40">
                           <h4 class="font-medium mb-2">General Formula:</h4>
-                          <p class="font-mono text-sm bg-background/80 p-2 rounded">Vcf = [(K1 × Db² - de²) × Hc + di² × h]</p>
+                          <p class="font-mono text-sm bg-background/80 p-2 rounded">Vcf = (π/4) × [K1 × Db² - de] × Hc + di² × h</p>
                           <p class="text-sm mt-2">Where:</p>
                           <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mt-2">
                             <div class="bg-background/50 p-2 rounded border border-border/30">
@@ -804,8 +611,8 @@ export default function SemanticsPage() {
           h = parseFloat(dataInputValues[hKey]);
         }
         
-        // Calculate Vcf: [(k1Db^2-de^2).Hc+di^2.h]
-        const vcf = ((instanceK1 * (Db**2) - de**2) * instanceHc) + (di**2) * h;
+        // Calculate Vcf: (π/4)×[K1Db^2-de].Hc+di^2.h
+        const vcf = (Math.PI/4) * ((instanceK1 * (Db**2) - de) * instanceHc) + (di**2) * h;
         
         // Add to results
         results.push({
@@ -819,11 +626,12 @@ export default function SemanticsPage() {
         
         // Step by step calculation for this instance
         const step1 = instanceK1 * (Db**2);
-        const step2 = step1 - (de**2);
+        const step2 = step1 - de;
         const step3 = step2 * instanceHc;
-        const step4 = di**2;
-        const step5 = step4 * h;
-        const step6 = step3 + step5;
+        const step4 = (Math.PI/4) * step3;
+        const step5 = di**2;
+        const step6 = step5 * h;
+        const step7 = step4 + step6;
         
         // Add equation steps for this instance
         equations += `
@@ -859,14 +667,15 @@ export default function SemanticsPage() {
               <div class="border-t border-border/30 pt-4">
                 <p class="font-medium">Vcf Calculation:</p>
                 <div class="mt-2 bg-background/60 p-3 rounded">
-                  <p class="font-mono text-sm">Vcf = [(k1Db^2-de^2).Hc+di^2.h]</p>
+                  <p class="font-mono text-sm">Vcf = (π/4) × [K1 × Db² - de] × Hc + di² × h</p>
                   <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                     <li>K1 × Db² = ${instanceK1.toFixed(4)} × ${Db.toFixed(4)}² = ${step1.toFixed(6)}</li>
-                    <li>K1 × Db² - de² = ${step1.toFixed(6)} - ${de.toFixed(4)}² = ${step2.toFixed(6)}</li>
-                    <li>[(K1 × Db² - de²) × Hc = ${step2.toFixed(6)} × ${instanceHc.toFixed(4)} = ${step3.toFixed(6)}</li>
-                    <li>di² = ${di.toFixed(4)}² = ${step4.toFixed(6)}</li>
-                    <li>di² × h = ${step4.toFixed(6)} × ${h.toFixed(4)} = ${step5.toFixed(6)}</li>
-                    <li>[(K1 × Db² - de²) × Hc + di² × h] = ${step3.toFixed(6)} + ${step5.toFixed(6)} = ${step6.toFixed(6)}</li>
+                    <li>(K1 × Db²) - de = ${step1.toFixed(6)} - ${de.toFixed(4)} = ${step2.toFixed(6)}</li>
+                    <li>[(K1 × Db²) - de] × Hc = ${step2.toFixed(6)} × ${instanceHc.toFixed(4)} = ${step3.toFixed(6)}</li>
+                    <li>(π/4) × [(K1 × Db²) - de] × Hc = ${(Math.PI/4).toFixed(4)} × ${step3.toFixed(6)} = ${step4.toFixed(6)}</li>
+                    <li>di² = ${di.toFixed(4)}² = ${step5.toFixed(6)}</li>
+                    <li>di² × h = ${step5.toFixed(6)} × ${h.toFixed(4)} = ${step6.toFixed(6)}</li>
+                    <li>(π/4) × [(K1 × Db²) - de] × Hc + di² × h = ${step4.toFixed(6)} + ${step6.toFixed(6)} = ${step7.toFixed(6)}</li>
                   </ol>
                   <p class="font-mono text-sm mt-2 font-bold">Vcf = ${vcf.toFixed(6)}</p>
                 </div>
@@ -1074,11 +883,7 @@ export default function SemanticsPage() {
                           <div class="space-y-4">
                             <div>
                               <p class="font-medium">Gc (cement grade):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Gc = (γc.γw)/(m.γc + γw)</p>
-                            </div>
-                            <div>
-                              <p class="font-medium">G'c (modified cement grade):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">G'c = K2.gc.Vfc</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Gc = (Hc × (γc - γw)) / Vcf</p>
                             </div>
                             <div>
                               <p class="font-medium">nc (number of cement sacks):</p>
@@ -1104,13 +909,6 @@ export default function SemanticsPage() {
                               <p class="font-medium">Ppmax (maximum pump pressure):</p>
                               <p class="font-mono text-sm bg-background/80 p-2 rounded">Ppmax = Pc + Pfr</p>
                               <p class="text-sm mt-1">Where Pfr (friction pressure) = 5 MPa (constant)</p>
-                            </div>
-                            <div>
-                              <p class="font-medium">Time Calculations:</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">tfc+tfd = ((Vcf+Vfd)*10^3)/Q</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">tc = tfc+tfd + td</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">tad = 0.75 * tp</p>
-                              <p class="text-sm mt-1">Where Q is the pump flow rate, td is input value, tp = 60</p>
                             </div>
                           </div>
                         </div>
@@ -1177,47 +975,24 @@ export default function SemanticsPage() {
           instanceM = parseFloat(instanceValues['m'][instanceNumber]);
         }
         
-        // Calculate Gc using instance-specific values - gc = (γc.γw)/(m.γc + γw)
-        const gc_value = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
+        // Calculate Gc using instance-specific values - (Hc * (gc - gw)) / Vcf
+        const gc_value = (instanceHc * (instanceGc - instanceGw)) / vcfValue;
         
-        // Get K2 value for this instance
-        let instanceK2 = 0;
-        if (k2Value && !isNaN(parseFloat(k2Value))) {
-          instanceK2 = parseFloat(k2Value);
-        } else if (instanceValues['k2'] && 
-                  instanceValues['k2'][instanceNumber] && 
-                  !isNaN(parseFloat(instanceValues['k2'][instanceNumber]))) {
-          instanceK2 = parseFloat(instanceValues['k2'][instanceNumber]);
-        }
-        
-        // Calculate G'c using instance-specific values - G'c = K2.gc.Vfc
-        const gc_prime = instanceK2 * gc_value * vcfValue;
+        // Calculate G'c (prime) using instance-specific values - gc_value * (1 - (gw / gc))
+        const gc_prime = gc_value * (1 - (instanceGw / instanceGc));
         
         // Calculate nc in sacks - (Vcf * gc_value) / m
         const nc = instanceM > 0 ? (vcfValue * gc_value) / instanceM : null;
         
-        // Get K3 value for this instance
-        let instanceK3 = 0;
-        if (k3Value && !isNaN(parseFloat(k3Value))) {
-          instanceK3 = parseFloat(k3Value);
-        } else if (instanceValues['k3'] && 
-                  instanceValues['k3'][instanceNumber] && 
-                  !isNaN(parseFloat(instanceValues['k3'][instanceNumber]))) {
-          instanceK3 = parseFloat(instanceValues['k3'][instanceNumber]);
-        }
-        
-        // Calculate Vw (water volume) using the new formula Vw = (K3 * m * gc * Vfc) / γw
-        const vw = (instanceM > 0 && instanceGw > 0) ? 
-                  (instanceK3 * instanceM * gc_value * vcfValue) / instanceGw : null;
+        // Calculate Vw (water volume) - assumes water ratio to cement
+        const vw = instanceM > 0 ? vcfValue * instanceGw : null;
         
         // Calculate Vfd (volume of fluid displacement)
         const vfd = (instanceGfc && instanceGf) ? 
                    vcfValue * (instanceGfc / instanceGf) * (1 - (instanceGw / instanceGc)) : null;
         
-        // Calculate Pymax (maximum pressure at yield point) - using the new formula from the image
-        // Pymax = 0.1[(Hc - h)(γfc - γf)]
-        const pymax = (instanceGfc && instanceGf && vcfResult.h) ? 
-                      0.1 * (instanceHc - vcfResult.h) * (instanceGfc - instanceGf) : null;
+        // Calculate Pymax (maximum pressure at yield point)
+        const pymax = nc && instanceGf ? nc * instanceGf * 9.81 : null;
         
         // Calculate Pc (confining pressure)
         const pc = pymax ? pymax * 0.85 : null; // Typical value is 85% of Pymax
@@ -1225,50 +1000,11 @@ export default function SemanticsPage() {
         // Pfr remains constant at 5 usually
         const pfr = 5;
         
-        // Calculate Ppmax (maximum pump pressure) based on the image formula
-        // Ppmax = (Pymax + Pc + Pfr) / 10
-        const ppmax = (pymax && pc) ? (pymax + pc + pfr) / 10 : null;
+        // Calculate Ppmax (maximum pump pressure)
+        const ppmax = pc ? (pc + pfr) / 10 : null;
         
-        // Calculate n (number of pumps) using tc/tad + 1 formula
-        // Get td value - from input
-        let instanceTd = 0;
-        if (tdValue && !isNaN(parseFloat(tdValue))) {
-          instanceTd = parseFloat(tdValue);
-        } else if (instanceValues['td'] && 
-                  instanceValues['td'][instanceNumber] && 
-                  !isNaN(parseFloat(instanceValues['td'][instanceNumber]))) {
-          instanceTd = parseFloat(instanceValues['td'][instanceNumber]);
-        }
-        
-        // Calculate total time variables
-        const tp = 60; // Constant value of 60
-        const tad = 0.75 * tp; // tad = 0.75 * tp
-        
-        // Get Q value from pumpResults if available
-        let Q = 0;
-        if (pumpResults && pumpResults.length > 0) {
-          // Look for pump data for this instance
-          const pumpForInstance = pumpResults.find(p => p.instance === instanceNumber && p.isRecommended);
-          if (pumpForInstance && pumpForInstance.flow) {
-            Q = pumpForInstance.flow;
-          }
-        }
-        
-        // Calculate tfc+tfd = ((Vcf+Vfd)*10^3)/Q
-        let tfcPlusTfd = 0;
-        if (Q > 0 && vfd !== null) {
-          tfcPlusTfd = ((vcfValue + vfd) * 1000) / Q;
-        }
-        
-        // Calculate tc = tfc+tfd + td
-        const tc = tfcPlusTfd + instanceTd;
-        
-        // Split tfcPlusTfd into tfc and tfd (50/50 split as a default approach)
-        const tfc = tfcPlusTfd / 2;
-        const tfd = tfcPlusTfd / 2;
-        
-        // Calculate n (number of pumps) based on the formula: n = tc/tad + 1
-        const n = tc > 0 && tad > 0 ? Math.ceil(tc / tad + 1) : null;
+        // Number of pump devices typically related to pressure requirements
+        const n = ppmax ? Math.ceil(ppmax) : null; // ppmax is already in units of MPa/10
         
         // Add equation steps for this instance
         gcEquations += `
@@ -1308,25 +1044,24 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">Gc Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Gc = (γc.γw)/(m.γc + γw)</p>
+                    <p class="font-mono text-sm">Gc = (Hc × (γc - γw)) / Vcf</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
-                      <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
-                      <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
-                      <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${gc_value.toFixed(4)}</li>
+                      <li>γc - γw = ${instanceGc.toFixed(4)} - ${instanceGw.toFixed(4)} = ${(instanceGc - instanceGw).toFixed(4)}</li>
+                      <li>Hc × (γc - γw) = ${instanceHc.toFixed(4)} × ${(instanceGc - instanceGw).toFixed(4)} = ${(instanceHc * (instanceGc - instanceGw)).toFixed(4)}</li>
+                      <li>(Hc × (γc - γw)) / Vcf = ${(instanceHc * (instanceGc - instanceGw)).toFixed(4)} / ${vcfValue.toFixed(4)} = ${gc_value.toFixed(4)}</li>
                     </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Gc = ${gc_value.toFixed(4)} tonf/m3</p>
+                    <p class="font-mono text-sm mt-2 font-bold">Gc = ${gc_value.toFixed(4)}</p>
                   </div>
                 </div>
                 
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">G'c Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">G'c = K2.gc.Vfc</p>
+                    <p class="font-mono text-sm">G'c = Gc × (1 - (γw / γc))</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>K2 = ${instanceK2.toFixed(4)}</li>
-                      <li>K2.gc = ${instanceK2.toFixed(4)} × ${gc_value.toFixed(4)} = ${(instanceK2 * gc_value).toFixed(4)}</li>
-                      <li>K2.gc.Vfc = ${(instanceK2 * gc_value).toFixed(4)} × ${vcfValue.toFixed(4)} = ${gc_prime.toFixed(4)}</li>
+                      <li>γw / γc = ${instanceGw.toFixed(4)} / ${instanceGc.toFixed(4)} = ${(instanceGw / instanceGc).toFixed(4)}</li>
+                      <li>1 - (γw / γc) = 1 - ${(instanceGw / instanceGc).toFixed(4)} = ${(1 - (instanceGw / instanceGc)).toFixed(4)}</li>
+                      <li>Gc × (1 - (γw / γc)) = ${gc_value.toFixed(4)} × ${(1 - (instanceGw / instanceGc)).toFixed(4)} = ${gc_prime.toFixed(4)}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">G'c = ${gc_prime.toFixed(4)}</p>
                   </div>
@@ -1347,13 +1082,9 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">Vw (Water Volume) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Vw = (K3 × m × Gc × Vfc) / γw</p>
+                    <p class="font-mono text-sm">Vw = Vcf × γw</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>K3 = ${instanceK3.toFixed(4)}</li>
-                      <li>K3 × m = ${instanceK3.toFixed(4)} × ${instanceM.toFixed(4)} = ${(instanceK3 * instanceM).toFixed(4)}</li>
-                      <li>(K3 × m) × Gc = ${(instanceK3 * instanceM).toFixed(4)} × ${gc_value.toFixed(4)} = ${(instanceK3 * instanceM * gc_value).toFixed(4)}</li>
-                      <li>(K3 × m × Gc) × Vfc = ${(instanceK3 * instanceM * gc_value).toFixed(4)} × ${vcfValue.toFixed(4)} = ${(instanceK3 * instanceM * gc_value * vcfValue).toFixed(4)}</li>
-                      <li>(K3 × m × Gc × Vfc) / γw = ${(instanceK3 * instanceM * gc_value * vcfValue).toFixed(4)} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
+                      <li>Vcf × γw = ${vcfValue.toFixed(4)} × ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
                   </div>
@@ -1379,11 +1110,10 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">Pymax (Max Pressure at Yield) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Pymax = 0.1[(Hc - h)(γfc - γf)]</p>
+                    <p class="font-mono text-sm">Pymax = nc × γf × 9.81</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>Hc - h = ${instanceHc.toFixed(4)} - ${vcfResult.h.toFixed(4)} = ${(instanceHc - vcfResult.h).toFixed(4)}</li>
-                      <li>γfc - γf = ${instanceGfc.toFixed(4)} - ${instanceGf.toFixed(4)} = ${(instanceGfc - instanceGf).toFixed(4)}</li>
-                      <li>0.1 × (Hc - h) × (γfc - γf) = 0.1 × ${(instanceHc - vcfResult.h).toFixed(4)} × ${(instanceGfc - instanceGf).toFixed(4)} = ${pymax !== null ? pymax.toFixed(4) : "N/A"}</li>
+                      <li>nc × γf = ${nc.toFixed(4)} × ${instanceGf.toFixed(4)} = ${(nc * instanceGf).toFixed(4)}</li>
+                      <li>nc × γf × 9.81 = ${(nc * instanceGf).toFixed(4)} × 9.81 = ${pymax !== null ? pymax.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Pymax = ${pymax !== null ? pymax.toFixed(4) : "N/A"} MPa</p>
                   </div>
@@ -1403,11 +1133,11 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">Ppmax (Maximum Pump Pressure) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Ppmax = (Pymax + Pc + Pfr) / 10</p>
+                    <p class="font-mono text-sm">Ppmax = (Pc + Pfr) / 10</p>
                     <p class="font-mono text-sm mt-1">Where Pfr (friction pressure) = 5 MPa (constant)</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>Pymax + Pc + Pfr = ${pymax !== null ? pymax.toFixed(4) : "N/A"} + ${pc !== null ? pc.toFixed(4) : "N/A"} + ${pfr} = ${pymax !== null && pc !== null ? (pymax + pc + pfr).toFixed(4) : "N/A"}</li>
-                      <li>(Pymax + Pc + Pfr) / 10 = ${pymax !== null && pc !== null ? (pymax + pc + pfr).toFixed(4) : "N/A"} / 10 = ${ppmax !== null ? ppmax.toFixed(4) : "N/A"}</li>
+                      <li>Pc + Pfr = ${pc !== null ? pc.toFixed(4) : "N/A"} + ${pfr} = ${pc !== null ? (pc + pfr).toFixed(4) : "N/A"}</li>
+                      <li>(Pc + Pfr) / 10 = ${pc !== null ? (pc + pfr).toFixed(4) : "N/A"} / 10 = ${ppmax !== null ? ppmax.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Ppmax = ${ppmax !== null ? ppmax.toFixed(4) : "N/A"} MPa/10</p>
                   </div>
@@ -1416,44 +1146,12 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">n (Number of Pumps) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">n = tc/tad + 1</p>
+                    <p class="font-mono text-sm">n = Ceiling(Ppmax)</p>
+                    <p class="font-mono text-sm mt-1">Since Ppmax is already in units of MPa/10</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>tc = ${tc > 0 ? tc.toFixed(2) : "N/A"}</li>
-                      <li>tad = ${tad.toFixed(2)}</li>
-                      <li>tc/tad = ${tc > 0 && tad > 0 ? (tc/tad).toFixed(4) : "N/A"}</li>
-                      <li>tc/tad + 1 = ${tc > 0 && tad > 0 ? (tc/tad).toFixed(4) : "N/A"} + 1 = ${tc > 0 && tad > 0 ? (tc/tad + 1).toFixed(4) : "N/A"}</li>
-                      <li>Ceiling(tc/tad + 1) = ${n !== null ? n : "N/A"}</li>
+                      <li>Ceiling(Ppmax) = Ceiling(${ppmax !== null ? ppmax.toFixed(4) : "N/A"}) = ${n !== null ? n : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">n = ${n !== null ? n : "N/A"} pumps</p>
-                  </div>
-                </div>
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">Time Calculations:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">tfc+tfd = ((Vcf+Vfd)*10^3)/Q</p>
-                    <p class="font-mono text-sm">tc = tfc+tfd + td</p>
-                    <p class="font-mono text-sm">tad = 0.75 * tp, where tp = 60</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>tp = 60 (constant)</li>
-                      <li>tad = 0.75 * tp = 0.75 * 60 = ${tad.toFixed(2)}</li>
-                      <li>Vcf + Vfd = ${vcfValue.toFixed(4)} + ${vfd !== null ? vfd.toFixed(4) : "N/A"} = ${vfd !== null ? (vcfValue + vfd).toFixed(4) : "N/A"}</li>
-                      <li>(Vcf + Vfd) * 10^3 = ${vfd !== null ? (vcfValue + vfd).toFixed(4) : "N/A"} * 1000 = ${vfd !== null ? ((vcfValue + vfd) * 1000).toFixed(2) : "N/A"}</li>
-                      <li>Q (flow rate from pump) = ${Q > 0 ? Q.toFixed(2) : "N/A"}</li>
-                      <li>tfc+tfd = ((Vcf+Vfd)*10^3)/Q = ${vfd !== null && Q > 0 ? ((vcfValue + vfd) * 1000).toFixed(2) : "N/A"} / ${Q > 0 ? Q.toFixed(2) : "N/A"} = ${tfcPlusTfd > 0 ? tfcPlusTfd.toFixed(2) : "N/A"}</li>
-                      <li>tfc = (tfc+tfd)/2 = ${tfcPlusTfd > 0 ? (tfcPlusTfd/2).toFixed(2) : "N/A"}</li>
-                      <li>tfd = (tfc+tfd)/2 = ${tfcPlusTfd > 0 ? (tfcPlusTfd/2).toFixed(2) : "N/A"}</li>
-                      <li>td (additional time) = ${instanceTd.toFixed(2)}</li>
-                      <li>tc = tfc+tfd + td = ${tfcPlusTfd > 0 ? tfcPlusTfd.toFixed(2) : "N/A"} + ${instanceTd.toFixed(2)} = ${tc > 0 ? tc.toFixed(2) : "N/A"}</li>
-                    </ol>
-                    <div class="grid grid-cols-2 gap-2 mt-2">
-                      <p class="font-mono text-sm font-bold">tfc = ${tfc > 0 ? tfc.toFixed(2) : "N/A"}</p>
-                      <p class="font-mono text-sm font-bold">tfd = ${tfd > 0 ? tfd.toFixed(2) : "N/A"}</p>
-                      <p class="font-mono text-sm font-bold">tc = ${tc > 0 ? tc.toFixed(2) : "N/A"}</p>
-                      <p class="font-mono text-sm font-bold">td = ${instanceTd.toFixed(2)}</p>
-                      <p class="font-mono text-sm font-bold">tp = ${tp.toFixed(2)}</p>
-                      <p class="font-mono text-sm font-bold">tad = ${tad.toFixed(2)}</p>
-                    </div>
                   </div>
                 </div>
                 ` : ''}
@@ -1506,13 +1204,7 @@ export default function SemanticsPage() {
           pc: pc,
           pfr: pfr,
           ppmax: ppmax,
-          n: n,
-          tfc: tfc,
-          tfd: tfd,
-          tc: tc,
-          td: instanceTd,
-          tp: tp,
-          tad: tad
+          n: n
         };
       });
       
@@ -1544,151 +1236,59 @@ export default function SemanticsPage() {
     }
   };
 
-  // Function to process pump selection using hardcoded data
+  // Function to handle pump file selection and processing
+  const handlePumpFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    setPumpFile(file);
+    setPumpFileName(file.name);
+  };
+  
+  // Function to process pump file and select suitable ones based on Ppmax
   const processPumpFileSelection = async () => {
-    if (!gcResults || gcResults.length === 0) {
-      showToast('error', "Please calculate GC results first");
+    if (!pumpFile || !gcResults || gcResults.length === 0) {
+      // showToast('error', "Please upload a pump data file and calculate GC results first");
       return;
     }
     
     setIsPumpSelectionLoading(true);
     
     try {
-      // Extract Ppmax values from GC results
-      const ppmaxValues: number[] = [];
-      // Also extract diameters for each instance
-      const instanceDiametersToSend: number[] = [];
+      // Create a FormData object
+      const formData = new FormData();
+      formData.append('file', pumpFile);
       
-      // Extract Ppmax values from GC results and convert from MPa/10 to MPa
-      // Also use instance-specific diameters if enabled
+      // Add Ppmax values for each instance
+      const ppmaxValues: Record<string, number> = {};
+      
+      // Extract Ppmax values from GC results
       gcResults.forEach(result => {
         if (result.ppmax !== null) {
-          // Use the value as is (no multiplication)
-          ppmaxValues.push(result.ppmax);
-          
-          // Add the appropriate diameter for this instance
-          if (useSingleDiameter) {
-            // Use the globally selected diameter for all instances
-            instanceDiametersToSend.push(selectedDiameter);
-          } else {
-            // Use instance-specific diameter
-            const diameter = instanceDiameters[result.instance] || selectedDiameter;
-            instanceDiametersToSend.push(diameter);
-          }
+          ppmaxValues[`ppmax_${result.instance}`] = result.ppmax;
         }
       });
       
-      if (ppmaxValues.length === 0) {
-        showToast('error', "No valid Ppmax values found. Please calculate parameters first.");
-        setIsPumpSelectionLoading(false);
-        return;
+      formData.append('ppmaxValues', JSON.stringify(ppmaxValues));
+      formData.append('diameter', selectedDiameter.toString());
+      
+      // Send file to server for processing
+      const response = await fetch('/api/process-pump-file', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setPumpResults(data.results);
+        // showToast('success', "Pump selection completed successfully");
+      } else {
+        // showToast('error', data.message || "Error processing pump file");
       }
-      
-      // Process the pump data locally
-      const results: PumpResult[] = [];
-      
-      // For each instance, find matching pumps
-      ppmaxValues.forEach((ppmax, index) => {
-        const instanceNumber = gcResults[index].instance;
-        const diameter = instanceDiametersToSend[index];
-        const diameterKey = diameter.toString() as "3.5" | "4" | "4.5";
-        
-        // Filter pumps by diameter and pressure
-        const matchingPumps = PUMP_DATA.filter(pump => {
-          // Check if this pump has data for the selected diameter
-          const hasDiameter = pump.pressures[diameterKey] !== null;
-          if (!hasDiameter) return false;
-          
-          // Check if this pump's pressure meets or exceeds the required Ppmax
-          const pumpPressure = pump.pressures[diameterKey] as number;
-          return pumpPressure >= ppmax;
-        });
-        
-        // Sort by pressure (descending), closest to Ppmax first
-        const sortedPumps = [...matchingPumps].sort((a, b) => {
-          const aPressure = a.pressures[diameterKey] as number;
-          const bPressure = b.pressures[diameterKey] as number;
-          return Math.abs(aPressure - ppmax) - Math.abs(bPressure - ppmax);
-        });
-        
-        // Format results for this instance
-        const pumpResultsForInstance: PumpResult[] = [];
-        
-        sortedPumps.forEach((pump, pumpIndex) => {
-          const pumpPressure = pump.pressures[diameterKey] as number;
-          const pumpFlow = pump.flows[diameterKey] as number;
-          
-          // Calculate time factors for the pump
-          let tfc = null;
-          let tfd = null;
-          let tc = null;
-          let tad = 45; // 0.75 * 60 (default value)
-          
-          // Get the corresponding Gc result for this instance
-          const gcResultForInstance = gcResults.find(r => r.instance === instanceNumber);
-          
-          if (gcResultForInstance && gcResultForInstance.vfd !== null) {
-            // Get td value from inputs
-            let instanceTd = 0;
-            if (tdValue && !isNaN(parseFloat(tdValue))) {
-              instanceTd = parseFloat(tdValue);
-            } else if (instanceValues['td'] && 
-                      instanceValues['td'][instanceNumber] && 
-                      !isNaN(parseFloat(instanceValues['td'][instanceNumber]))) {
-              instanceTd = parseFloat(instanceValues['td'][instanceNumber]);
-            }
-            
-            // Calculate tfc+tfd = ((Vcf+Vfd)*10^3)/Q
-            const tfcPlusTfd = ((gcResultForInstance.vcf + gcResultForInstance.vfd) * 1000) / pumpFlow;
-            
-            // Calculate tc = tfc+tfd + td
-            tc = tfcPlusTfd + instanceTd;
-            
-            // Split tfcPlusTfd into tfc and tfd (50/50 split as a default approach)
-            tfc = tfcPlusTfd / 2;
-            tfd = tfcPlusTfd / 2;
-          }
-          
-          pumpResultsForInstance.push({
-            type: pump.type,
-            diameter,
-            pressure: pumpPressure,
-            flow: pumpFlow,
-            speed: pump.speed,
-            price: pumpIndex + 1, // Placeholder price based on index
-            isRecommended: pumpIndex === 0, // Mark the pump with closest pressure as recommended
-            instance: instanceNumber,
-            ppmax,
-            tfc,
-            tfd,
-            tc,
-            tad,
-            isTimeAllowed: null,
-            isAlternative: false,
-          });
-        });
-        
-        // If no exact matches, try to find alternatives with higher pressure
-        if (pumpResultsForInstance.length === 0) {
-          // Implementation for finding alternatives...
-          // Current logic omitted for brevity
-        }
-        
-        // Add all results for this instance
-        results.push(...pumpResultsForInstance);
-      });
-      
-      // Update state with results
-      setPumpResults(results);
-      
-      showToast('success', "Pump selection completed", {
-        description: `Found ${results.length} suitable pumps.`
-      });
     } catch (error) {
-      console.error('Error in pump selection:', error);
-      showToast('error', "Pump selection failed", {
-        description: error instanceof Error ? error.message : "Unknown error"
-      });
+      console.error('Error processing pump file:', error);
+      // showToast('error', "Failed to process pump file");
     } finally {
       setIsPumpSelectionLoading(false);
     }
@@ -1786,14 +1386,10 @@ export default function SemanticsPage() {
   useEffect(() => {
     // Load data on component mount
     console.log("Initial mount effect - loading data");
+    loadInputData();
     
-    // First try to load semantics-specific data
-    const hasSemanticData = loadInputData();
-    
-    // Only try to load from legacy storage if no semantics data was found
-    if (!hasSemanticData) {
-      loadInputsFromLegacyStorage();
-    }
+    // Try to load from legacy storage if needed
+    loadInputsFromLegacyStorage();
 
     // Force display a toast to confirm data was loaded
     if(localStorage.getItem('wellsAnalyzerSemanticData')) {
@@ -1829,7 +1425,7 @@ export default function SemanticsPage() {
     initialLoadComplete,
     hcValue, gammaC, gammaW, gammaFC, gammaF,
     k1Value, k2Value, k3Value, mValue,
-    tdValue,
+    tfcValue, tfdValue, tdValue,
     hValue, instanceValues, singleInputFields
   ]);
   
@@ -2056,7 +1652,9 @@ export default function SemanticsPage() {
 
                   {renderInputField('m', 'm value (for gc only)', mValue, updateMValue)}
 
-                  <div className="grid grid-cols-1 gap-4 mt-4">
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    {renderInputField('tfc', 'tfc', tfcValue, updateTfcValue)}
+                    {renderInputField('tfd', 'tfd', tfdValue, updateTfdValue)}
                     {renderInputField('td', 'td', tdValue, updateTdValue)}
                   </div>
 
@@ -2201,7 +1799,9 @@ export default function SemanticsPage() {
                       
                       {renderInputField('h', 'h (height parameter)', hValue, updateHValue, 'm')}
 
-                      <div className="grid grid-cols-1 gap-4 mt-4">
+                      <div className="grid grid-cols-3 gap-4 mt-4">
+                        {renderInputField('tfc', 'tfc', tfcValue, updateTfcValue)}
+                        {renderInputField('tfd', 'tfd', tfdValue, updateTfdValue)}
                         {renderInputField('td', 'td', tdValue, updateTdValue)}
                       </div>
 
@@ -2252,14 +1852,7 @@ export default function SemanticsPage() {
                     </Button>
                   </CardFooter>
                 </Card>
-              </TabsContent>
 
-              <TabsContent value="results" className="mt-0 space-y-4">
-                <Card className="border-border/40 shadow-sm">
-                  <CardHeader className="bg-muted/30 border-b border-border/30">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="h-8 w-1 bg-primary rounded-full" />
                         <CardTitle>Vcf Calculation Results</CardTitle>
                       </div>
                     </div>
@@ -2315,6 +1908,7 @@ export default function SemanticsPage() {
                               <TableHead className="text-center">Pc</TableHead>
                               <TableHead className="text-center">Pfr</TableHead>
                               <TableHead className="text-center">Ppmax</TableHead>
+                              <TableHead className="text-center">n</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -2330,6 +1924,7 @@ export default function SemanticsPage() {
                                 <TableCell className="text-center">{result.pc?.toFixed(2) || "N/A"}</TableCell>
                                 <TableCell className="text-center">{result.pfr?.toFixed(2) || "N/A"}</TableCell>
                                 <TableCell className="text-center">{result.ppmax?.toFixed(2) || "N/A"}</TableCell>
+                                <TableCell className="text-center">{result.n?.toFixed(0) || "N/A"}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -2388,9 +1983,9 @@ export default function SemanticsPage() {
                   <CardContent className="p-6">
                     <div className="grid gap-6">
                       {/* File Upload Section */}
-                      <div className="">
+                      <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          {/* <Label className="text-base font-medium">Pump Data File</Label> */}
+                          <Label className="text-base font-medium">Pump Data File</Label>
                           {pumpFileName && (
                             <Badge variant="outline" className="px-3 py-1 flex items-center gap-2">
                               {pumpFileName}
@@ -2410,143 +2005,74 @@ export default function SemanticsPage() {
                           )}
                         </div>
                         
-                        {/* File Upload UI - Replace with Pump Data Table */}
                         <div className="flex justify-center">
-                          <div className="w-full overflow-x-auto">
-                            <div className="flex justify-between items-center mb-2">
-                              <h3 className="text-base font-medium">Pump Data Table</h3>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={togglePumpDataTableMinimized}
-                                className="ml-2 h-8 w-8 p-0"
-                              >
-                                {pumpDataTableMinimized ? (
-                                  <Maximize className="h-4 w-4" />
-                                ) : (
-                                  <Minimize className="h-4 w-4" />
-                                )}
-                              </Button>
+                          <div className="w-full max-w-md">
+                            <div className="flex items-center justify-center w-full">
+                              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/30 border-border/50 hover:border-primary/50">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                  <svg className="w-8 h-8 mb-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                  </svg>
+                                  <p className="mb-2 text-sm text-muted-foreground">
+                                    <span className="font-medium">Click to upload</span> or drag and drop
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">Excel file (.xlsx, .xls)</p>
+                                </div>
+                                <input 
+                                  id="dropzone-file" 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept=".xlsx,.xls"
+                                  onChange={handlePumpFileChange}
+                                  ref={fileInputRef}
+                                />
+                              </label>
                             </div>
-                            {!pumpDataTableMinimized && (
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Speed</TableHead>
-                                    <TableHead>Diameter (ɸ=3 1/2")</TableHead>
-                                    <TableHead>Flow (L/min)</TableHead>
-                                    <TableHead>Diameter (ɸ=4")</TableHead>
-                                    <TableHead>Flow (L/min)</TableHead>
-                                    <TableHead>Diameter (ɸ=4 1/2")</TableHead>
-                                    <TableHead>Flow (L/min)</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {PUMP_DATA.map((pump, index) => (
-                                    <TableRow key={index}>
-                                      <TableCell>{pump.type}</TableCell>
-                                      <TableCell>{pump.speed}</TableCell>
-                                      <TableCell>{pump.pressures["3.5"] !== null ? `${pump.pressures["3.5"]} MPa` : "-"}</TableCell>
-                                      <TableCell>{pump.flows["3.5"] !== null ? pump.flows["3.5"] : "-"}</TableCell>
-                                      <TableCell>{pump.pressures["4"] !== null ? `${pump.pressures["4"]} MPa` : "-"}</TableCell>
-                                      <TableCell>{pump.flows["4"] !== null ? pump.flows["4"] : "-"}</TableCell>
-                                      <TableCell>{pump.pressures["4.5"] !== null ? `${pump.pressures["4.5"]} MPa` : "-"}</TableCell>
-                                      <TableCell>{pump.flows["4.5"] !== null ? pump.flows["4.5"] : "-"}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            )}
                           </div>
                         </div>
                       </div>
                       
                       {/* Pump Diameter Selection */}
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-base font-medium">Pump Diameters</Label>
+                        <Label className="text-base font-medium">Select Pump Diameter</Label>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
                           <div className="flex items-center space-x-2">
-                            <Switch 
-                              id="use-instance-diameters"
-                              checked={!useSingleDiameter}
-                              onCheckedChange={(checked) => setUseSingleDiameter(!checked)}
+                            <input
+                              type="radio"
+                              id="diameter-3.5"
+                              value="3.5"
+                              name="pump-diameter"
+                              className="h-4 w-4 text-primary border-primary/50 focus:ring-primary/30"
+                              checked={selectedDiameter === 3.5}
+                              onChange={() => setSelectedDiameter(3.5)}
                             />
-                            <Label htmlFor="use-instance-diameters" className="text-sm font-normal">
-                              Use instance-specific diameters
-                            </Label>
+                            <Label htmlFor="diameter-3.5" className="text-sm font-normal">3.5 inch</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="diameter-4"
+                              value="4"
+                              name="pump-diameter"
+                              className="h-4 w-4 text-primary border-primary/50 focus:ring-primary/30"
+                              checked={selectedDiameter === 4}
+                              onChange={() => setSelectedDiameter(4)}
+                            />
+                            <Label htmlFor="diameter-4" className="text-sm font-normal">4 inch</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="diameter-4.5"
+                              value="4.5"
+                              name="pump-diameter"
+                              className="h-4 w-4 text-primary border-primary/50 focus:ring-primary/30"
+                              checked={selectedDiameter === 4.5}
+                              onChange={() => setSelectedDiameter(4.5)}
+                            />
+                            <Label htmlFor="diameter-4.5" className="text-sm font-normal">4.5 inch</Label>
                           </div>
                         </div>
-
-                        {useSingleDiameter ? (
-                          // Global diameter selector (original UI)
-                          <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="diameter-3.5"
-                                value="3.5"
-                                name="pump-diameter"
-                                className="h-4 w-4 text-primary border-primary/50 focus:ring-primary/30"
-                                checked={selectedDiameter === 3.5}
-                                onChange={() => setSelectedDiameter(3.5)}
-                              />
-                              <Label htmlFor="diameter-3.5" className="text-sm font-normal">3.5 inch</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="diameter-4"
-                                value="4"
-                                name="pump-diameter"
-                                className="h-4 w-4 text-primary border-primary/50 focus:ring-primary/30"
-                                checked={selectedDiameter === 4}
-                                onChange={() => setSelectedDiameter(4)}
-                              />
-                              <Label htmlFor="diameter-4" className="text-sm font-normal">4 inch</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="diameter-4.5"
-                                value="4.5"
-                                name="pump-diameter"
-                                className="h-4 w-4 text-primary border-primary/50 focus:ring-primary/30"
-                                checked={selectedDiameter === 4.5}
-                                onChange={() => setSelectedDiameter(4.5)}
-                              />
-                              <Label htmlFor="diameter-4.5" className="text-sm font-normal">4.5 inch</Label>
-                            </div>
-                          </div>
-                        ) : (
-                          // Instance-specific diameter selectors
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {gcResults && gcResults.length > 0 ? (
-                              gcResults.map((result) => (
-                                <div key={`diameter-instance-${result.instance}`} className="space-y-2">
-                                  <Label className="text-sm">Instance {result.instance}</Label>
-                                  <Select 
-                                    value={instanceDiameters[result.instance]?.toString() || "4"} 
-                                    onValueChange={(value) => updateInstanceDiameter(result.instance, parseFloat(value))}
-                                  >
-                                    <SelectTrigger className="w-full">
-                                      <SelectValue placeholder="Select diameter" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="3.5">3.5 inch</SelectItem>
-                                      <SelectItem value="4">4 inch</SelectItem>
-                                      <SelectItem value="4.5">4.5 inch</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="col-span-3 text-center text-muted-foreground py-2">
-                                Calculate parameters first to set instance-specific diameters
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
 
                       {/* Ppmax Value Display */}
@@ -2558,7 +2084,7 @@ export default function SemanticsPage() {
                               <div key={index} className="flex justify-between items-center">
                                 <span className="text-sm font-medium">Instance {index + 1}:</span>
                                 <span className="font-mono">
-                                  {result.ppmax ? `${result.ppmax.toFixed(4)} MPa/10` : "N/A"}
+                                  {result.ppmax ? `${result.ppmax.toFixed(4)} MPa` : "N/A"}
                                 </span>
                               </div>
                             ))
@@ -2576,7 +2102,7 @@ export default function SemanticsPage() {
                       <Button 
                         onClick={processPumpFileSelection}
                         className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                        disabled={isPumpSelectionLoading || gcResults.length === 0}
+                        disabled={isPumpSelectionLoading || !pumpFile}
                       >
                         {isPumpSelectionLoading ? (
                           <>
@@ -2611,9 +2137,6 @@ export default function SemanticsPage() {
                         <div className="h-8 w-1 bg-green-500 rounded-full" />
                         <CardTitle>Matching Pumps</CardTitle>
                       </div>
-                      <CardDescription>
-                        Showing pumps that meet or exceed the required pressure values
-                      </CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
                       <ScrollArea className="h-[600px] w-full">
@@ -2622,16 +2145,8 @@ export default function SemanticsPage() {
                           {Array.from(new Set(pumpResults.map(p => p.instance))).sort((a, b) => a - b).map(instance => (
                             <div key={instance} className="mb-8">
                               <div className="px-6 py-3 bg-muted/50 border-y border-border/50">
-                                <h3 className="text-lg font-medium flex items-center justify-between">
-                                  <span>
-                                    Instance {instance} - Ppmax: {pumpResults.find(p => p.instance === instance)?.ppmax.toFixed(4)} MPa
-                                  </span>
-                                  <span className="text-sm font-normal flex items-center gap-2">
-                                    <span className="text-muted-foreground">Diameter:</span>
-                                    <Badge variant="outline" className="bg-muted/80">
-                                      {pumpResults.find(p => p.instance === instance)?.diameter}" 
-                                    </Badge>
-                                  </span>
+                                <h3 className="text-lg font-medium">
+                                  Instance {instance} - Ppmax: {pumpResults.find(p => p.instance === instance)?.ppmax.toFixed(4)} MPa
                                 </h3>
                               </div>
                               
@@ -2642,10 +2157,7 @@ export default function SemanticsPage() {
                                     <TableHead>Diameter (in)</TableHead>
                                     <TableHead>Pressure (MPa)</TableHead>
                                     <TableHead>Flow Rate</TableHead>
-                                    <TableHead>Speed</TableHead>
-                                    <TableHead>tfc+tfd</TableHead>
-                                    <TableHead>tc</TableHead>
-                                    <TableHead>n</TableHead>
+                                    <TableHead>Price</TableHead>
                                     <TableHead className="text-right"></TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -2655,29 +2167,20 @@ export default function SemanticsPage() {
                                     .map((pump, index) => (
                                       <TableRow 
                                         key={`${instance}-${index}`}
-                                        className={pump.isRecommended ? "bg-green-500/10" : 
-                                                 pump.isAlternative ? "bg-amber-500/10" : ""}
+                                        className={pump.isRecommended ? "bg-green-500/10" : ""}
                                       >
-                                        <TableCell className="font-medium flex items-center gap-2">
+                                        <TableCell className="font-medium flex items-center">
                                           {pump.type}
                                           {pump.isRecommended && (
-                                            <Badge className="bg-green-500 hover:bg-green-600">
+                                            <Badge className="ml-2 bg-green-500 hover:bg-green-600">
                                               Recommended
-                                            </Badge>
-                                          )}
-                                          {pump.isAlternative && (
-                                            <Badge className="bg-amber-500 hover:bg-amber-600">
-                                              Alternative
                                             </Badge>
                                           )}
                                         </TableCell>
                                         <TableCell>{pump.diameter}</TableCell>
                                         <TableCell>{pump.pressure.toFixed(2)}</TableCell>
                                         <TableCell>{pump.flow.toFixed(2)}</TableCell>
-                                        <TableCell>{pump.speed || '-'}</TableCell>
-                                        <TableCell>{(pump.tfc && pump.tfd) ? (pump.tfc + pump.tfd).toFixed(2) : "N/A"}</TableCell>
-                                        <TableCell>{pump.tc?.toFixed(2) || "N/A"}</TableCell>
-                                        <TableCell>{pump.tc && pump.tad ? Math.ceil(pump.tc / pump.tad + 1).toString() : "N/A"}</TableCell>
+                                        <TableCell>{pump.price.toFixed(2)}</TableCell>
                                         <TableCell className="text-right">
                                           {pump.isRecommended && (
                                             <CheckCircle className="h-5 w-5 text-green-500 inline-block" />

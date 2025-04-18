@@ -18,7 +18,7 @@ interface CalculationInstance {
 }
 
 // Define types for pump results
-interface PumpResult {
+export interface PumpResult {
   type: string;
   diameter: number;
   pressure: number;
@@ -27,6 +27,15 @@ interface PumpResult {
   isRecommended: boolean;
   instance: number;
   ppmax: number;
+  // Time factor fields
+  tfc: number | null;
+  tfd: number | null;
+  tc: number | null;
+  tad: number;
+  isTimeAllowed: boolean | null;
+  // New fields
+  isAlternative?: boolean;
+  speed?: number | null;
 }
 
 interface FileUploadContextType {
@@ -81,7 +90,17 @@ export function FileUploadProvider({ children }: { children: ReactNode }) {
   const [hadData, setHadData] = useState<HADResults | null>(null);
   
   // Pump selection results
-  const [pumpResults, setPumpResults] = useState<PumpResult[]>([]);
+  const [pumpResults, setPumpResultsInternal] = useState<PumpResult[]>([]);
+  
+  // Custom setter with logging for pump results
+  const setPumpResults = (results: PumpResult[]) => {
+    console.log("FileUploadContext: Setting pump results", {
+      count: results.length,
+      instances: results.length > 0 ? Array.from(new Set(results.map(p => p.instance))) : [],
+      firstResult: results[0] || null
+    });
+    setPumpResultsInternal(results);
+  };
 
   return (
     <FileUploadContext.Provider
