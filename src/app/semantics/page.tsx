@@ -1206,9 +1206,17 @@ export default function SemanticsPage() {
           instanceK3 = parseFloat(instanceValues['k3'][instanceNumber]);
         }
         
-        // Calculate Vw (water volume) using the new formula Vw = (K3 * m * gc * Vfc) / γw
-        const vw = (instanceM > 0 && instanceGw > 0) ? 
-                  (instanceK3 * instanceM * gc_value * vcfValue) / instanceGw : null;
+        // Calculate m using the formula: m = (γw * (γc - γfc)) / (γc * (γfc - γw))
+        let calculatedM = null;
+        if (instanceGw > 0 && instanceGc > 0 && instanceGfc > 0 && 
+            (instanceGfc - instanceGw) !== 0) {
+          calculatedM = (instanceGw * (instanceGc - instanceGfc)) / (instanceGc * (instanceGfc - instanceGw));
+        }
+        
+        // Calculate Vw (water volume) using the new formula with calculated m
+        // Only calculate if we have a valid calculated m value
+        const vw = (calculatedM !== null && instanceGw > 0) ? 
+                  (instanceK3 * calculatedM * gc_value * vcfValue) / instanceGw : null;
         
         // Calculate Vfd (volume of fluid displacement)
         const vfd = (instanceGfc && instanceGf) ? 
@@ -1350,10 +1358,11 @@ export default function SemanticsPage() {
                     <p class="font-mono text-sm">Vw = (K3 × m × Gc × Vfc) / γw</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>K3 = ${instanceK3.toFixed(4)}</li>
-                      <li>K3 × m = ${instanceK3.toFixed(4)} × ${instanceM.toFixed(4)} = ${(instanceK3 * instanceM).toFixed(4)}</li>
-                      <li>(K3 × m) × Gc = ${(instanceK3 * instanceM).toFixed(4)} × ${gc_value.toFixed(4)} = ${(instanceK3 * instanceM * gc_value).toFixed(4)}</li>
-                      <li>(K3 × m × Gc) × Vfc = ${(instanceK3 * instanceM * gc_value).toFixed(4)} × ${vcfValue.toFixed(4)} = ${(instanceK3 * instanceM * gc_value * vcfValue).toFixed(4)}</li>
-                      <li>(K3 × m × Gc × Vfc) / γw = ${(instanceK3 * instanceM * gc_value * vcfValue).toFixed(4)} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
+                      <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
+                      <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gc_value.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value * vcfValue).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
                   </div>

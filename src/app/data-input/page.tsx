@@ -20,6 +20,10 @@ export default function DataInput({}: DataInputProps) {
   const [initialLoading, setInitialLoading] = useState(true)
   // Track which fields are using single input mode
   const [singleInputFields, setSingleInputFields] = useState<Record<string, boolean>>({})
+  // Add state to track if we're displaying the transformed dα value
+  const [displayFormattedDalpha, setDisplayFormattedDalpha] = useState(true)
+  // Track the displayed dα value separately
+  const [displayedDalphaValue, setDisplayedDalphaValue] = useState('')
 
   // Load saved data on component mount
   useEffect(() => {
@@ -31,6 +35,11 @@ export default function DataInput({}: DataInputProps) {
         if (savedData) {
           const data = JSON.parse(savedData);
           setFormData(data);
+          
+          // Initialize the displayed dα value if it exists
+          if (data['dα']) {
+            setDisplayedDalphaValue((parseFloat(data['dα']) * 100000).toFixed(2));
+          }
         }
         
         // Try to load the single input preferences
@@ -53,10 +62,30 @@ export default function DataInput({}: DataInputProps) {
   }, [])
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
+    // Special handling for dα
+    if (field === 'dα' && displayFormattedDalpha) {
+      // Store the displayed value
+      setDisplayedDalphaValue(value);
+      
+      // Try to convert to number
+      let numValue = 0;
+      try {
+        numValue = value ? parseFloat(value) : 0;
+      } catch (e) {
+        // Invalid number, just keep the displayed value
+      }
+      
+      // Store the actual value (divided by 100000)
+      setFormData(prev => ({
+        ...prev,
+        [field]: (numValue / 100000).toString()
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
   }
   
   // Handle single input toggle
@@ -183,14 +212,43 @@ export default function DataInput({}: DataInputProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {fields.map(field => (
           <div key={field} className="space-y-2 bg-muted/30 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
-            <Label htmlFor={field} className="text-base font-medium text-primary">{field}</Label>
-            <Input
-              id={field}
-              placeholder={`Enter ${field}`}
-              value={formData[field] || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(field, e.target.value)}
-              className="focus:ring-1 focus:ring-primary"
-            />
+            <Label htmlFor={field} className="text-base font-medium text-primary">
+              {field}
+              {field === 'dα' && displayFormattedDalpha && (
+                <span className="text-xs ml-2 text-muted-foreground">(×10⁻⁵)</span>
+              )}
+            </Label>
+            {field === 'dα' && displayFormattedDalpha ? (
+              <Input
+                id={field}
+                placeholder="Enter value (e.g., 18.8)"
+                value={displayedDalphaValue}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(field, e.target.value)}
+                className="focus:ring-1 focus:ring-primary"
+                inputMode="decimal"
+              />
+            ) : (
+              <Input
+                id={field}
+                placeholder={`Enter ${field}`}
+                value={formData[field] || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(field, e.target.value)}
+                className="focus:ring-1 focus:ring-primary"
+              />
+            )}
+            {field === 'dα' && (
+              <div className="flex items-center gap-2 mt-1">
+                <Switch
+                  id="toggle-dalpha-format"
+                  checked={displayFormattedDalpha}
+                  onCheckedChange={() => setDisplayFormattedDalpha(!displayFormattedDalpha)}
+                  className="scale-75 origin-left"
+                />
+                <Label htmlFor="toggle-dalpha-format" className="text-xs text-muted-foreground cursor-pointer">
+                  {displayFormattedDalpha ? "Using simplified format" : "Using raw value"}
+                </Label>
+              </div>
+            )}
           </div>
         ))}
       </div>
