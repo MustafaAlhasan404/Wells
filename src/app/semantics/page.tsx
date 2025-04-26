@@ -37,6 +37,7 @@ import { GanttChart, Trash2, Check, FileText, LayoutGrid, Table as TableIcon } f
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Slider } from "@/components/ui/slider"
 // import { useToast } from "@/components/ui/use-toast"
+import { calculateDim, HADResults } from "@/utils/casingCalculations";
 
 interface VcfResult {
   instance: number;
@@ -290,11 +291,11 @@ export default function SemanticsPage() {
   const [k1Value, setK1Value] = useState<string>("");  // K1 state variable
   const [k2Value, setK2Value] = useState<string>("");  // K2 state variable
   const [k3Value, setK3Value] = useState<string>("");  // K3 state variable
-  const [mValue, setMValue] = useState<string>("");    // m value for gc calculation
   const [tfcValue, setTfcValue] = useState<string>(""); // tfc value (for compatibility only)
   const [tfdValue, setTfdValue] = useState<string>(""); // tfd value (for compatibility only)
   const [tdValue, setTdValue] = useState<string>("");   // td value
   const [hValue, setHValue] = useState<string>("");     // h value for Vcf calculation
+  const [mValue, setMValue] = useState<string>("");     // m value for Gc calculation
   
   // Track which fields are using single input mode
   const [singleInputFields, setSingleInputFields] = useState<Record<string, boolean>>({});
@@ -335,7 +336,8 @@ export default function SemanticsPage() {
     pumpResults,
     setPumpFile,
     setPumpFileName,
-    setPumpResults
+    setPumpResults,
+    hadData // <-- add hadData from context
   } = useFileUpload();
 
   // Add to state declarations near the top of the component
@@ -384,7 +386,6 @@ export default function SemanticsPage() {
       k1: k1Value,
       k2: k2Value,
       k3: k3Value,
-      m: mValue,
       td: tdValue,
       h: hValue,
       instanceValues: instanceValues,
@@ -449,7 +450,6 @@ export default function SemanticsPage() {
       if (data.k1) setK1Value(data.k1);
       if (data.k2) setK2Value(data.k2);
       if (data.k3) setK3Value(data.k3);
-      if (data.m) setMValue(data.m);
       // Skip tfc and tfd - no longer used
       if (data.td) setTdValue(data.td);
       if (data.h) setHValue(data.h);
@@ -554,7 +554,6 @@ export default function SemanticsPage() {
       setK1Value("");
       setK2Value("");
       setK3Value("");
-      setMValue("");
       setTfcValue("");
       setTfdValue("");
       setTdValue("");
@@ -578,8 +577,8 @@ export default function SemanticsPage() {
     saveInputData();
   }, [
     hcValue, gammaC, gammaW, gammaFC, gammaF,
-    k1Value, k2Value, k3Value, mValue,
-    tfcValue, tfdValue, tdValue,
+    k1Value, k2Value, k3Value,
+    tdValue,
     hValue, instanceValues, singleInputFields
   ]);
 
@@ -595,7 +594,6 @@ export default function SemanticsPage() {
         case 'k1': updateK1Value(value); break;
         case 'k2': updateK2Value(value); break;
         case 'k3': updateK3Value(value); break;
-        case 'm': updateMValue(value); break;
         case 'tfc': updateTfcValue(value); break;
         case 'tfd': updateTfdValue(value); break;
         case 'td': updateTdValue(value); break;
@@ -759,11 +757,33 @@ export default function SemanticsPage() {
         // Get values from the casing table
         const Db = parseFloat(result.nearestBitSize || '0') / 1000; // Nearest bit size in m
         const de = parseFloat(result.dcsg || '0') / 1000; // dcsg in m
-        const di = parseFloat(result.internalDiameter || '0') / 1000; // Internal diameter in m
+        // const di = parseFloat(result.internalDiameter || '0') / 1000; // Internal diameter in m
+
+        // --- Get Dim from HAD data ---
+        let dimValue: number | null = null;
+        if (hadData) {
+          const sectionName = getHadSectionName(result.section);
+          const sectionData = hadData[sectionName];
+          if (sectionData) {
+            const atHeadKeys = Object.keys(sectionData);
+            if (atHeadKeys.length > 0) {
+              const hadRows = sectionData[atHeadKeys[0]];
+              const dimStr = calculateDim(hadRows);
+              const dimNum = parseFloat(dimStr);
+              if (!isNaN(dimNum)) {
+                dimValue = dimNum / 1000; // Convert mm to m
+              }
+            }
+          }
+        }
+        // Fallback to di if Dim is not available
+        if (dimValue === null) {
+          dimValue = parseFloat(result.internalDiameter || '0') / 1000;
+        }
         
         // Add logging to debug
         console.log('Casing result:', result);
-        console.log('Db:', Db, 'de:', de, 'di:', di);
+        console.log('Db:', Db, 'de:', de, 'di:', dimValue);
         
         // Get instance-specific Hc value if available and not in single input mode
         let instanceHc = Hc;
@@ -805,14 +825,14 @@ export default function SemanticsPage() {
         }
         
         // Calculate Vcf: [(k1Db^2-de^2).Hc+di^2.h]
-        const vcf = ((instanceK1 * (Db**2) - de**2) * instanceHc) + (di**2) * h;
+        const vcf = ((instanceK1 * (Db**2) - de**2) * instanceHc) + (dimValue**2) * h;
         
         // Add to results
         results.push({
           instance: i + 1,
           db: Db * 1000,
           de: de * 1000,
-          di: di * 1000,
+          di: dimValue * 1000, // Store Dim as di for display
           h: h,
           vcf: vcf
         });
@@ -821,7 +841,7 @@ export default function SemanticsPage() {
         const step1 = instanceK1 * (Db**2);
         const step2 = step1 - (de**2);
         const step3 = step2 * instanceHc;
-        const step4 = di**2;
+        const step4 = dimValue**2;
         const step5 = step4 * h;
         const step6 = step3 + step5;
         
@@ -848,7 +868,7 @@ export default function SemanticsPage() {
                     <span class="font-mono">Hc = ${instanceHc.toFixed(4)} m</span>
                   </div>
                   <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">di = ${di.toFixed(4)} m (${(di*1000).toFixed(2)} mm)</span>
+                    <span class="font-mono">di = ${dimValue.toFixed(4)} m (${(dimValue*1000).toFixed(2)} mm)</span>
                   </div>
                   <div class="bg-background/50 p-2 rounded border border-border/30">
                     <span class="font-mono">h = ${h.toFixed(4)}</span>
@@ -864,7 +884,7 @@ export default function SemanticsPage() {
                     <li>K1 × Db² = ${instanceK1.toFixed(4)} × ${Db.toFixed(4)}² = ${step1.toFixed(6)}</li>
                     <li>K1 × Db² - de² = ${step1.toFixed(6)} - ${de.toFixed(4)}² = ${step2.toFixed(6)}</li>
                     <li>[(K1 × Db² - de²) × Hc = ${step2.toFixed(6)} × ${instanceHc.toFixed(4)} = ${step3.toFixed(6)}</li>
-                    <li>di² = ${di.toFixed(4)}² = ${step4.toFixed(6)}</li>
+                    <li>di² = ${dimValue.toFixed(4)}² = ${step4.toFixed(6)}</li>
                     <li>di² × h = ${step4.toFixed(6)} × ${h.toFixed(4)} = ${step5.toFixed(6)}</li>
                     <li>[(K1 × Db² - de²) × Hc + di² × h] = ${step3.toFixed(6)} + ${step5.toFixed(6)} = ${step6.toFixed(6)}</li>
                   </ol>
@@ -1768,7 +1788,6 @@ export default function SemanticsPage() {
       case 'k1': return k1Value;
       case 'k2': return k2Value;
       case 'k3': return k3Value;
-      case 'm': return mValue;
       case 'tfc': return tfcValue;
       case 'tfd': return tfdValue;
       case 'td': return tdValue;
@@ -1837,7 +1856,7 @@ export default function SemanticsPage() {
   }, [
     initialLoadComplete,
     hcValue, gammaC, gammaW, gammaFC, gammaF,
-    k1Value, k2Value, k3Value, mValue,
+    k1Value, k2Value, k3Value,
     tdValue,
     hValue, instanceValues, singleInputFields
   ]);
@@ -1965,12 +1984,6 @@ export default function SemanticsPage() {
     setTimeout(() => saveInputData(), 0);
   };
 
-  const updateMValue = (value: string) => {
-    setMValue(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
-  };
-
   const updateTfcValue = (value: string) => {
     setTfcValue(value);
     // Auto-save after changing value
@@ -1993,6 +2006,14 @@ export default function SemanticsPage() {
     setHValue(value);
     // Auto-save after changing value
     setTimeout(() => saveInputData(), 0);
+  };
+
+  // Helper to get HAD section name from casing result section
+  const getHadSectionName = (section: string) => {
+    if (section.toLowerCase().includes("production")) return "Production Section";
+    if (section.toLowerCase().includes("surface")) return "Surface Section";
+    if (section.toLowerCase().includes("intermediate")) return "Intermediate Section";
+    return section + " Section";
   };
 
   return (
@@ -2062,8 +2083,6 @@ export default function SemanticsPage() {
                     {renderInputField('gammaFC', 'γfc', gammaFC, updateGammaFC)}
                     {renderInputField('gammaF', 'γf', gammaF, updateGammaF)}
                   </div>
-
-                  {renderInputField('m', 'm value (for gc only)', mValue, updateMValue)}
 
                   <div className="grid grid-cols-1 gap-4 mt-4">
                     {renderInputField('td', 'td', tdValue, updateTdValue)}
@@ -2206,8 +2225,6 @@ export default function SemanticsPage() {
                         {renderInputField('gammaF', 'γf', gammaF, updateGammaF)}
                       </div>
 
-                      {renderInputField('m', 'm value (for gc only)', mValue, updateMValue)}
-                      
                       {renderInputField('h', 'h (height parameter)', hValue, updateHValue, 'm')}
 
                       <div className="grid grid-cols-1 gap-4 mt-4">

@@ -100,6 +100,7 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                       <TableRow>
                         <TableHead>HAD</TableHead>
                         <TableHead>External Pressure (MPa)</TableHead>
+                        <TableHead>Internal Diameter (mm)</TableHead>
                         <TableHead>Metal Type</TableHead>
                         <TableHead>Tensile Strength (MPa)</TableHead>
                         <TableHead>Unit Weight (kg/m)</TableHead>
@@ -114,6 +115,7 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                         <TableRow key={index}>
                           <TableCell>{item.had.toFixed(2)}</TableCell>
                           <TableCell>{item.externalPressure.toFixed(2)}</TableCell>
+                          <TableCell>{item.internalDiameter !== undefined ? item.internalDiameter.toFixed(2) : '-'}</TableCell>
                           <TableCell>{item.metalType}</TableCell>
                           <TableCell>{item.tensileStrength.toFixed(2)}</TableCell>
                           <TableCell>{item.unitWeight.toFixed(2)}</TableCell>

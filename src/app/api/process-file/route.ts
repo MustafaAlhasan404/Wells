@@ -241,7 +241,8 @@ export async function POST(req: NextRequest) {
                   externalPressure: row.externalPressure,
                   metalType: row.metalType,
                   tensileStrength: row.tensileStrength,
-                  unitWeight: row.unitWeight
+                  unitWeight: row.unitWeight,
+                  internalDiameter: row.internalDiameter
                 };
                 
                 // For Surface Section, cap HAD at inputted depth

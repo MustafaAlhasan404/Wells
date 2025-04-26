@@ -949,6 +949,7 @@ export async function extractAdditionalInfo(
     let metalTypeCol = -1;
     let tensileStrengthCol = -1;
     let unitWeightCol = -1;
+    let internalDiameterCol = -1;
     
     // Find column indexes
     for (let rowIdx = 0; rowIdx < data.length; rowIdx++) {
@@ -972,13 +973,16 @@ export async function extractAdditionalInfo(
       if (rowText.includes('unit weight length lbs/ft')) {
         unitWeightCol = rowText.indexOf('unit weight length lbs/ft');
       }
+      if (rowText.includes('internal diameter')) {
+        internalDiameterCol = rowText.indexOf('internal diameter');
+      }
       
-      if (atHeadCol !== -1 && externalPressureCol !== -1 && metalTypeCol !== -1 && tensileStrengthCol !== -1 && unitWeightCol !== -1) {
+      if (atHeadCol !== -1 && externalPressureCol !== -1 && metalTypeCol !== -1 && tensileStrengthCol !== -1 && unitWeightCol !== -1 && internalDiameterCol !== -1) {
         break;
       }
     }
     
-    if (atHeadCol === -1 || externalPressureCol === -1 || metalTypeCol === -1 || tensileStrengthCol === -1 || unitWeightCol === -1) {
+    if (atHeadCol === -1 || externalPressureCol === -1 || metalTypeCol === -1 || tensileStrengthCol === -1 || unitWeightCol === -1 || internalDiameterCol === -1) {
       return [];
     }
     
@@ -997,13 +1001,15 @@ export async function extractAdditionalInfo(
           const externalPressure = parseFloat(row[externalPressureCol]);
           const tensileStrength = parseFloat(row[tensileStrengthCol]);
           const unitWeight = parseFloat(row[unitWeightCol]);
+          const internalDiameter = parseFloat(row[internalDiameterCol]);
           
           matchingRows.push({
             atHead: rowAtHead,
             externalPressure,
             metalType: rowMetalType,
             tensileStrength,
-            unitWeight
+            unitWeight,
+            internalDiameter
           });
         }
       } catch (e) {

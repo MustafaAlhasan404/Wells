@@ -591,7 +591,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-4 md:pt-6">
-                    <CasingResults results={casingResults} />
+                    <CasingResults results={casingResults} hadData={hadData} />
                   </CardContent>
                 </Card>
 

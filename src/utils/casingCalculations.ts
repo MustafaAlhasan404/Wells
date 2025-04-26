@@ -74,6 +74,7 @@ export interface HADData {
   metalType: string;
   tensileStrength: number;
   unitWeight: number;
+  internalDiameter?: number; // Internal diameter for this row
   depth?: number; // Optional depth for Surface Section
   L1?: number;    // Length of section 1
   L2?: number;    // Length of section 2
@@ -109,6 +110,7 @@ export interface AdditionalInfo {
   metalType: string;
   tensileStrength: number;
   unitWeight: number;
+  internalDiameter: number; // Internal diameter for this row
 }
 
 /**
@@ -499,4 +501,29 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
   console.log("Final calculated data:", JSON.stringify(rows, null, 2));
   
   return updatedData;
+}
+
+/**
+ * Calculate Dim (mean internal diameter) for a HAD section
+ * @param hadSectionData Array of HADData for a section
+ * @returns Dim as a string (mean internal diameter)
+ */
+export function calculateDim(hadSectionData: HADData[] | undefined): string {
+  if (!hadSectionData || hadSectionData.length === 0) return "-";
+  // Collect all Lvalues and their corresponding internal diameters
+  const pairs: { L: number, di: number }[] = [];
+  hadSectionData.forEach(row => {
+    if (row.L1 && row.internalDiameter) pairs.push({ L: row.L1, di: row.internalDiameter });
+    if (row.L2 && row.internalDiameter) pairs.push({ L: row.L2, di: row.internalDiameter });
+    if (row.L3 && row.internalDiameter) pairs.push({ L: row.L3, di: row.internalDiameter });
+    if (row.L4 && row.internalDiameter) pairs.push({ L: row.L4, di: row.internalDiameter });
+  });
+  // Remove zero or negative L values
+  const filtered = pairs.filter(p => p.L > 0);
+  if (filtered.length === 0) return "-";
+  if (filtered.length === 1) return filtered[0].di.toFixed(2);
+  const numerator = filtered.reduce((sum, p) => sum + p.L * p.di, 0);
+  const denominator = filtered.reduce((sum, p) => sum + p.L, 0);
+  if (denominator === 0) return "-";
+  return (numerator / denominator).toFixed(2);
 } 
