@@ -41,52 +41,6 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  // State for input minimization
-  const [inputsMinimized, setInputsMinimized] = useState(false);
-  // Animation state
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  // Animation classes
-  const [inputsAnimationClass, setInputsAnimationClass] = useState("");
-  const [resultsAnimationClass, setResultsAnimationClass] = useState("");
-
-  // Auto-minimize inputs if results exist when component mounts or when results change
-  useEffect(() => {
-    if (casingResults && casingResults.length > 0) {
-      setInputsMinimized(true);
-    }
-  }, [casingResults]);
-
-  // Update section inputs when iterations change
-  useEffect(() => {
-    const numIterations = parseInt(iterations);
-    
-    // Generate section names
-    let sectionNames: string[] = [];
-    if (numIterations === 3) {
-      sectionNames = ["Production", "Intermediate", "Surface"];
-    } else {
-      sectionNames = ["Production"];
-      for (let i = 0; i < numIterations - 2; i++) {
-        sectionNames.push(`Intermediate ${i+1}`);
-      }
-      sectionNames.push("Surface");
-    }
-    
-    // Default metal types
-    const defaultMetalTypes = ["N-80", "P-110", "K-55"];
-    
-    // Create new sections array
-    const newSections = Array(numIterations).fill(null).map((_, i) => {
-      const existingSection = sectionInputs[i];
-      return {
-        multiplier: existingSection?.multiplier || "",
-        metalType: existingSection?.metalType || defaultMetalTypes[Math.min(i, defaultMetalTypes.length - 1)],
-        depth: existingSection?.depth || ""
-      };
-    });
-    
-    setSectionInputs(newSections);
-  }, [iterations]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -184,24 +138,10 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
       setCasingResults(data.results || []);
       setHadData(data.hadData || null);
       
-      // Set animation classes for when results appear
-      setIsTransitioning(true);
-      setInputsMinimized(true);
-      setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-right duration-500");
-      
       showToast('success', "Calculations completed", {
         icon: <CheckCircle className="h-4 w-4 text-green-500" />,
         description: "All calculations have been successfully processed."
       });
-
-      // Reset transition flag after animation completes
-      setTimeout(() => {
-        setIsTransitioning(false);
-        // Keep the fade-in effect but remove the animation classes
-        setInputsAnimationClass("");
-        setResultsAnimationClass("");
-      }, 600);
     } catch (err: any) {
       console.error("Error in submission:", err);
       setError(err.message || "Failed to calculate casing parameters");
@@ -213,33 +153,6 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Toggle minimized state with animation
-  const toggleMinimized = () => {
-    if (casingResults.length === 0) return; // Only allow toggling when there are results
-    
-    setIsTransitioning(true);
-    const newState = !inputsMinimized;
-    setInputsMinimized(newState);
-    
-    // Add animation classes based on the state change
-    if (newState) {
-      // Minimizing - inputs slide to left, results slide from right
-      setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-right duration-500");
-    } else {
-      // Maximizing - inputs slide from left, results slide to right
-      setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-right-reverse duration-500");
-    }
-    
-    // Reset transition flag after animation completes
-    setTimeout(() => {
-      setIsTransitioning(false);
-      setInputsAnimationClass("");
-      setResultsAnimationClass("");
-    }, 600);
   };
 
   const saveData = () => {
@@ -258,19 +171,13 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     });
   };
 
-  // Function to clear all saved data
   const clearSavedData = () => {
     // Clear results
     setCasingResults([]);
     setHadData(null);
-    
     // Clear file data
     setCasingFile(null);
     setCasingFileName("");
-    
-    // Reset UI state
-    setInputsMinimized(false);
-    
     // Show toast notification
     showToast('success', "Data cleared", {
       description: "All casing calculation results have been reset."
@@ -303,8 +210,6 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     
     // Add a LocalStorage persistence indicator if results are restored
     if (casingResults && casingResults.length > 0) {
-      setInputsMinimized(true);
-      
       // Only show the toast if it's the first time loading results
       const hasShownToast = localStorage.getItem('casingResultsToastShown');
       if (!hasShownToast) {
@@ -341,36 +246,15 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                 </>
               )}
             </Button>
-            {/* Toggle button - changes between Minimize and Maximize based on current state */}
             {casingResults.length > 0 && (
-              <>
-                <Button 
-                  onClick={toggleMinimized} 
-                  variant="outline" 
-                  className="gap-2"
-                  title={inputsMinimized ? "Maximize inputs" : "Minimize inputs"}
-                >
-                  {inputsMinimized ? (
-                    <>
-                      <Maximize className="h-4 w-4" />
-                      Maximize
-                    </>
-                  ) : (
-                    <>
-                      <Minimize className="h-4 w-4" />
-                      Minimize
-                    </>
-                  )}
-                </Button>
-                <Button 
-                  onClick={clearSavedData} 
-                  variant="outline" 
-                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  title="Clear all saved data"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </>
+              <Button 
+                onClick={clearSavedData} 
+                variant="outline" 
+                className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                title="Clear all saved data"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             )}
           </div>
         </div>
@@ -378,16 +262,12 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
         <ScrollArea className="h-[calc(100vh-200px)]">
           <div className={cn(
             "space-y-6 md:space-y-10 pb-10",
-            "transition-all duration-500 ease-in-out",
-            isTransitioning && "opacity-90",
-            inputsMinimized && casingResults.length > 0 && "flex flex-col md:flex-row gap-6"
+            "transition-all duration-500 ease-in-out"
           )}>
             {/* Input section */}
             <div className={cn(
               "space-y-6 relative", 
-              "transition-all duration-500 ease-in-out",
-              inputsAnimationClass,
-              inputsMinimized && casingResults.length > 0 && "md:w-1/3"
+              "transition-all duration-500 ease-in-out"
             )}>
               {/* File Upload Card */}
               <Card className="border-primary/20 shadow-md">
@@ -397,10 +277,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                     Select Excel file with casing data
                   </CardDescription>
                 </CardHeader>
-                <CardContent className={cn(
-                  "pt-4 md:pt-6",
-                  inputsMinimized && "hidden md:block"
-                )}>
+                <CardContent className="pt-4 md:pt-6">
                   <div className="flex items-center gap-4">
                     <input 
                       type="file" 
@@ -443,10 +320,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                     Enter calculation parameters
                   </CardDescription>
                 </CardHeader>
-                <CardContent className={cn(
-                  "pt-4 md:pt-6",
-                  inputsMinimized && "hidden md:block"
-                )}>
+                <CardContent className="pt-4 md:pt-6">
                   <div className="space-y-6">
                     <div className="space-y-2">
                       <Label htmlFor="initialDcsgAmount" className="text-base font-medium text-primary">
@@ -489,10 +363,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                     Enter parameters for each section
                   </CardDescription>
                 </CardHeader>
-                <CardContent className={cn(
-                  "pt-4 md:pt-6",
-                  inputsMinimized && "hidden md:block"
-                )}>
+                <CardContent className="pt-4 md:pt-6">
                   <div className="space-y-8">
                     {sectionInputs.map((section, index) => {
                       // Generate section names
@@ -579,8 +450,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
             {casingResults.length > 0 && (
               <div className={cn(
                 "transition-all duration-500 ease-in-out",
-                resultsAnimationClass,
-                inputsMinimized ? "md:w-2/3" : "w-full"
+                "w-full"
               )}>
                 <Card className="border-primary/20 shadow-md">
                   <CardHeader className="bg-muted/50 border-b border-border/50">
