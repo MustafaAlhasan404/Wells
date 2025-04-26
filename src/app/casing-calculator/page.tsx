@@ -42,14 +42,6 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedFile = e.target.files[0];
-      setCasingFile(selectedFile);
-      setCasingFileName(selectedFile.name);
-    }
-  };
-
   const handleSectionInputChange = (index: number, field: keyof SectionInput, value: string) => {
     const updatedInputs = [...sectionInputs];
     updatedInputs[index][field] = value;
@@ -226,6 +218,35 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     }
   }, []);
 
+  // Add a function to load the file from the public directory
+  const loadCasingFile = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/tables/FinalCasingTable.xlsx');
+      if (!response.ok) throw new Error('Failed to fetch the casing file.');
+      const blob = await response.blob();
+      // Create a File object if possible
+      let file: File;
+      try {
+        file = new File([blob], 'FinalCasingTable.xlsx', { type: blob.type });
+      } catch {
+        setError('File API is not supported in this browser.');
+        showToast('error', 'Load failed', { description: 'File API is not supported in this browser.' });
+        setIsLoading(false);
+        return;
+      }
+      setCasingFile(file);
+      setCasingFileName('FinalCasingTable.xlsx');
+      showToast('success', 'File loaded', { description: 'Casing file loaded from public directory.' });
+    } catch (err: any) {
+      setError(err.message || 'Failed to load casing file.');
+      showToast('error', 'Load failed', { description: err.message || 'Failed to load casing file.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background">
       <NavBar />
@@ -274,38 +295,32 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                 <CardHeader className="bg-muted/50 border-b border-border/50">
                   <CardTitle className="text-lg sm:text-xl text-primary/90">File Selection</CardTitle>
                   <CardDescription>
-                    Select Excel file with casing data
+                    Load the casing Excel file from the public directory
+                    {casingFile && <span className="ml-1 text-green-500">(loaded)</span>}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-4 md:pt-6">
-                  <div className="flex items-center gap-4">
-                    <input 
-                      type="file" 
-                      accept=".xlsx,.xls" 
-                      onChange={handleFileChange}
-                      ref={fileInputRef}
-                      className="hidden"
-                    />
-                    <Button 
-                      onClick={() => fileInputRef.current?.click()} 
-                      variant="outline"
-                      className="gap-2"
+                  <div className="space-y-2">
+                    <Button
+                      variant="default"
+                      onClick={loadCasingFile}
+                      disabled={isLoading}
+                      className="w-full"
                     >
-                      <FileUp className="h-4 w-4" />
-                      Select File
+                      {isLoading ? (
+                        <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
+                      ) : (
+                        <>Load</>
+                      )}
                     </Button>
-                    {casingFile && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>{casingFileName}</span>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => setCasingFile(null)}
-                          className="h-6 px-2"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
+                    {casingFileName && (
+                      <div className="text-sm text-muted-foreground truncate">
+                        {casingFileName}
+                      </div>
+                    )}
+                    {error && (
+                      <div className="p-2 mt-2 rounded-md bg-destructive/10 text-destructive text-sm">
+                        {error}
                       </div>
                     )}
                   </div>

@@ -251,11 +251,32 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     };
   };
   
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedFile = e.target.files[0];
-      setDrillCollarFile(selectedFile);
-      setDrillCollarFileName(selectedFile.name);
+  // Add a function to load the file from the public directory
+  const loadDrillCollarFile = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/tables/Formation%20design.xlsx');
+      if (!response.ok) throw new Error('Failed to fetch the drill collar file.');
+      const blob = await response.blob();
+      // Create a File object if possible
+      let file: File;
+      try {
+        file = new File([blob], 'Formation design.xlsx', { type: blob.type });
+      } catch {
+        setError('File API is not supported in this browser.');
+        showToast('error', 'Load failed', { description: 'File API is not supported in this browser.' });
+        setIsLoading(false);
+        return;
+      }
+      setDrillCollarFile(file);
+      setDrillCollarFileName('Formation design.xlsx');
+      showToast('success', 'File loaded', { description: 'Drill collar file loaded from public directory.' });
+    } catch (err: any) {
+      setError(err.message || 'Failed to load drill collar file.');
+      showToast('error', 'Load failed', { description: err.message || 'Failed to load drill collar file.' });
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -453,8 +474,8 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                   <div>
                     <CardTitle className="text-lg text-primary/90">File Selection</CardTitle>
                     <CardDescription className="text-sm">
-                      Upload a drill collar table Excel file
-                      {drillCollarFile && <span className="ml-1 text-green-500">(saved)</span>}
+                      Load the drill collar table Excel file from the public directory
+                      {drillCollarFile && <span className="ml-1 text-green-500">(loaded)</span>}
                     </CardDescription>
                   </div>
                   {drillCollarFile && (
@@ -469,37 +490,23 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                 inputsMinimized && "hidden md:block"
               )}>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="drill-collar-file"
-                      type="file"
-                      accept=".xlsx,.xls"
-                      onChange={handleFileChange}
-                      className="flex-1 focus:ring-1 focus:ring-primary"
-                    />
-                    <Button 
-                      variant="outline" 
-                      size="icon"
-                      onClick={() => {
-                        setDrillCollarFile(null);
-                        setDrillCollarFileName("");
-                        // Also clear from localStorage
-                        localStorage.removeItem('drillCollarFileMetadata');
-                        showToast('info', "File removed", { 
-                          description: "The drill collar file has been removed." 
-                        });
-                      }}
-                      disabled={!drillCollarFile}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    variant="default"
+                    onClick={loadDrillCollarFile}
+                    disabled={isLoading}
+                    className="w-full"
+                  >
+                    {isLoading ? (
+                      <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
+                    ) : (
+                      <>Load</>
+                    )}
+                  </Button>
                   {drillCollarFileName && (
                     <div className="text-sm text-muted-foreground truncate">
                       {drillCollarFileName}
                     </div>
                   )}
-                  
                   {error && (
                     <div className="p-2 mt-2 rounded-md bg-destructive/10 text-destructive text-sm">
                       {error}
