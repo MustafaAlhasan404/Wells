@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Minimize, Maximize } from "lucide-react"
+import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Minimize, Maximize, Download } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
@@ -490,18 +490,28 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                 inputsMinimized && "hidden md:block"
               )}>
                 <div className="space-y-2">
-                  <Button
-                    variant="default"
-                    onClick={loadDrillCollarFile}
-                    disabled={isLoading}
-                    className="w-full"
-                  >
-                    {isLoading ? (
-                      <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
-                    ) : (
-                      <>Load</>
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="default"
+                      onClick={loadDrillCollarFile}
+                      disabled={isLoading}
+                      className="flex-1"
+                    >
+                      {isLoading ? (
+                        <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
+                      ) : (
+                        <>Load</>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open('/tables/Formation%20design.xlsx', '_blank')}
+                      className="px-3"
+                      title="Download Excel file"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
                   {drillCollarFileName && (
                     <div className="text-sm text-muted-foreground truncate">
                       {drillCollarFileName}

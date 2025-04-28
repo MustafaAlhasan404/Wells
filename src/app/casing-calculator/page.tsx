@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { NavBar } from "@/components/nav-bar"
-import { FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, ChevronRight, ChevronLeft, Minimize, Maximize } from "lucide-react"
+import { FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, ChevronRight, ChevronLeft, Minimize, Maximize, Download } from "lucide-react"
 import { SectionInput } from "@/utils/casingCalculations"
 import CasingResults from "@/components/casing-results"
 import HADResults from "@/components/had-results"
@@ -301,18 +301,28 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                 </CardHeader>
                 <CardContent className="pt-4 md:pt-6">
                   <div className="space-y-2">
-                    <Button
-                      variant="default"
-                      onClick={loadCasingFile}
-                      disabled={isLoading}
-                      className="w-full"
-                    >
-                      {isLoading ? (
-                        <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
-                      ) : (
-                        <>Load</>
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="default"
+                        onClick={loadCasingFile}
+                        disabled={isLoading}
+                        className="flex-1"
+                      >
+                        {isLoading ? (
+                          <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
+                        ) : (
+                          <>Load</>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => window.open('/tables/FinalCasingTable.xlsx', '_blank')}
+                        className="px-3"
+                        title="Download Excel file"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
                     {casingFileName && (
                       <div className="text-sm text-muted-foreground truncate">
                         {casingFileName}
