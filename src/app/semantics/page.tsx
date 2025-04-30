@@ -1214,8 +1214,12 @@ export default function SemanticsPage() {
         // Calculate G'c using instance-specific values - G'c = K2.gc.Vfc
         const gc_prime = instanceK2 * gc_value * vcfValue;
         
-        // Calculate nc in sacks - (Vcf * gc_value) / m
-        const nc = instanceM > 0 ? (vcfValue * gc_value) / instanceM : null;
+        // Calculate nc in sacks
+        // Use G'c-based formula when m is zero: nc = (G'c * 1000) / 50
+        // Otherwise use the original formula: nc = (Vcf * gc_value) / m
+        const nc = instanceM > 0 
+                  ? (vcfValue * gc_value) / instanceM 
+                  : (gc_prime * 1000) / 50; // When m is 0, use G'c for calculation
         
         // Get K3 value for this instance
         let instanceK3 = 0;
@@ -1364,10 +1368,14 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">nc (Cement Sacks) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">nc = (Vcf × Gc) / m</p>
+                    <p class="font-mono text-sm">${instanceM > 0 ? 'nc = (Vcf × Gc) / m' : 'nc = (G\'c × 1000) / 50'}</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>Vcf × Gc = ${vcfValue.toFixed(4)} × ${gc_value.toFixed(4)} = ${(vcfValue * gc_value).toFixed(4)}</li>
-                      <li>(Vcf × Gc) / m = ${(vcfValue * gc_value).toFixed(4)} / ${instanceM.toFixed(4)} = ${nc !== null ? nc.toFixed(4) : "N/A"}</li>
+                      ${instanceM > 0 ? 
+                      `<li>Vcf × Gc = ${vcfValue.toFixed(4)} × ${gc_value.toFixed(4)} = ${(vcfValue * gc_value).toFixed(4)}</li>
+                      <li>(Vcf × Gc) / m = ${(vcfValue * gc_value).toFixed(4)} / ${instanceM.toFixed(4)} = ${nc !== null ? nc.toFixed(4) : "N/A"}</li>` 
+                      : 
+                      `<li>G'c × 1000 = ${gc_prime.toFixed(4)} × 1000 = ${(gc_prime * 1000).toFixed(4)}</li>
+                      <li>(G'c × 1000) / 50 = ${(gc_prime * 1000).toFixed(4)} / 50 = ${nc !== null ? nc.toFixed(4) : "N/A"}</li>`}
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">nc = ${nc !== null ? nc.toFixed(4) : "N/A"} sacks</p>
                   </div>
