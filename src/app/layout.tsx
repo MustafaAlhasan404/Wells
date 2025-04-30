@@ -1,23 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "sonner";
 import { FileUploadProvider } from "@/context/FileUploadContext";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Deep Drill",
-  description: "Advanced analytics for well engineering",
+  title: "Deep Drill - Well Formation Analysis",
+  description: "Advanced analytics for well engineering and drill collar design",
 };
 
 export default function RootLayout({
@@ -27,19 +19,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${inter.className} min-h-screen bg-background text-foreground antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >
           <FileUploadProvider>
-            {children}
+            <main className="min-h-screen flex flex-col">
+              {children}
+            </main>
+            <Toaster position="top-right" closeButton richColors />
           </FileUploadProvider>
-          <Toaster />
         </ThemeProvider>
       </body>
     </html>

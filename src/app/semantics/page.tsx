@@ -21,7 +21,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { NavBar } from "@/components/nav-bar"
-import { Calculator, Eye, EyeOff, ArrowRight, RefreshCcw, AlertCircle, X, CheckCircle, Save, Info, AlertTriangle, Loader2, Maximize, Minimize } from "lucide-react"
+import { Calculator, Eye, EyeOff, ArrowRight, RefreshCcw, AlertCircle, X, CheckCircle, Save, Info, AlertTriangle, Loader2, Maximize, Minimize, Settings, Layers, LoaderCircle } from "lucide-react"
 import { toast } from "sonner"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
@@ -38,6 +38,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Slider } from "@/components/ui/slider"
 // import { useToast } from "@/components/ui/use-toast"
 import { calculateDim, HADResults } from "@/utils/casingCalculations";
+import { motion } from "framer-motion"
 
 interface VcfResult {
   instance: number;
@@ -1767,9 +1768,18 @@ export default function SemanticsPage() {
         const newValues = {...instanceValues};
         if (!newValues[field]) newValues[field] = {};
         
+        // Get all instance numbers from vcfResults
+        if (vcfResults && vcfResults.length > 0) {
+          // Apply the value to each instance from Vcf results
+          vcfResults.forEach(result => {
+            newValues[field][result.instance] = fieldValue;
+          });
+        } else {
+          // Fallback to default 3 instances if no vcfResults
         newValues[field][1] = fieldValue;
         newValues[field][2] = fieldValue;
         newValues[field][3] = fieldValue;
+        }
         
         setInstanceValues(newValues);
         // Save after updating instance values
@@ -1904,7 +1914,34 @@ export default function SemanticsPage() {
         ) : (
           // Multiple inputs mode
           <div className="space-y-2">
-            {[1, 2, 3].map(instance => (
+            {vcfResults && vcfResults.length > 0 ? (
+              // Show inputs for each instance from vcfResults
+              vcfResults.map(result => (
+                <div key={`${fieldId}_${result.instance}`} className="space-y-1">
+                  <Label htmlFor={`${fieldId}_${result.instance}`} className="text-sm text-muted-foreground">
+                    Instance {result.instance}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id={`${fieldId}_${result.instance}`}
+                      placeholder={`Enter ${label} (${result.instance})`}
+                      value={instanceValues[fieldId]?.[result.instance] || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                        updateField(fieldId, e.target.value, result.instance)
+                      }
+                      className="pl-3 pr-12 h-10 border-border/50 focus:border-primary"
+                    />
+                    {unit && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                        {unit}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              // Fallback to default 3 instances if no vcfResults
+              [1, 2, 3].map(instance => (
               <div key={`${fieldId}_${instance}`} className="space-y-1">
                 <Label htmlFor={`${fieldId}_${instance}`} className="text-sm text-muted-foreground">
                   Instance {instance}
@@ -1926,7 +1963,8 @@ export default function SemanticsPage() {
                   )}
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         )}
       </div>
@@ -2012,198 +2050,138 @@ export default function SemanticsPage() {
   const getHadSectionName = (section: string) => {
     if (section.toLowerCase().includes("production")) return "Production Section";
     if (section.toLowerCase().includes("surface")) return "Surface Section";
-    if (section.toLowerCase().includes("intermediate")) return "Intermediate Section";
+    
+    // Handle numbered intermediate sections
+    if (section.toLowerCase().includes("intermediate")) {
+      // Extract the number if present (e.g., "Intermediate 1" -> "1")
+      const match = section.match(/intermediate\s+(\d+)/i);
+      if (match && match[1]) {
+        return `Intermediate ${match[1]} Section`;
+      }
+      // Default to generic intermediate if no number found
+      return "Intermediate Section";
+    }
+    
     return section + " Section";
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background/95 dark:bg-background">
+    <div className="min-h-screen flex flex-col bg-background">
       <NavBar />
-      <div className="flex-1 container mx-auto px-4 py-6 space-y-8">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-          <div className="flex flex-col space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">
-              Semantics Analysis
-            </h1>
-            <p className="text-muted-foreground">
-              Calculate and analyze semantic parameters for well construction
-            </p>
+      <div className="flex-1 overflow-auto">
+        {/* Hero section with gradient background */}
+        <div className="relative bg-gradient-to-r from-primary/5 to-primary/10 border-b border-primary/10">
+          <div className="absolute inset-0 bg-grid-pattern opacity-10" style={{
+            backgroundSize: '20px 20px',
+            backgroundImage: `linear-gradient(to right, var(--primary)/20 1px, transparent 1px), 
+                            linear-gradient(to bottom, var(--primary)/20 1px, transparent 1px)`
+          }} />
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+            >
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">
+                  Semantics Design
+                </h1>
+                <p className="mt-2 text-muted-foreground max-w-xl">
+                  Calculate and analyze semantic parameters for well construction and design
+                </p>
+              </div>
+              {/* Visual indicator of process step */}
+              <div className="hidden md:flex items-center space-x-2 bg-background/80 backdrop-blur-sm p-2 rounded-lg border border-border/40 shadow-sm">
+                <div className="flex space-x-1.5">
+                  <div className="h-2 w-2 rounded-full bg-muted"></div>
+                  <div className="h-2 w-2 rounded-full bg-muted"></div>
+                  <div className="h-2 w-6 rounded-full bg-primary"></div>
+                </div>
+                <span className="text-xs font-medium text-primary">Phase 3</span>
+              </div>
+            </motion.div>
           </div>
-          
-          <Button 
-            onClick={saveData} 
-            disabled={isLoading} 
-            className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary"
-          >
-            {isLoading ? (
-              <>
-                <RefreshCcw className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Data
-              </>
-            )}
-          </Button>
         </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column - Input Section */}
-          <div className="lg:col-span-5 space-y-6 lg:hidden">
-            {/* Input Parameters Card */}
-            <Card className="border-border/40 shadow-sm">
-              <CardHeader className="bg-muted/30 border-b border-border/30">
-                <div className="flex items-center space-x-2">
-                  <div className="h-8 w-1 bg-primary rounded-full" />
-                  <div>
-                    <CardTitle>Input Parameters</CardTitle>
-                    <CardDescription>Enter values for calculation</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid gap-6">
-                  {renderInputField('hc', 'Hc Value', hcValue, updateHcValue, 'm')}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {renderInputField('gammaC', 'γc', gammaC, updateGammaC)}
-                    <div className="space-y-2">
-                      <Label htmlFor="gamma-w" className="text-sm font-medium">γw (fixed at 1)</Label>
-                      <Input
-                        id="gamma-w"
-                        value="1"
-                        disabled
-                        className="border-border/50 focus:border-primary bg-muted"
-                      />
-                    </div>
-                    {renderInputField('gammaFC', 'γfc', gammaFC, updateGammaFC)}
-                    {renderInputField('gammaF', 'γf', gammaF, updateGammaF)}
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 mt-4">
-                    {renderInputField('td', 'td', tdValue, updateTdValue)}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    {renderInputField('k1', 'K1', k1Value, updateK1Value)}
-                    {renderInputField('k2', 'K2', k2Value, updateK2Value)}
-                    {renderInputField('k3', 'K3', k3Value, updateK3Value)}
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col space-y-2">
-                <div className="flex gap-2 w-full">
-                  <Button 
-                    onClick={calculateVcf}
-                    className="flex-1 bg-primary/80 hover:bg-primary/90 text-primary-foreground shadow-sm"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
-                        Calculating Vcf...
-                      </>
-                    ) : (
-                      <>
-                        <Calculator className="mr-2 h-4 w-4" />
-                        Calculate Vcf
-                      </>
-                    )}
-                  </Button>
-                </div>
-                
-                <Button 
-                  onClick={calculateGcGc}
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                  disabled={isLoading}
+        <div className="px-4 sm:px-6 md:px-8 lg:px-10 max-w-7xl mx-auto w-full py-6 md:py-10 space-y-6 md:space-y-8">
+          <Tabs defaultValue="inputs" className="w-full">
+            <div className="flex items-center justify-between mb-6">
+              <TabsList className="grid grid-cols-4 w-full max-w-xl bg-zinc-900 rounded-full overflow-hidden p-0 h-12">
+                <TabsTrigger 
+                  value="inputs" 
+                  className="flex items-center justify-center gap-2 h-full rounded-full
+                    data-[state=inactive]:bg-transparent
+                    data-[state=inactive]:text-zinc-400
+                    data-[state=inactive]:hover:text-zinc-300
+                    data-[state=active]:bg-zinc-800
+                    data-[state=active]:text-white"
                 >
-                  {isLoading ? (
-                    <>
-                      <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
-                      Calculating All Parameters...
-                    </>
-                  ) : (
-                    <>
-                      <Calculator className="mr-2 h-4 w-4" />
-                      Calculate All Parameters
-                    </>
-                  )}
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
+                  <Settings className="h-4 w-4" />
+                  <span>Parameters</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="results" 
+                  className="flex items-center justify-center gap-2 h-full rounded-full
+                    data-[state=inactive]:bg-transparent
+                    data-[state=inactive]:text-zinc-400
+                    data-[state=inactive]:hover:text-zinc-300
+                    data-[state=active]:bg-zinc-800
+                    data-[state=active]:text-white"
+                >
+                  <Calculator className="h-4 w-4" />
+                  <span>Results</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="equations" 
+                  className="flex items-center justify-center gap-2 h-full rounded-full
+                    data-[state=inactive]:bg-transparent
+                    data-[state=inactive]:text-zinc-400
+                    data-[state=inactive]:hover:text-zinc-300
+                    data-[state=active]:bg-zinc-800
+                    data-[state=active]:text-white"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>Equations</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="pump-selection" 
+                  className="flex items-center justify-center gap-2 h-full rounded-full
+                    data-[state=inactive]:bg-transparent
+                    data-[state=inactive]:text-zinc-400
+                    data-[state=inactive]:hover:text-zinc-300
+                    data-[state=active]:bg-zinc-800
+                    data-[state=active]:text-white"
+                >
+                  <Layers className="h-4 w-4" />
+                  <span>Pump</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              {(vcfResults.length > 0 || gcResults.length > 0) && (
+              <Button 
+                  onClick={clearSavedData} 
+                  variant="outline" 
+                  size="sm"
+                  className="flex items-center gap-1.5"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Clear</span>
+              </Button>
+              )}
+            </div>
 
-          {/* Right Column - Results Section */}
-          <div className="lg:col-span-12 space-y-6">
-            <Tabs defaultValue="inputs" className="w-full">
-              <div className="flex items-center justify-between mb-6">
-                <TabsList className="inline-flex h-9 items-center justify-center rounded-full bg-background border border-border/50 p-0.5">
-                  <TabsTrigger 
-                    value="inputs" 
-                    className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
-                  >
-                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                    Inputs
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="results" 
-                    className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
-                  >
-                    <Calculator className="mr-2 h-4 w-4" />
-                    Results
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="equations" 
-                    className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
-                  >
-                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M4 7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7C20 7.55228 19.5523 8 19 8H5C4.44772 8 4 7.55228 4 7Z" fill="currentColor"/>
-                      <path d="M4 12C4 11.4477 4.44772 11 5 11H19C19.5523 11 20 11.4477 20 12C20 12.5523 19.5523 13 19 13H5C4.44772 13 4 12.5523 4 12Z" fill="currentColor"/>
-                      <path d="M5 16C4.44772 16 4 16.4477 4 17C4 17.5523 4.44772 18 5 18H19C19.5523 18 20 17.5523 20 17C20 16.4477 19.5523 16 19 16H5Z" fill="currentColor"/>
-                    </svg>
-                    Equations
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="pump-selection" 
-                    className="inline-flex items-center justify-center whitespace-nowrap rounded-full px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-gradient-to-r from-primary/90 to-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm hover:bg-muted/40"
-                  >
-                    <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M14 8V4C14 3.44772 13.5523 3 13 3H4C3.44772 3 3 3.44772 3 4V8C3 8.55228 3.44772 9 4 9H13C13.5523 9 14 8.55228 14 8Z" fill="currentColor"/>
-                      <path d="M4 11C3.44772 11 3 11.4477 3 12V20C3 20.5523 3.44772 21 4 21H20C20.5523 21 21 20.5523 21 20V12C21 11.4477 20.5523 11 20 11H4Z" fill="currentColor"/>
-                      <circle cx="17.5" cy="6.5" r="3.5" fill="currentColor"/>
-                    </svg>
-                    Pump Selection
-                  </TabsTrigger>
-                </TabsList>
-                
-                {(vcfResults.length > 0 || gcResults.length > 0) && (
-                  <Button 
-                    onClick={clearSavedData} 
-                    variant="outline" 
-                    className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    title="Clear all saved data"
-                  >
-                    <X className="h-4 w-4" />
-                    Clear
-                  </Button>
-                )}
-              </div>
-
-              <TabsContent value="inputs" className="mt-0 space-y-4">
-                <Card className="border-border/40 shadow-sm">
-                  <CardHeader className="bg-muted/30 border-b border-border/30">
-                    <div className="flex items-center justify-between">
+            <TabsContent value="inputs" className="mt-0 space-y-4">
+                <Card className="border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardHeader className="bg-muted/40 border-b border-border/40 flex items-center">
+                    <div>
                       <div className="flex items-center space-x-2">
-                        <div className="h-8 w-1 bg-primary rounded-full" />
-                        <CardTitle>Input Parameters</CardTitle>
+                      <Settings className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-lg sm:text-xl text-primary/90">Input Parameters</CardTitle>
                       </div>
+                    <CardDescription className="mt-1.5">
+                      Enter essential parameters for semantics calculations
+                      </CardDescription>
                     </div>
                   </CardHeader>
                   <CardContent className="p-6">
@@ -2213,12 +2191,12 @@ export default function SemanticsPage() {
                       <div className="grid grid-cols-2 gap-4">
                         {renderInputField('gammaC', 'γc', gammaC, updateGammaC)}
                         <div className="space-y-2">
-                          <Label htmlFor="tab-gamma-w" className="text-sm font-medium">γw (fixed at 1)</Label>
+                        <Label htmlFor="tab-gamma-w" className="text-sm font-medium">γw (fixed at 1)</Label>
                           <Input
-                            id="tab-gamma-w"
+                          id="tab-gamma-w"
                             value="1"
                             disabled
-                            className="border-border/50 focus:border-primary bg-muted"
+                          className="border-border/50 focus:border-primary bg-muted/50"
                           />
                         </div>
                         {renderInputField('gammaFC', 'γfc', gammaFC, updateGammaFC)}
@@ -2238,498 +2216,451 @@ export default function SemanticsPage() {
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col space-y-2">
-                    <div className="flex gap-2 w-full">
+                <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col sm:flex-row gap-2">
                       <Button 
                         onClick={calculateVcf}
-                        className="flex-1 bg-primary/80 hover:bg-primary/90 text-primary-foreground shadow-sm"
+                    className="flex-1 bg-primary/80 hover:bg-primary/90 text-primary-foreground shadow-sm gap-2"
                         disabled={isLoading}
                       >
                         {isLoading ? (
                           <>
-                            <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
-                            Calculating Vcf...
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                        <span>Calculating...</span>
                           </>
                         ) : (
                           <>
-                            <Calculator className="mr-2 h-4 w-4" />
-                            Calculate Vcf
+                        <Calculator className="h-4 w-4" />
+                        <span>Calculate Vcf</span>
                           </>
                         )}
                       </Button>
-                    </div>
                     
                     <Button 
                       onClick={calculateGcGc}
-                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm gap-2"
                       disabled={isLoading}
                     >
                       {isLoading ? (
                         <>
-                          <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
-                          Calculating All Parameters...
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                        <span>Calculating...</span>
                         </>
                       ) : (
                         <>
-                          <Calculator className="mr-2 h-4 w-4" />
-                          Calculate All Parameters
+                        <Calculator className="h-4 w-4" />
+                        <span>Calculate All</span>
                         </>
                       )}
                     </Button>
                   </CardFooter>
                 </Card>
-              </TabsContent>
+            </TabsContent>
 
-              <TabsContent value="results" className="mt-0 space-y-4">
-                <Card className="border-border/40 shadow-sm">
-                  <CardHeader className="bg-muted/30 border-b border-border/30">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="h-8 w-1 bg-primary rounded-full" />
-                        <CardTitle>Vcf Calculation Results</CardTitle>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <ScrollArea className="h-[300px] w-full">
-                      <div className="p-6">
-                        {isLoading ? (
-                          <div className="space-y-4">
-                            <Skeleton className="h-4 w-full" />
-                            <Skeleton className="h-4 w-[90%]" />
-                            <Skeleton className="h-4 w-[95%]" />
-                          </div>
-                        ) : resultsHTML ? (
-                          <div 
-                            dangerouslySetInnerHTML={{ __html: resultsHTML }}
-                            className="prose prose-sm max-w-none dark:prose-invert"
-                          />
-                        ) : (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>Enter parameters and calculate to see results</p>
-                          </div>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-
-                {/* GcResults Table */}
-                {gcResults.length > 0 && (
-                  <Card className="border-border/40 shadow-sm mt-6">
-                    <CardHeader className="bg-muted/30 border-b border-border/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className="h-8 w-1 bg-green-500 rounded-full" />
-                          <CardTitle>Gc/G'c Calculation Results</CardTitle>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-center">Instance</TableHead>
-                              <TableHead className="text-center">Vcf</TableHead>
-                              <TableHead className="text-center">Gc</TableHead>
-                              <TableHead className="text-center">nc (sacks)</TableHead>
-                              <TableHead className="text-center">Vw</TableHead>
-                              <TableHead className="text-center">Vfd</TableHead>
-                              <TableHead className="text-center">Pymax</TableHead>
-                              <TableHead className="text-center">Pc</TableHead>
-                              <TableHead className="text-center">Pfr</TableHead>
-                              <TableHead className="text-center">Ppmax</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {gcResults.map((result, index) => (
-                              <TableRow key={index}>
-                                <TableCell className="text-center font-medium">{result.instance}</TableCell>
-                                <TableCell className="text-center">{result.vcf?.toFixed(4) || "N/A"}</TableCell>
-                                <TableCell className="text-center">{result.gc?.toFixed(4) || "N/A"}</TableCell>
-                                <TableCell className="text-center">{result.nc?.toFixed(2) || "N/A"}</TableCell>
-                                <TableCell className="text-center">{result.vw?.toFixed(2) || "N/A"}</TableCell>
-                                <TableCell className="text-center">{result.vfd?.toFixed(2) || "N/A"}</TableCell>
-                                <TableCell className="text-center">{result.pymax?.toFixed(2) || "N/A"}</TableCell>
-                                <TableCell className="text-center">{result.pc?.toFixed(2) || "N/A"}</TableCell>
-                                <TableCell className="text-center">{result.pfr?.toFixed(2) || "N/A"}</TableCell>
-                                <TableCell className="text-center">{result.ppmax?.toFixed(2) || "N/A"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              <TabsContent value="equations" className="mt-0 space-y-4">
-                <Card className="border-border/40 shadow-sm">
-                  <CardHeader className="bg-muted/30 border-b border-border/30">
+            <TabsContent value="results" className="mt-0 space-y-4">
+              <Card className="border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardHeader className="bg-muted/40 border-b border-border/40 flex items-center">
+                            <div>
                     <div className="flex items-center space-x-2">
-                      <div className="h-8 w-1 bg-primary rounded-full" />
-                      <CardTitle>Calculation Equations</CardTitle>
-                    </div>
-                  </CardHeader>
+                      <Calculator className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-lg sm:text-xl text-primary/90">Vcf Calculation Results</CardTitle>
+                            </div>
+                    <CardDescription className="mt-1.5">
+                      View calculated volume of cement fluid values
+                    </CardDescription>
+                        </div>
+                      </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[300px] w-full">
+                    <div className="p-6">
+                      {isLoading ? (
+                          <div className="space-y-4">
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-[90%]" />
+                          <Skeleton className="h-4 w-[95%]" />
+                                </div>
+                      ) : resultsHTML ? (
+                        <div 
+                          dangerouslySetInnerHTML={{ __html: resultsHTML }}
+                          className="prose prose-sm max-w-none dark:prose-invert"
+                        />
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Enter parameters and calculate to see results</p>
+                                </div>
+                      )}
+                                </div>
+                  </ScrollArea>
+                      </CardContent>
+                    </Card>
+                  
+              {/* GcResults Table */}
+              {gcResults.length > 0 && (
+                <Card className="border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm mt-6">
+                  <CardHeader className="bg-muted/40 border-b border-border/40 flex items-center">
+                          <div>
+                      <div className="flex items-center space-x-2">
+                        <Layers className="h-5 w-5 text-primary" />
+                        <CardTitle className="text-lg sm:text-xl text-primary/90">Gc/G'c Calculation Results</CardTitle>
+                          </div>
+                      <CardDescription className="mt-1.5">
+                        View cement grade calculation parameters
+                      </CardDescription>
+                        </div>
+                      </CardHeader>
                   <CardContent className="p-0">
-                    <ScrollArea className="h-[600px] w-full">
-                      <div className="p-6">
-                        {equationHTML ? (
-                          <div 
-                            dangerouslySetInnerHTML={{ __html: equationHTML }}
-                            className="prose prose-sm max-w-none dark:prose-invert"
-                          />
-                        ) : (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <svg className="h-12 w-12 mx-auto mb-4 opacity-50" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M4 7C4 6.44772 4.44772 6 5 6H19C19.5523 6 20 6.44772 20 7C20 7.55228 19.5523 8 19 8H5C4.44772 8 4 7.55228 4 7Z" fill="currentColor"/>
-                              <path d="M4 12C4 11.4477 4.44772 11 5 11H19C19.5523 11 20 11.4477 20 12C20 12.5523 19.5523 13 19 13H5C4.44772 13 4 12.5523 4 12Z" fill="currentColor"/>
-                              <path d="M5 16C4.44772 16 4 16.4477 4 17C4 17.5523 4.44772 18 5 18H19C19.5523 18 20 17.5523 20 17C20 16.4477 19.5523 16 19 16H5Z" fill="currentColor"/>
-                            </svg>
-                            <p>Equations will appear after calculation</p>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-center">Instance</TableHead>
+                            <TableHead className="text-center">Vcf</TableHead>
+                            <TableHead className="text-center">Gc</TableHead>
+                            <TableHead className="text-center">nc (sacks)</TableHead>
+                            <TableHead className="text-center">Vw</TableHead>
+                            <TableHead className="text-center">Vfd</TableHead>
+                            <TableHead className="text-center">Pymax</TableHead>
+                            <TableHead className="text-center">Pc</TableHead>
+                            <TableHead className="text-center">Pfr</TableHead>
+                            <TableHead className="text-center">Ppmax</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {gcResults.map((result, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="text-center font-medium">{result.instance}</TableCell>
+                              <TableCell className="text-center">{result.vcf?.toFixed(4) || "N/A"}</TableCell>
+                              <TableCell className="text-center">{result.gc?.toFixed(4) || "N/A"}</TableCell>
+                              <TableCell className="text-center">{result.nc?.toFixed(2) || "N/A"}</TableCell>
+                              <TableCell className="text-center">{result.vw?.toFixed(2) || "N/A"}</TableCell>
+                              <TableCell className="text-center">{result.vfd?.toFixed(2) || "N/A"}</TableCell>
+                              <TableCell className="text-center">{result.pymax?.toFixed(2) || "N/A"}</TableCell>
+                              <TableCell className="text-center">{result.pc?.toFixed(2) || "N/A"}</TableCell>
+                              <TableCell className="text-center">{result.pfr?.toFixed(2) || "N/A"}</TableCell>
+                              <TableCell className="text-center">{result.ppmax?.toFixed(2) || "N/A"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                            </div>
+                      </CardContent>
+                    </Card>
+              )}
+                  </TabsContent>
+                  
+            <TabsContent value="equations" className="mt-0 space-y-4">
+              <Card className="border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardHeader className="bg-muted/40 border-b border-border/40 flex items-center">
+                            <div>
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-lg sm:text-xl text-primary/90">Calculation Equations</CardTitle>
+                            </div>
+                    <CardDescription className="mt-1.5">
+                      Detailed explanation of the formulas used in calculations
+                    </CardDescription>
+                          </div>
+                          <Button
+                    variant="ghost" 
+                    size="icon" 
+                            onClick={toggleEquationsMinimized}
+                    className="ml-auto"
+                          >
+                    {equationsMinimized ? <Maximize className="h-4 w-4" /> : <Minimize className="h-4 w-4" />}
+                          </Button>
+                      </CardHeader>
+                <CardContent className={cn("transition-all duration-300", equationsMinimized ? "max-h-96" : "max-h-[800px]")}>
+                  <ScrollArea className={cn("w-full", equationsMinimized ? "h-96" : "h-[800px]")}>
+                    <div className="p-6">
+                      {equationHTML ? (
+                        <div 
+                          dangerouslySetInnerHTML={{ __html: equationHTML }}
+                          className="prose prose-sm max-w-none dark:prose-invert"
+                        />
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>Calculate parameters to view equations and steps</p>
                           </div>
                         )}
-                      </div>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="pump-selection" className="mt-0 space-y-4">
-                <Card className="border-border/40 shadow-sm">
-                  <CardHeader className="bg-muted/30 border-b border-border/30">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="h-8 w-1 bg-primary rounded-full" />
-                        <div>
-                          <CardTitle>Pump Selection</CardTitle>
-                          <CardDescription>Upload Excel file to select suitable pumps based on Ppmax</CardDescription>
-                        </div>
-                      </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="grid gap-6">
-                      {/* File Upload Section */}
-                      <div className="">
+                  </ScrollArea>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+            <TabsContent value="pump-selection" className="mt-0 space-y-4">
+              <Card className="border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardHeader className="bg-muted/40 border-b border-border/40 flex items-center">
+                            <div>
+                    <div className="flex items-center space-x-2">
+                      <Layers className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-lg sm:text-xl text-primary/90">Pump Selection</CardTitle>
+                            </div>
+                    <CardDescription className="mt-1.5">
+                      Find optimal pumps based on calculated parameters
+                    </CardDescription>
+                          </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          {/* <Label className="text-base font-medium">Pump Data File</Label> */}
-                          {pumpFileName && (
-                            <Badge variant="outline" className="px-3 py-1 flex items-center gap-2">
-                              {pumpFileName}
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-4 w-4 text-muted-foreground hover:text-destructive"
-                                onClick={() => {
-                                  setPumpFile(null);
-                                  setPumpFileName("");
-                                  if (fileInputRef.current) fileInputRef.current.value = "";
-                                }}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </Badge>
-                          )}
+                          <Label htmlFor="diameter-selection" className="text-base font-medium text-primary">Select Diameter</Label>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="toggle-diameter" className="text-xs text-muted-foreground">
+                              Use for all instances
+                            </Label>
+                            <Switch 
+                              id="toggle-diameter"
+                              checked={useSingleDiameter}
+                              onCheckedChange={setUseSingleDiameter}
+                            />
+                          </div>
                         </div>
                         
-                        {/* File Upload UI - Replace with Pump Data Table */}
-                        <div className="flex justify-center">
-                          <div className="w-full overflow-x-auto">
-                            <div className="flex justify-between items-center mb-2">
-                              <h3 className="text-base font-medium">Pump Data Table</h3>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={togglePumpDataTableMinimized}
-                                className="ml-2 h-8 w-8 p-0"
-                              >
-                                {pumpDataTableMinimized ? (
-                                  <Maximize className="h-4 w-4" />
-                                ) : (
-                                  <Minimize className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
-                            {!pumpDataTableMinimized && (
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Speed</TableHead>
-                                    <TableHead>Diameter (ɸ=3 1/2")</TableHead>
-                                    <TableHead>Flow (L/min)</TableHead>
-                                    <TableHead>Diameter (ɸ=4")</TableHead>
-                                    <TableHead>Flow (L/min)</TableHead>
-                                    <TableHead>Diameter (ɸ=4 1/2")</TableHead>
-                                    <TableHead>Flow (L/min)</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {PUMP_DATA.map((pump, index) => (
-                                    <TableRow key={index}>
-                                      <TableCell>{pump.type}</TableCell>
-                                      <TableCell>{pump.speed}</TableCell>
-                                      <TableCell>{pump.pressures["3.5"] !== null ? `${pump.pressures["3.5"]} MPa` : "-"}</TableCell>
-                                      <TableCell>{pump.flows["3.5"] !== null ? pump.flows["3.5"] : "-"}</TableCell>
-                                      <TableCell>{pump.pressures["4"] !== null ? `${pump.pressures["4"]} MPa` : "-"}</TableCell>
-                                      <TableCell>{pump.flows["4"] !== null ? pump.flows["4"] : "-"}</TableCell>
-                                      <TableCell>{pump.pressures["4.5"] !== null ? `${pump.pressures["4.5"]} MPa` : "-"}</TableCell>
-                                      <TableCell>{pump.flows["4.5"] !== null ? pump.flows["4.5"] : "-"}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            )}
+                        {useSingleDiameter ? (
+                          <Select
+                            value={selectedDiameter.toString()}
+                            onValueChange={(value) => setSelectedDiameter(parseFloat(value))}
+                          >
+                            <SelectTrigger id="diameter-selection" className="w-full focus:ring-1 focus:ring-primary">
+                              <SelectValue placeholder="Select pump diameter" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="3.5">3.5"</SelectItem>
+                              <SelectItem value="4">4"</SelectItem>
+                              <SelectItem value="4.5">4.5"</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="space-y-3">
+                            {vcfResults.map(result => (
+                              <div key={`diameter-${result.instance}`} className="flex items-center gap-3">
+                                <Label className="w-24 text-sm">Instance {result.instance}</Label>
+                                <Select
+                                  value={instanceDiameters[result.instance]?.toString() || "4"}
+                                  onValueChange={(value) => updateInstanceDiameter(result.instance, parseFloat(value))}
+                                >
+                                  <SelectTrigger className="w-full focus:ring-1 focus:ring-primary">
+                                    <SelectValue placeholder="Select diameter" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="3.5">3.5"</SelectItem>
+                                    <SelectItem value="4">4"</SelectItem>
+                                    <SelectItem value="4.5">4.5"</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            ))}
                           </div>
-                        </div>
+                        )}
                       </div>
                       
-                      {/* Pump Diameter Selection */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-base font-medium">Pump Diameters</Label>
-                          <div className="flex items-center space-x-2">
-                            <Switch 
-                              id="use-instance-diameters"
-                              checked={!useSingleDiameter}
-                              onCheckedChange={(checked) => setUseSingleDiameter(!checked)}
-                            />
-                            <Label htmlFor="use-instance-diameters" className="text-sm font-normal">
-                              Use instance-specific diameters
-                            </Label>
-                          </div>
-                        </div>
-
-                        {useSingleDiameter ? (
-                          // Global diameter selector (original UI)
-                          <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="diameter-3.5"
-                                value="3.5"
-                                name="pump-diameter"
-                                className="h-4 w-4 text-primary border-primary/50 focus:ring-primary/30"
-                                checked={selectedDiameter === 3.5}
-                                onChange={() => setSelectedDiameter(3.5)}
-                              />
-                              <Label htmlFor="diameter-3.5" className="text-sm font-normal">3.5 inch</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="diameter-4"
-                                value="4"
-                                name="pump-diameter"
-                                className="h-4 w-4 text-primary border-primary/50 focus:ring-primary/30"
-                                checked={selectedDiameter === 4}
-                                onChange={() => setSelectedDiameter(4)}
-                              />
-                              <Label htmlFor="diameter-4" className="text-sm font-normal">4 inch</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="diameter-4.5"
-                                value="4.5"
-                                name="pump-diameter"
-                                className="h-4 w-4 text-primary border-primary/50 focus:ring-primary/30"
-                                checked={selectedDiameter === 4.5}
-                                onChange={() => setSelectedDiameter(4.5)}
-                              />
-                              <Label htmlFor="diameter-4.5" className="text-sm font-normal">4.5 inch</Label>
-                            </div>
-                          </div>
-                        ) : (
-                          // Instance-specific diameter selectors
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {gcResults && gcResults.length > 0 ? (
-                              gcResults.map((result) => (
-                                <div key={`diameter-instance-${result.instance}`} className="space-y-2">
-                                  <Label className="text-sm">Instance {result.instance}</Label>
-                                  <Select 
-                                    value={instanceDiameters[result.instance]?.toString() || "4"} 
-                                    onValueChange={(value) => updateInstanceDiameter(result.instance, parseFloat(value))}
-                                  >
-                                    <SelectTrigger className="w-full">
-                                      <SelectValue placeholder="Select diameter" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="3.5">3.5 inch</SelectItem>
-                                      <SelectItem value="4">4 inch</SelectItem>
-                                      <SelectItem value="4.5">4.5 inch</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="col-span-3 text-center text-muted-foreground py-2">
-                                Calculate parameters first to set instance-specific diameters
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Ppmax Value Display */}
-                      <div className="space-y-3">
-                        <Label className="text-base font-medium">Current Ppmax Values</Label>
-                        <div className="bg-muted/40 p-3 rounded-md border border-border/50 space-y-2">
-                          {gcResults && gcResults.length > 0 ? (
-                            gcResults.map((result, index) => (
-                              <div key={index} className="flex justify-between items-center">
-                                <span className="text-sm font-medium">Instance {index + 1}:</span>
-                                <span className="font-mono">
-                                  {result.ppmax ? `${result.ppmax.toFixed(4)} MPa/10` : "N/A"}
-                                </span>
-                              </div>
-                            ))
+                      <div className="flex flex-col justify-end space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                          Select the appropriate pump diameter for your calculations. Run the process to find the best pump configurations.
+                        </p>
+                            <Button
+                          onClick={processPumpFileSelection} 
+                          disabled={isPumpSelectionLoading || gcResults.length === 0} 
+                          className="mt-auto bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm gap-2"
+                        >
+                          {isPumpSelectionLoading ? (
+                            <>
+                              <LoaderCircle className="h-4 w-4 animate-spin" />
+                              <span>Processing...</span>
+                            </>
                           ) : (
-                            <span className="text-muted-foreground">
-                              Calculate parameters first to get Ppmax values
-                            </span>
+                            <>
+                              <Calculator className="h-4 w-4" />
+                              <span>Run Pump Selection</span>
+                            </>
                           )}
-                        </div>
+                            </Button>
                       </div>
                     </div>
-                  </CardContent>
-                  <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col space-y-2">
-                    <div className="flex gap-2 w-full">
-                      <Button 
-                        onClick={processPumpFileSelection}
-                        className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                        disabled={isPumpSelectionLoading || gcResults.length === 0}
-                      >
-                        {isPumpSelectionLoading ? (
-                          <>
-                            <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
-                            Finding Pumps...
-                          </>
-                        ) : (
-                          <>
-                            <Calculator className="mr-2 h-4 w-4" />
-                            Find Matching Pumps
-                          </>
-                        )}
-                      </Button>
-                      {pumpResults.length > 0 && (
-                        <Button 
-                          onClick={clearPumpResults}
-                          variant="outline" 
-                          className="px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                            
+                    <div className="pt-4 border-t border-border/30">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-medium text-primary/90">Pump Data</h3>
+                            <Button
+                          variant="ghost" 
+                              size="sm"
+                          onClick={togglePumpDataTableMinimized}
+                          className="gap-1"
+                            >
+                          {pumpDataTableMinimized ? "Show Details" : "Hide Details"}
+                          {pumpDataTableMinimized ? <Maximize className="h-3.5 w-3.5" /> : <Minimize className="h-3.5 w-3.5" />}
+                            </Button>
+                          </div>
+                      
+                      {!pumpDataTableMinimized && (
+                        <div className="border border-border/30 rounded-md overflow-hidden">
+                          <ScrollArea className="h-80 w-full">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Pump Type</TableHead>
+                                  <TableHead>Speed</TableHead>
+                                  <TableHead>3.5" Pressure</TableHead>
+                                  <TableHead>3.5" Flow</TableHead>
+                                  <TableHead>4" Pressure</TableHead>
+                                  <TableHead>4" Flow</TableHead>
+                                  <TableHead>4.5" Pressure</TableHead>
+                                  <TableHead>4.5" Flow</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {PUMP_DATA.map((pump, index) => (
+                                  <TableRow key={index}>
+                                    <TableCell>{pump.type}</TableCell>
+                                    <TableCell>{pump.speed}</TableCell>
+                                    <TableCell>{pump.pressures["3.5"] !== null ? pump.pressures["3.5"] : "-"}</TableCell>
+                                    <TableCell>{pump.flows["3.5"] !== null ? pump.flows["3.5"] : "-"}</TableCell>
+                                    <TableCell>{pump.pressures["4"] !== null ? pump.pressures["4"] : "-"}</TableCell>
+                                    <TableCell>{pump.flows["4"] !== null ? pump.flows["4"] : "-"}</TableCell>
+                                    <TableCell>{pump.pressures["4.5"] !== null ? pump.pressures["4.5"] : "-"}</TableCell>
+                                    <TableCell>{pump.flows["4.5"] !== null ? pump.flows["4.5"] : "-"}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </ScrollArea>
+                        </div>
                       )}
                     </div>
-                  </CardFooter>
-                </Card>
-                
-                {/* Add the pump results display here where it belongs */}
-                {pumpResults.length > 0 && (
-                  <Card className="border-border/40 shadow-sm mt-4">
-                    <CardHeader className="bg-muted/30 border-b border-border/30">
-                      <div className="flex items-center space-x-2">
-                        <div className="h-8 w-1 bg-green-500 rounded-full" />
-                        <CardTitle>Matching Pumps</CardTitle>
-                      </div>
-                      <CardDescription>
-                        Showing pumps that meet or exceed the required pressure values
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <ScrollArea className="h-[600px] w-full">
-                        <div className="p-0">
-                          {/* Group pumps by instance */}
-                          {Array.from(new Set(pumpResults.map(p => p.instance))).sort((a, b) => a - b).map(instance => (
-                            <div key={instance} className="mb-8">
-                              <div className="px-6 py-3 bg-muted/50 border-y border-border/50">
-                                <h3 className="text-lg font-medium flex items-center justify-between">
-                                  <span>
-                                    Instance {instance} - Ppmax: {pumpResults.find(p => p.instance === instance)?.ppmax.toFixed(4)} MPa
-                                  </span>
-                                  <span className="text-sm font-normal flex items-center gap-2">
-                                    <span className="text-muted-foreground">Diameter:</span>
-                                    <Badge variant="outline" className="bg-muted/80">
-                                      {pumpResults.find(p => p.instance === instance)?.diameter}" 
-                                    </Badge>
-                                  </span>
-                                </h3>
+                    
+                    {/* Pump Results Section */}
+                    {pumpResults && pumpResults.length > 0 && (
+                      <div className="pt-4 border-t border-border/30">
+                        <h3 className="text-lg font-medium text-primary/90 mb-4">Selected Pumps</h3>
+                          <div className="space-y-6">
+                          {[...new Set(pumpResults.map(pump => pump.instance))].map(instance => {
+                            const pumpsForInstance = pumpResults.filter(pump => pump.instance === instance);
+                            const recommendedPump = pumpsForInstance.find(pump => pump.isRecommended);
+                            
+                            return (
+                              <div key={`instance-${instance}`} className="border border-border/30 rounded-md overflow-hidden">
+                                <div className="bg-muted/30 px-4 py-3 border-b border-border/30">
+                                  <h4 className="font-medium">Instance {instance}</h4>
+                                </div>
+                                <div className="p-4">
+                                  {recommendedPump ? (
+                                    <div className="space-y-4">
+                                      <div className="flex items-center space-x-2">
+                                        <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
+                                          Recommended
+                                        </Badge>
+                                        <span className="font-medium">{recommendedPump.type}</span>
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div className="bg-background/50 p-2 rounded border border-border/30">
+                                          <span className="text-xs text-muted-foreground">Diameter</span>
+                                          <p className="font-medium">{recommendedPump.diameter}"</p>
+                                        </div>
+                                        <div className="bg-background/50 p-2 rounded border border-border/30">
+                                          <span className="text-xs text-muted-foreground">Speed</span>
+                                          <p className="font-medium">{recommendedPump.speed}</p>
+                                        </div>
+                                        <div className="bg-background/50 p-2 rounded border border-border/30">
+                                          <span className="text-xs text-muted-foreground">Pressure</span>
+                                          <p className="font-medium">{recommendedPump.pressure} MPa</p>
+                                        </div>
+                                        <div className="bg-background/50 p-2 rounded border border-border/30">
+                                          <span className="text-xs text-muted-foreground">Flow</span>
+                                          <p className="font-medium">{recommendedPump.flow} L/min</p>
+                                        </div>
+                                      </div>
+                                      
+                                      {recommendedPump.tfc !== null && (
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                                          <div className="bg-background/50 p-2 rounded border border-border/30">
+                                            <span className="text-xs text-muted-foreground">Cement Fill Time</span>
+                                            <p className="font-medium">{recommendedPump.tfc?.toFixed(2)} min</p>
+                                          </div>
+                                          <div className="bg-background/50 p-2 rounded border border-border/30">
+                                            <span className="text-xs text-muted-foreground">Displacement Time</span>
+                                            <p className="font-medium">{recommendedPump.tfd?.toFixed(2)} min</p>
+                                          </div>
+                                          <div className="bg-background/50 p-2 rounded border border-border/30">
+                                            <span className="text-xs text-muted-foreground">Total Time</span>
+                                            <p className="font-medium">{recommendedPump.tc?.toFixed(2)} min</p>
+                                          </div>
+                                          <div className="bg-background/50 p-2 rounded border border-border/30">
+                                            <span className="text-xs text-muted-foreground">Required Pressure</span>
+                                            <p className="font-medium">{recommendedPump.ppmax.toFixed(2)} MPa</p>
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Add Accordion to show all available pumps */}
+                                      {pumpsForInstance.length > 1 && (
+                                        <Accordion type="single" collapsible className="mt-4 bg-muted/10 rounded-md border border-border/30">
+                                          <AccordionItem value="all-pumps" className="border-b-0">
+                                            <AccordionTrigger className="px-4 py-3 hover:bg-muted/10 hover:no-underline">
+                                              <span className="text-sm font-medium flex items-center gap-2">
+                                                <Layers className="h-4 w-4" />
+                                                Show All Available Pumps ({pumpsForInstance.length})
+                                          </span>
+                                            </AccordionTrigger>
+                                            <AccordionContent className="px-0">
+                                              <div className="overflow-x-auto">
+                                                <Table>
+                                                  <TableHeader>
+                                                    <TableRow>
+                                                      <TableHead>Type</TableHead>
+                                                      <TableHead>Speed</TableHead>
+                                                      <TableHead>Pressure</TableHead>
+                                                      <TableHead>Flow</TableHead>
+                                                      <TableHead>Fill Time</TableHead>
+                                                      <TableHead>Total Time</TableHead>
+                                                      <TableHead></TableHead>
+                                                    </TableRow>
+                                                  </TableHeader>
+                                                  <TableBody>
+                                                    {pumpsForInstance.map((pump, pumpIndex) => (
+                                                      <TableRow key={pumpIndex} className={pump.isRecommended ? "bg-primary/5" : ""}>
+                                                        <TableCell className="font-medium">{pump.type}</TableCell>
+                                                        <TableCell>{pump.speed}</TableCell>
+                                                        <TableCell>{pump.pressure} MPa</TableCell>
+                                                        <TableCell>{pump.flow} L/min</TableCell>
+                                                        <TableCell>{pump.tfc ? pump.tfc.toFixed(2) : "N/A"}</TableCell>
+                                                        <TableCell>{pump.tc ? pump.tc.toFixed(2) : "N/A"}</TableCell>
+                                                        <TableCell>
+                                                          {pump.isRecommended && (
+                                                            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
+                                                              Recommended
+                                                            </Badge>
+                                                          )}
+                                                        </TableCell>
+                                                      </TableRow>
+                                                    ))}
+                                                  </TableBody>
+                                                </Table>
+                            </div>
+                                            </AccordionContent>
+                                          </AccordionItem>
+                                        </Accordion>
+                                      )}
+                          </div>
+                        ) : (
+                                    <p className="text-muted-foreground">No recommended pump found for this instance.</p>
+                                  )}
+                            </div>
                               </div>
-                              
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="w-[180px]">Type/Model</TableHead>
-                                    <TableHead>Diameter (in)</TableHead>
-                                    <TableHead>Pressure (MPa)</TableHead>
-                                    <TableHead>Flow Rate</TableHead>
-                                    <TableHead>Speed</TableHead>
-                                    <TableHead>tfc+tfd</TableHead>
-                                    <TableHead>tc</TableHead>
-                                    <TableHead>n</TableHead>
-                                    <TableHead className="text-right"></TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {pumpResults
-                                    .filter(pump => pump.instance === instance)
-                                    .map((pump, index) => (
-                                      <TableRow 
-                                        key={`${instance}-${index}`}
-                                        className={pump.isRecommended ? "bg-green-500/10" : 
-                                                 pump.isAlternative ? "bg-amber-500/10" : ""}
-                                      >
-                                        <TableCell className="font-medium flex items-center gap-2">
-                                          {pump.type}
-                                          {pump.isRecommended && (
-                                            <Badge className="bg-green-500 hover:bg-green-600">
-                                              Recommended
-                                            </Badge>
-                                          )}
-                                          {pump.isAlternative && (
-                                            <Badge className="bg-amber-500 hover:bg-amber-600">
-                                              Alternative
-                                            </Badge>
-                                          )}
-                                        </TableCell>
-                                        <TableCell>{pump.diameter}</TableCell>
-                                        <TableCell>{pump.pressure.toFixed(2)}</TableCell>
-                                        <TableCell>{pump.flow.toFixed(2)}</TableCell>
-                                        <TableCell>{pump.speed || '-'}</TableCell>
-                                        <TableCell>{(pump.tfc && pump.tfd) ? (pump.tfc + pump.tfd).toFixed(2) : "N/A"}</TableCell>
-                                        <TableCell>{pump.tc?.toFixed(2) || "N/A"}</TableCell>
-                                        <TableCell>{pump.tc && pump.tad ? Math.ceil(pump.tc / pump.tad + 1).toString() : "N/A"}</TableCell>
-                                        <TableCell className="text-right">
-                                          {pump.isRecommended && (
-                                            <CheckCircle className="h-5 w-5 text-green-500 inline-block" />
-                                          )}
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          ))}
-                          
-                          {/* Show message if no results for any instance */}
-                          {pumpResults.length === 0 && (
-                            <div className="py-10 text-center text-muted-foreground">
-                              No matching pumps found for any instance
-                            </div>
-                          )}
+                            );
+                          })}
                         </div>
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            </Tabs>
-          </div>
+                          </div>
+                        )}
+                  </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
         </div>
       </div>
     </div>

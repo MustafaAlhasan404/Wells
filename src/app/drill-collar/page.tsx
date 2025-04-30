@@ -1,20 +1,5 @@
-import { NavBar } from "@/components/nav-bar";
-import DrillCollarCalculator from "@/components/drill-collar-calculator";
+import { redirect } from "next/navigation"
 
-export const metadata = {
-  title: "Drill Collar Calculator | Deep Drill",
-  description: "Calculate drill collar values and pipe data based on well parameters",
-};
-
-export default function DrillCollarPage() {
-  return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
-      <NavBar />
-      <div className="flex-1 overflow-auto p-4 md:p-6">
-        <div className="max-w-7xl mx-auto space-y-4">          
-          <DrillCollarCalculator />
-        </div>
-      </div>
-    </div>
-  );
+export default function DrillCollarRedirect() {
+  redirect("/formation-design?tab=drill-collar")
 } 

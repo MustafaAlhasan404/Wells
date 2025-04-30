@@ -6,13 +6,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Minimize, Maximize, Download } from "lucide-react"
+import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Minimize, Maximize, Download, Layers, FileDown, Check } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
 import { EnhancedTable } from "@/components/ui/enhanced-table"
 import { showToast } from "@/utils/toast-utils"
 import { formatMmWithInches } from "@/utils/casingCalculations"
+import { motion } from "framer-motion"
 
 interface DrillCollarCalculatorProps {}
 
@@ -21,10 +22,6 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   const { 
     casingResults,
     setCasingResults,
-    drillCollarFile,
-    setDrillCollarFile,
-    drillCollarFileName,
-    setDrillCollarFileName,
     drillCollarResults: contextDrillCollarResults,
     setDrillCollarResults: setContextDrillCollarResults,
     drillCollarCalculations,
@@ -43,14 +40,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
-  // State for input minimization
-  const [inputsMinimized, setInputsMinimized] = useState(false);
-  // Animation state
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  // Animation classes
-  const [inputsAnimationClass, setInputsAnimationClass] = useState("");
-  const [resultsAnimationClass, setResultsAnimationClass] = useState("");
+  const [isCalculated, setIsCalculated] = useState(false);
   
   // Load stored results on mount
   useEffect(() => {
@@ -60,9 +50,6 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       if (drillCollarCalculations && drillCollarCalculations.length > 0) {
         setCalculations(drillCollarCalculations);
       }
-      
-      // Auto minimize inputs if we have results
-      setInputsMinimized(true);
     }
   }, [contextDrillCollarResults, drillCollarCalculations]);
   
@@ -80,43 +67,6 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     }
   }, [localDrillCollarResults, calculations]);
   
-  // Attempt to restore file from localStorage on component mount
-  // Note: We can't store the actual File object, only its metadata
-  useEffect(() => {
-    // Don't attempt to restore if we already have a file from context
-    if (!drillCollarFile) {
-      try {
-        const fileMetadata = localStorage.getItem('drillCollarFileMetadata');
-        if (fileMetadata) {
-          const { name } = JSON.parse(fileMetadata);
-          setDrillCollarFileName(name);
-        }
-      } catch (error) {
-        console.error('Failed to restore file metadata from localStorage:', error);
-      }
-    }
-  }, [drillCollarFile]);
-  
-  // Store file metadata in localStorage whenever it changes
-  useEffect(() => {
-    if (drillCollarFile) {
-      try {
-        const metadata = { 
-          name: drillCollarFileName,
-          lastModified: drillCollarFile.lastModified,
-          type: drillCollarFile.type,
-          size: drillCollarFile.size
-        };
-        localStorage.setItem('drillCollarFileMetadata', JSON.stringify(metadata));
-      } catch (error) {
-        console.error('Failed to save file metadata to localStorage:', error);
-      }
-    } else if (!drillCollarFile && !drillCollarFileName) {
-      // Clear metadata if file is cleared
-      localStorage.removeItem('drillCollarFileMetadata');
-    }
-  }, [drillCollarFile, drillCollarFileName]);
-  
   // Load saved results from localStorage on mount
   useEffect(() => {
     try {
@@ -127,9 +77,6 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         const parsedResults = JSON.parse(savedResults);
         setLocalDrillCollarResults(parsedResults);
         setContextDrillCollarResults(parsedResults);
-        
-        // Auto minimize inputs if we have results
-        setInputsMinimized(true);
         
         // Show toast notification to inform user that data was loaded
         showToast('info', "Loaded saved drill collar results", {
@@ -147,6 +94,11 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     }
   }, []);
   
+  // Function to download the template Excel file
+  const downloadTemplateFile = () => {
+    window.open('/tables/Formation design.xlsx', '_blank');
+  };
+  
   // Function to clear all saved data
   const clearSavedData = () => {
     // Clear local state
@@ -158,17 +110,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     setContextDrillCollarResults([]);
     setDrillCollarCalculations([]);
     
-    // Clear file data
-    setDrillCollarFile(null);
-    setDrillCollarFileName("");
-    
     // Clear localStorage
     localStorage.removeItem('drillCollarResults');
     localStorage.removeItem('drillCollarCalculations');
-    localStorage.removeItem('drillCollarFileMetadata');
-    
-    // Reset UI state
-    setInputsMinimized(false);
     
     // Show toast notification
     showToast('success', "Data cleared", {
@@ -208,114 +152,134 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   // Extract casing values needed for calculations
   const extractCasingValues = () => {
     if (!casingResults || casingResults.length === 0) {
-      showToast('error', "No casing results found", {
+      showToast('error', "No casing data found", {
         icon: <AlertCircle className="h-4 w-4 text-destructive" />,
-        description: "Please calculate casing values first."
+        description: "Please calculate casing data first before proceeding."
       });
       return null;
     }
     
-    // Get the original initial DCSG amount from storage
-    const initialDcsg = getInitialDcsg();
-    
-    if (!initialDcsg) {
-      showToast('error', "Initial DCSG value not found", {
+    try {
+      // Map the casing results to extract the values we need
+      const initialDcsg = getInitialDcsg() || '';
+      
+      // Extract atHead values from dcsg property (strip formatting)
+      const atHeadValues = casingResults.map(result => {
+        // Extract numeric value from dcsg string, e.g. "244.5 mm (9 5/8")" -> 244.5
+        if (!result.dcsg) return 0;
+        const match = result.dcsg.match(/(\d+(?:\.\d+)?)/);
+        return match ? parseFloat(match[1]) : 0;
+      }).filter(val => val > 0); // Filter out zero values
+      
+      // Extract nearest bit sizes (strip formatting)
+      const nearestBitSizes = casingResults.map(result => {
+        // Extract numeric value from nearestBitSize string
+        if (!result.nearestBitSize) return 0;
+        const match = result.nearestBitSize.match(/(\d+(?:\.\d+)?)/);
+        return match ? parseFloat(match[1]) : 0;
+      });
+      
+      console.log("Extracted values:", { initialDcsg, atHeadValues, nearestBitSizes });
+      
+      return {
+        initialDcsg,
+        atHeadValues,
+        nearestBitSizes
+      };
+    } catch (error) {
+      console.error("Error extracting casing values:", error);
+      showToast('error', "Invalid casing data", {
         icon: <AlertCircle className="h-4 w-4 text-destructive" />,
-        description: "Please recalculate casing values first."
+        description: "The casing data is not in the expected format."
       });
       return null;
     }
-    
-    // Extract at head values and nearest bit sizes
-    const atHeadValues: number[] = [];
-    const nearestBitSizes: number[] = [];
-    
-    casingResults.forEach(result => {
-      // Extract at head value from dcsg
-      const dcsgMatch = result.dcsg?.match(/^([\d.]+)/);
-      if (dcsgMatch) {
-        atHeadValues.push(parseFloat(dcsgMatch[1]));
+  };
+  
+  // Render results table
+  const renderResultsTable = () => {
+    if (localDrillCollarResults.length === 0) {
+      return (
+        <div className="text-center text-muted-foreground py-8">
+          <p>No results yet. Calculate to see drill collar specifications.</p>
+        </div>
+      );
       }
       
-      // Extract nearest bit size
-      const bitSizeMatch = result.nearestBitSize?.match(/^([\d.]+)/);
-      if (bitSizeMatch) {
-        nearestBitSizes.push(parseFloat(bitSizeMatch[1]));
-      }
-    });
-    
-    return {
-      initialDcsg,
-      atHeadValues,
-      nearestBitSizes
-    };
+    return (
+      <div className="overflow-auto rounded-md border border-border/50 bg-background/80">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border/50 bg-muted/40">
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Section</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">At Head</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Bit Size</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Drill Collar</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Number of Columns</th>
+            </tr>
+          </thead>
+          <tbody>
+            {localDrillCollarResults.map((result, index) => (
+              <tr 
+                key={index} 
+                className={cn(
+                  "border-b border-border/40 hover:bg-muted/20 transition-colors",
+                  index === localDrillCollarResults.length - 1 && "border-b-0"
+                )}
+              >
+                <td className="px-4 py-3">{formatSection(result.section)}</td>
+                <td className="px-4 py-3">{formatMmWithInches(result.atHead.toFixed(2))}</td>
+                <td className="px-4 py-3">{formatMmWithInches(result.bitSize.toFixed(2))}</td>
+                <td className="px-4 py-3 font-medium text-primary">{formatMmWithInches(result.drillCollar.toFixed(2))}</td>
+                <td className="px-4 py-3">{typeof result.numberOfColumns !== 'undefined' ? result.numberOfColumns : 'N/A'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   };
   
-  // Add a function to load the file from the public directory
-  const loadDrillCollarFile = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/tables/Formation%20design.xlsx');
-      if (!response.ok) throw new Error('Failed to fetch the drill collar file.');
-      const blob = await response.blob();
-      // Create a File object if possible
-      let file: File;
-      try {
-        file = new File([blob], 'Formation design.xlsx', { type: blob.type });
-      } catch {
-        setError('File API is not supported in this browser.');
-        showToast('error', 'Load failed', { description: 'File API is not supported in this browser.' });
-        setIsLoading(false);
-        return;
-      }
-      setDrillCollarFile(file);
-      setDrillCollarFileName('Formation design.xlsx');
-      showToast('success', 'File loaded', { description: 'Drill collar file loaded from public directory.' });
-    } catch (err: any) {
-      setError(err.message || 'Failed to load drill collar file.');
-      showToast('error', 'Load failed', { description: err.message || 'Failed to load drill collar file.' });
-    } finally {
-      setIsLoading(false);
+  // Format section name for display
+  const formatSection = (section: string | undefined) => {
+    // Handle undefined or null values
+    if (!section) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-900/30 px-2 py-1 text-xs text-gray-600 dark:text-gray-400">
+          Unknown
+        </span>
+      );
     }
-  };
-  
-  // Toggle minimized state with animation
-  const toggleMinimized = () => {
-    if (localDrillCollarResults.length === 0) return; // Only allow toggling when there are results
     
-    setIsTransitioning(true);
-    const newState = !inputsMinimized;
-    setInputsMinimized(newState);
-    
-    // Add animation classes based on the state change
-    if (newState) {
-      // Minimizing - inputs slide to left, results slide from right
-      setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-right duration-500");
+    if (section === "Production") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs text-green-600 dark:text-green-400">
+          Production
+        </span>
+      );
+    } else if (section === "Surface") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs text-yellow-600 dark:text-yellow-400">
+          Surface
+        </span>
+      );
+    } else if (section.startsWith("Intermediate")) {
+      // Handle both "Intermediate" and "Intermediate X" formats
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs text-blue-600 dark:text-blue-400">
+          {section}
+        </span>
+      );
     } else {
-      // Maximizing - inputs slide from left, results slide to right
-      setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-right-reverse duration-500");
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-900/30 px-2 py-1 text-xs text-gray-600 dark:text-gray-400">
+          {section}
+        </span>
+      );
     }
-    
-    // Reset transition flag after animation completes
-    setTimeout(() => {
-      setIsTransitioning(false);
-      setInputsAnimationClass("");
-      setResultsAnimationClass("");
-    }, 600);
   };
   
   const calculateDrillCollar = async () => {
-    if (!drillCollarFile) {
-      showToast('error', "Please select a file", {
-        icon: <AlertCircle className="h-4 w-4 text-destructive" />,
-        description: "Please upload a drill collar table Excel file."
-      });
-      return;
-    }
-    
     const casingValues = extractCasingValues();
     if (!casingValues) {
       return;
@@ -335,7 +299,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     
     try {
       const apiFormData = new FormData();
-      apiFormData.append('file', drillCollarFile);
+      apiFormData.append('useDefaultFile', 'true');
       apiFormData.append('formData', JSON.stringify(formData));
       apiFormData.append('casingData', JSON.stringify(casingValues));
       
@@ -355,40 +319,20 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       console.log("API Response:", data);
       console.log("Calculations:", data.calculations);
       
-      // Update both local state and context
-      const drillCollarResultsData = data.drillCollarResults || [];
-      const calculationsData = data.calculations || [];
+      // Update state with the results
+      setLocalDrillCollarResults(data.drillCollarResults || []);
+      setDrillCollarData(data.drillCollarData || {});
       
-      setLocalDrillCollarResults(drillCollarResultsData);
-      setCalculations(calculationsData);
-      setDrillCollarData(data.drillCollarData || null);
+      // Use extended calculations if available, otherwise use regular calculations
+      setCalculations(data.extendedCalculations || data.calculations || []);
       
-      // Save debug info with b values
-      if (data.debugInfo && data.debugInfo.bValues) {
-        setBValueDebugInfo(data.debugInfo.bValues);
-      }
+      setIsLoading(false);
+      setIsCalculated(true);
       
-      // Update context for persistence across tab changes
-      setContextDrillCollarResults(drillCollarResultsData);
-      setDrillCollarCalculations(calculationsData);
-      
-      // Set animation classes for when results appear
-      setIsTransitioning(true);
-      setInputsMinimized(true);
-      setInputsAnimationClass("animate-in fade-in slide-in-from-left duration-500");
-      setResultsAnimationClass("animate-in fade-in slide-in-from-right duration-500");
-      
-      showToast('success', "Calculations completed", {
-        icon: <CheckCircle className="h-4 w-4 text-green-500" />,
-        description: "Drill collar calculations have been successfully processed."
+      showToast('success', "Drill collar calculation completed", {
+        icon: <Check className="h-4 w-4 text-success" />,
+        description: "The drill collar calculations have been successfully completed."
       });
-      
-      // Reset transition flag after animation completes
-      setTimeout(() => {
-        setIsTransitioning(false);
-        setInputsAnimationClass("");
-        setResultsAnimationClass("");
-      }, 600);
       
     } catch (err: any) {
       console.error("Error in submission:", err);
@@ -398,298 +342,148 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         icon: <AlertCircle className="h-4 w-4 text-red-500" />,
         description: err.message || "Failed to calculate drill collar values"
       });
-    } finally {
-      setIsLoading(false);
     }
   };
   
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 text-transparent bg-clip-text">Drill Collar Calculator</h1>
+    <div className="space-y-6">
+      {!localDrillCollarResults.length ? (
+        <motion.div 
+          className="space-y-6"
+          key="inputs"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-1 bg-primary rounded-full"></div>
+              <h3 className="text-lg font-medium">Drill Collar Design</h3>
+            </div>
+            
         <div className="flex gap-2">
-          <Button onClick={calculateDrillCollar} disabled={isLoading || !drillCollarFile} variant="default" className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary">
+              <Button 
+                onClick={downloadTemplateFile} 
+                variant="outline" 
+                size="sm"
+                className="flex items-center gap-1.5"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                <span>Download Template</span>
+              </Button>
+              
+              <Button 
+                onClick={calculateDrillCollar} 
+                disabled={isLoading} 
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
             {isLoading ? (
               <>
-                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    <span>Processing...</span>
               </>
             ) : (
               <>
                 <Calculator className="h-4 w-4" />
-                Calculate
+                    <span>Calculate</span>
               </>
             )}
           </Button>
+            </div>
+          </div>
+        </motion.div>
+      ) : null}
+      
           {localDrillCollarResults.length > 0 && (
-            <>
+        <motion.div 
+          className="space-y-6"
+          key="results"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-1 bg-primary rounded-full"></div>
+              <h3 className="text-lg font-medium">Drill Collar Results</h3>
+            </div>
+            
+            <div className="flex gap-2">
               <Button 
-                onClick={toggleMinimized} 
+                onClick={downloadTemplateFile} 
                 variant="outline" 
-                className="gap-2"
-                title={inputsMinimized ? "Maximize inputs" : "Minimize inputs"}
+                size="sm"
+                className="flex items-center gap-1.5"
               >
-                {inputsMinimized ? (
+                <FileDown className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Download</span>
+              </Button>
+              
+              <Button 
+                onClick={calculateDrillCollar} 
+                disabled={isLoading} 
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1.5"
+              >
+                {isLoading ? (
                   <>
-                    <Maximize className="h-4 w-4" />
-                    Maximize
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    <span className="hidden sm:inline">Processing...</span>
                   </>
                 ) : (
                   <>
-                    <Minimize className="h-4 w-4" />
-                    Minimize
+                    <Calculator className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Calculate</span>
                   </>
                 )}
               </Button>
+              
               <Button 
                 onClick={clearSavedData} 
                 variant="outline" 
-                className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                title="Clear all saved data"
+                size="sm"
+                className="flex items-center gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Clear</span>
               </Button>
-            </>
-          )}
-        </div>
-      </div>
-      
-      <ScrollArea className="h-[calc(100vh-180px)]">
-        <div className={cn(
-          "space-y-4 md:space-y-6 pb-6",
-          "transition-all duration-500 ease-in-out",
-          isTransitioning && "opacity-90",
-          inputsMinimized && localDrillCollarResults.length > 0 && "flex flex-col md:flex-row gap-4"
-        )}>
-          {/* Input section */}
-          <div className={cn(
-            "space-y-4 relative", 
-            "transition-all duration-500 ease-in-out",
-            inputsAnimationClass,
-            inputsMinimized && localDrillCollarResults.length > 0 && "md:w-1/3"
-          )}>
-            <Card className="border-primary/20 shadow-md">
-              <CardHeader className="bg-muted/50 border-b border-border/50 py-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-lg text-primary/90">File Selection</CardTitle>
-                    <CardDescription className="text-sm">
-                      Load the drill collar table Excel file from the public directory
-                      {drillCollarFile && <span className="ml-1 text-green-500">(loaded)</span>}
-                    </CardDescription>
-                  </div>
-                  {drillCollarFile && (
-                    <div className="flex items-center gap-2 text-sm text-green-500">
-                      <CheckCircle className="h-4 w-4" />
-                    </div>
-                  )}
                 </div>
-              </CardHeader>
-              <CardContent className={cn(
-                "pt-3 pb-3",
-                inputsMinimized && "hidden md:block"
-              )}>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="default"
-                      onClick={loadDrillCollarFile}
-                      disabled={isLoading}
-                      className="flex-1"
-                    >
-                      {isLoading ? (
-                        <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
-                      ) : (
-                        <>Load</>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => window.open('/tables/Formation%20design.xlsx', '_blank')}
-                      className="px-3"
-                      title="Download Excel file"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {drillCollarFileName && (
-                    <div className="text-sm text-muted-foreground truncate">
-                      {drillCollarFileName}
-                    </div>
-                  )}
-                  {error && (
-                    <div className="p-2 mt-2 rounded-md bg-destructive/10 text-destructive text-sm">
-                      {error}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
           
-          {/* Results section */}
-          {(localDrillCollarResults.length > 0) && (
-            <div className={cn(
-              "transition-all duration-500 ease-in-out",
-              resultsAnimationClass,
-              inputsMinimized ? "md:w-2/3" : "w-full"
-            )}>
-              <Card className="border-primary/20 shadow-md">
-                <CardHeader className="bg-muted/50 border-b border-border/50 py-3">
-                  <CardTitle className="text-lg text-primary/90">Drill Collar Results</CardTitle>
-                  <CardDescription className="text-sm">
-                    Section by section details
-                    <span className="ml-1 text-green-500">(saved)</span>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-3 pb-3">
-                  <div className="overflow-auto">
-                    <EnhancedTable
-                      headers={["Section", "Drill Collars", "Number of Columns"]}
-                      rows={localDrillCollarResults.map(result => [
-                        `${result.section} Section`,
-                        formatMmWithInches(result.drillCollar.toFixed(2)),
-                        result.numberOfColumns || "N/A"
-                      ])}
-                      rounded={true}
-                      highlightOnHover={true}
-                      alternateRows={true}
-                    />
-                  </div>
-                  
-                  {/* Debug Toggle Button */}
-                  <div className="mt-6 flex justify-end">
-                    <Button 
-                      onClick={() => setShowDebugInfo(!showDebugInfo)} 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-xs"
-                    >
-                      {showDebugInfo ? "Hide Debug Info" : "Show Debug Info"}
-                    </Button>
-                  </div>
-                  
-                  {/* Debug Calculation Information - only shown when toggled */}
-                  {showDebugInfo && (
-                    <div className="mt-3 border border-border/40 rounded-md p-4 bg-muted/10">
-                      <h3 className="text-base font-semibold mb-3 text-primary">Debug Calculation Information</h3>
-                      <p className="text-sm mb-3">This shows how the Number of Columns is calculated (L0c / 9):</p>
-                      
-                      <div className="space-y-4">
-                        {localDrillCollarResults.map((result, index) => {
-                          const instanceNum = index + 1;
-                          const formData = getCasingData();
-                          const correspondingCalc = calculations.find(c => 
-                            (c.instance === instanceNum && result.section === (
-                              instanceNum === 1 ? "Production" : 
-                              instanceNum === 2 ? "Intermediate" : "Surface"))
-                          );
-                          
-                          // Find b value from debug info
-                          const debugBValue = bValueDebugInfo && bValueDebugInfo.length > 0 
-                            ? bValueDebugInfo.find(info => 
-                                info && info.section === result.section
-                              )
-                            : null;
-                          
-                          return (
-                            <div key={index} className="border border-border/30 rounded-md p-3 bg-background/50">
-                              <h4 className="font-medium mb-2 text-sm">{result.section} Section Calculation:</h4>
-                              
-                              <div className="grid grid-cols-2 gap-3 text-xs">
-                                <div className="bg-muted/20 p-2 rounded border border-border/20">
-                                  <span className="font-semibold">Input Values:</span>
-                                  {formData && (
-                                    <div className="mt-1 space-y-1">
-                                      <div>WOB_{instanceNum}: {formData[`WOB_${instanceNum}`] || "Not found"}</div>
-                                      <div>C_{instanceNum}: {formData[`C_${instanceNum}`] || "Not found"}</div>
-                                      <div>qc_{instanceNum}: {formData[`qc_${instanceNum}`] || "Not found"}</div>
-                                      <div>γ_{instanceNum}: {formData[`γ_${instanceNum}`] || "Not found"}</div>
-                                      <div>
-                                        b_{instanceNum}: {debugBValue && typeof debugBValue.bValue === 'number' 
-                                          ? debugBValue.bValue.toFixed(4) 
-                                          : "Not found"} {debugBValue && debugBValue.gamma && (
-                                            <span className="text-green-500">
-                                              (derived from Excel based on γ={debugBValue.gamma})
-                                            </span>
-                                          )}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                <div className="bg-muted/20 p-2 rounded border border-border/20">
-                                  <span className="font-semibold">Calculation:</span>
-                                  <div className="mt-1 space-y-1">
-                                    <div>Drill Collar: {formatMmWithInches(result.drillCollar.toFixed(2))}</div>
-                                    
-                                    {(typeof result.numberOfColumns === 'undefined' || result.numberOfColumns === null) && (
-                                      <div className="text-amber-500">
-                                        No L0c data available for this section. This could happen if:
-                                        <ul className="list-disc list-inside mt-1">
-                                          <li>Missing corresponding calculation instance</li>
-                                          <li>Required input values were not found</li>
-                                          <li>Instance/section mapping mismatch</li>
-                                        </ul>
-                                      </div>
-                                    )}
-                                    
-                                    {typeof result.numberOfColumns !== 'undefined' && result.numberOfColumns !== null && (
-                                      <>
-                                        <div className="mt-1">L0c: WOB / (C * qc * b) ≈ {(result.numberOfColumns * 9).toFixed(2)}</div>
-                                        <div>Number of Columns: L0c / 9 = {result.numberOfColumns}</div>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="mt-3 text-xs">
-                                <span className="font-semibold">Matching Calculation Instance:</span> {
-                                  correspondingCalc 
-                                    ? `Instance ${correspondingCalc.instance}`
-                                    : "No matching calculation found"
-                                }
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+          {renderResultsTable()}
+          
+          {calculations.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-5 w-1 bg-primary rounded-full"></div>
+                <h3 className="text-lg font-medium">Metal Grade Results</h3>
+              </div>
               
-              {calculations.length > 0 && (
-                <Card className="border-primary/20 shadow-md mt-4">
-                  <CardHeader className="bg-muted/50 border-b border-border/50 py-3">
-                    <CardTitle className="text-lg text-primary/90">Calculation Results</CardTitle>
-                    <CardDescription className="text-sm">
-                      Metal grade and maximum length calculations
-                      <span className="ml-1 text-green-500">(saved)</span>
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-3 pb-3">
-                    <div className="overflow-auto">
-                      <EnhancedTable
-                        headers={["Instance", "Drill Pipe Metal Grade", "Lmax"]}
-                        rows={calculations.map(calc => [
-                          calc.instance,
-                          calc.drillPipeMetalGrade || "N/A",
-                          calc.Lmax
-                        ])}
-                        rounded={true}
-                        highlightOnHover={true}
-                        alternateRows={true}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              <div className="overflow-auto rounded-md border border-border/50 bg-background/80">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/50 bg-muted/40">
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Section</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Metal Grade</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Max Length (Lmax)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {calculations.map((calc, index) => (
+                      <tr key={index} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3">{formatSection(calc.section)}</td>
+                        <td className="px-4 py-3 font-medium text-primary">{calc.drillPipeMetalGrade}</td>
+                        <td className="px-4 py-3">{calc.Lmax} m</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
-        </div>
-      </ScrollArea>
+        </motion.div>
+      )}
     </div>
   );
 } 

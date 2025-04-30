@@ -21,7 +21,7 @@ export function NavBar() {
     <header className="sticky top-0 z-40 border-b bg-background">
       <div className="container flex h-16 items-center px-4 sm:px-8">
         <div className="flex items-center">
-          <Link href="/data-input" className="flex items-center space-x-2">
+          <Link href="/casing-calculator" className="flex items-center space-x-2">
             <MountainIcon className="h-6 w-6 text-primary" />
             <span className="hidden font-bold sm:inline-block">Deep Drill</span>
           </Link>
@@ -31,14 +31,6 @@ export function NavBar() {
           <div className="hidden md:flex items-center space-x-4">
             <nav className="flex items-center space-x-4">
               <Link 
-                href="/data-input" 
-                className={cn("text-sm font-medium transition-colors hover:text-primary", 
-                  pathname === "/data-input" ? "text-primary" : "text-muted-foreground"
-                )}
-              >
-                Data Input
-              </Link>
-              <Link 
                 href="/casing-calculator" 
                 className={cn("text-sm font-medium transition-colors hover:text-primary", 
                   pathname === "/casing-calculator" ? "text-primary" : "text-muted-foreground"
@@ -47,12 +39,12 @@ export function NavBar() {
                 Casing Calculator
               </Link>
               <Link 
-                href="/drill-collar" 
+                href="/formation-design" 
                 className={cn("text-sm font-medium transition-colors hover:text-primary", 
-                  pathname === "/drill-collar" ? "text-primary" : "text-muted-foreground"
+                  pathname === "/formation-design" ? "text-primary" : "text-muted-foreground"
                 )}
               >
-                Drill Collar
+                Formation Design
               </Link>
               <Link 
                 href="/semantics" 
@@ -87,14 +79,6 @@ export function NavBar() {
         <div className="container md:hidden">
           <nav className="flex flex-col space-y-4 p-4">
             <Link 
-              href="/data-input" 
-              className={cn("text-sm font-medium transition-colors hover:text-primary", 
-                pathname === "/data-input" ? "text-primary" : "text-muted-foreground"
-              )}
-            >
-              Data Input
-            </Link>
-            <Link 
               href="/casing-calculator" 
               className={cn("text-sm font-medium transition-colors hover:text-primary", 
                 pathname === "/casing-calculator" ? "text-primary" : "text-muted-foreground"
@@ -103,12 +87,12 @@ export function NavBar() {
               Casing Calculator
             </Link>
             <Link 
-              href="/drill-collar" 
+              href="/formation-design" 
               className={cn("text-sm font-medium transition-colors hover:text-primary", 
-                pathname === "/drill-collar" ? "text-primary" : "text-muted-foreground"
+                pathname === "/formation-design" ? "text-primary" : "text-muted-foreground"
               )}
             >
-              Drill Collar
+              Formation Design
             </Link>
             <Link 
               href="/semantics" 

@@ -69,22 +69,46 @@ export async function POST(req: NextRequest) {
 
     // Parse the form data
     const formData = await req.formData();
-    const file = formData.get('file') as File;
+    const useDefaultFile = formData.get('useDefaultFile') === 'true';
     const initialDcsgAmount = formData.get('initialDcsgAmount') as string;
     const iterations = parseInt(formData.get('iterations') as string);
     
     console.log("Request parameters:", { 
-      fileName: file?.name,
-      fileSize: file?.size,
-      fileType: file?.type,
+      useDefaultFile,
       initialDcsgAmount,
       iterations
     });
     
-    if (!file) {
-      console.error("Missing file in request");
-      return NextResponse.json({ error: 'No file provided. Please upload an Excel file.' }, { status: 400 });
+    // Handle file - either from upload or from default path
+    let arrayBuffer: ArrayBuffer;
+    
+    if (useDefaultFile) {
+      // Use the default file from public directory
+      console.log("Using default FinalCasingTable.xlsx file");
+      const filePath = path.join(process.cwd(), 'public', 'tables', 'FinalCasingTable.xlsx');
+      const fileData = await fs.readFile(filePath);
+      // Ensure we're working with an ArrayBuffer
+      arrayBuffer = Buffer.from(fileData).buffer.slice(0, fileData.length);
+    } else {
+      // Use uploaded file
+      const file = formData.get('file') as File;
+      
+      if (!file) {
+        console.error("Missing file in request");
+        return NextResponse.json({ error: 'No file provided. Please upload an Excel file.' }, { status: 400 });
+      }
+      
+      console.log("Using uploaded file:", { 
+        fileName: file?.name,
+        fileSize: file?.size,
+        fileType: file?.type
+      });
+      
+      // Read the file to buffer
+      arrayBuffer = await file.arrayBuffer();
     }
+    
+    console.log("File read to buffer, size:", arrayBuffer.byteLength);
 
     if (!initialDcsgAmount) {
       console.error("Missing initialDcsgAmount in request");
@@ -113,10 +137,6 @@ export async function POST(req: NextRequest) {
       sectionInputs.push({ multiplier, metalType, depth });
     }
 
-    // Read the file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    console.log("File read to buffer, size:", arrayBuffer.byteLength);
-    
     // Debug Excel structure
     debugExcelStructure(arrayBuffer);
     
@@ -126,15 +146,12 @@ export async function POST(req: NextRequest) {
     const calculatedValues: Array<[number | null, number | null, number | null]> = [];
     let nextDcsg: number | null = null;
     const resultData: any[] = [];
-    const hadData: any = {
-      "Production Section": {},
-      "Intermediate Section": {},
-      "Surface Section": {}
-    };
-
+    
     // Determine section names
     let sectionNames: string[] = [];
-    if (iterations === 3) {
+    if (iterations === 2) {
+      sectionNames = ["Production", "Surface"];
+    } else if (iterations === 3) {
       sectionNames = ["Production", "Intermediate", "Surface"];
     } else {
       sectionNames = ["Production"];
@@ -142,6 +159,12 @@ export async function POST(req: NextRequest) {
         sectionNames.push(`Intermediate ${i+1}`);
       }
       sectionNames.push("Surface");
+    }
+    
+    // Initialize hadData dynamically based on sectionNames
+    const hadData: any = {};
+    for (const name of sectionNames) {
+      hadData[`${name} Section`] = {};
     }
 
     console.log("Starting iteration through sections:", sectionNames);
@@ -270,6 +293,13 @@ export async function POST(req: NextRequest) {
               
               // Add to HAD data
               const roundedAtHead = Math.round(atHeadValue * 100) / 100;
+              
+              // Initialize if this is the first time for this section/atHead
+              if (!hadData[sectionName]) {
+                hadData[sectionName] = {};
+              }
+              
+              // Store HAD data for this section/atHead combination
               hadData[sectionName][roundedAtHead] = hadDataList;
               
               // Check if HAD is sufficient for depth

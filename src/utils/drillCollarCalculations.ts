@@ -95,6 +95,7 @@ export function calculateDrillCollar(
     } else if (i === totalIterations - 1) {
       sectionName = "Surface";
     } else {
+      // All middle sections are just "Intermediate" without numbers
       sectionName = "Intermediate";
     }
     
@@ -105,6 +106,11 @@ export function calculateDrillCollar(
       drillCollar: nearestDrillCollarDiameter || 0,
       numberOfColumns: 0
     });
+  }
+  
+  // Ensure the last item is always marked as Surface
+  if (results.length > 0) {
+    results[results.length - 1].section = "Surface";
   }
   
   return results;
