@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,7 +16,8 @@ import { motion } from "framer-motion"
 // Import the data input form directly with a relative path instead of alias
 import DataInputForm from "../../components/data-input-form"
 
-export default function FormationDesignPage() {
+// Client component that safely uses useSearchParams
+function FormationContent() {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const [activeTab, setActiveTab] = useState(tabParam === 'drill-collar' ? 'drill-collar' : 'data-input')
@@ -211,5 +212,29 @@ export default function FormationDesignPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Loading fallback for Suspense
+function FormationLoading() {
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <NavBar />
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Spinner size="lg" className="mx-auto" />
+          <p className="text-muted-foreground">Loading formation design data...</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Main page component with Suspense
+export default function FormationDesignPage() {
+  return (
+    <Suspense fallback={<FormationLoading />}>
+      <FormationContent />
+    </Suspense>
   )
 } 
