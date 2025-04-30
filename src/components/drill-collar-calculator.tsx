@@ -75,8 +75,22 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       
       if (savedResults && (!contextDrillCollarResults || contextDrillCollarResults.length === 0)) {
         const parsedResults = JSON.parse(savedResults);
-        setLocalDrillCollarResults(parsedResults);
-        setContextDrillCollarResults(parsedResults);
+        
+        // Ensure section names are preserved correctly
+        const validatedResults = parsedResults.map((result: any, index: number) => {
+          // Make sure section names are correctly assigned
+          let section = result.section;
+          if (!section || section === "Unknown") {
+            // Assign section based on index if missing or unknown
+            if (index === 0) section = "Production";
+            else if (index === parsedResults.length - 1) section = "Surface";
+            else section = "Intermediate";
+          }
+          return {...result, section};
+        });
+        
+        setLocalDrillCollarResults(validatedResults);
+        setContextDrillCollarResults(validatedResults);
         
         // Show toast notification to inform user that data was loaded
         showToast('info', "Loaded saved drill collar results", {
@@ -86,8 +100,21 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       
       if (savedCalculations && (!drillCollarCalculations || drillCollarCalculations.length === 0)) {
         const parsedCalculations = JSON.parse(savedCalculations);
-        setCalculations(parsedCalculations);
-        setDrillCollarCalculations(parsedCalculations);
+        
+        // Ensure each calculation has a valid section
+        const validatedCalculations = parsedCalculations.map((calc: any, index: number) => {
+          // Validate section name in calculations too
+          if (!calc.section || calc.section === "Unknown") {
+            // Use the instance to determine section if available
+            if (calc.instance === 1) calc.section = "Production";
+            else if (calc.instance === 3) calc.section = "Surface";
+            else calc.section = "Intermediate";
+          }
+          return calc;
+        });
+        
+        setCalculations(validatedCalculations);
+        setDrillCollarCalculations(validatedCalculations);
       }
     } catch (error) {
       console.error('Failed to load saved drill collar results:', error);
@@ -319,12 +346,35 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       console.log("API Response:", data);
       console.log("Calculations:", data.calculations);
       
-      // Update state with the results
-      setLocalDrillCollarResults(data.drillCollarResults || []);
+      // Ensure all results have valid section names
+      const validatedResults = data.drillCollarResults.map((result: any, index: number) => {
+        if (!result.section || result.section === "Unknown") {
+          // Determine section based on position
+          if (index === 0) result.section = "Production";
+          else if (index === data.drillCollarResults.length - 1) result.section = "Surface";
+          else result.section = "Intermediate";
+        }
+        return result;
+      });
+      
+      // Update state with the validated results
+      setLocalDrillCollarResults(validatedResults);
+      setContextDrillCollarResults(validatedResults); // Update context too
       setDrillCollarData(data.drillCollarData || {});
       
       // Use extended calculations if available, otherwise use regular calculations
-      setCalculations(data.extendedCalculations || data.calculations || []);
+      const validatedCalculations = (data.extendedCalculations || data.calculations || []).map((calc: any) => {
+        if (!calc.section || calc.section === "Unknown") {
+          // Use instance to determine section if available
+          if (calc.instance === 1) calc.section = "Production";
+          else if (calc.instance === 3) calc.section = "Surface";
+          else calc.section = "Intermediate";
+        }
+        return calc;
+      });
+      
+      setCalculations(validatedCalculations);
+      setDrillCollarCalculations(validatedCalculations); // Update context too
       
       setIsLoading(false);
       setIsCalculated(true);

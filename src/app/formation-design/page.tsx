@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,18 +27,74 @@ function FormationContent() {
   // From FileUploadContext to determine if data is available
   const { 
     drillCollarResults,
-    casingResults
+    casingResults,
+    setDrillCollarResults,
+    drillCollarCalculations,
+    setDrillCollarCalculations
   } = useFileUpload();
+
+  // Load cached results from localStorage on mount
+  const loadCachedResults = useCallback(() => {
+    try {
+      const savedResults = localStorage.getItem('drillCollarResults');
+      const savedCalculations = localStorage.getItem('drillCollarCalculations');
+      
+      if (savedResults && (!drillCollarResults || drillCollarResults.length === 0)) {
+        const parsedResults = JSON.parse(savedResults);
+        
+        // Validate section names to ensure they're preserved correctly
+        const validatedResults = parsedResults.map((result: any, index: number) => {
+          // Make sure section names are correctly assigned
+          let section = result.section;
+          if (!section || section === "Unknown") {
+            // Assign section based on index if missing or unknown
+            if (index === 0) section = "Production";
+            else if (index === parsedResults.length - 1) section = "Surface";
+            else section = "Intermediate";
+          }
+          return {...result, section};
+        });
+        
+        setDrillCollarResults(validatedResults);
+        
+        // Show success toast
+        toast.info("Loaded saved drill collar results", {
+          description: "Previous calculation results have been restored."
+        });
+      }
+      
+      if (savedCalculations && (!drillCollarCalculations || drillCollarCalculations.length === 0)) {
+        const parsedCalculations = JSON.parse(savedCalculations);
+        
+        // Validate section names in calculations too
+        const validatedCalculations = parsedCalculations.map((calc: any, index: number) => {
+          // Make sure each calculation has a valid section
+          if (!calc.section || calc.section === "Unknown") {
+            // Use the instance to determine section if available
+            if (calc.instance === 1) calc.section = "Production";
+            else if (calc.instance === 3) calc.section = "Surface";
+            else calc.section = "Intermediate";
+          }
+          return calc;
+        });
+        
+        setDrillCollarCalculations(validatedCalculations);
+      }
+    } catch (error) {
+      console.error('Failed to load saved drill collar results:', error);
+    }
+  }, [drillCollarResults, drillCollarCalculations, setDrillCollarResults, setDrillCollarCalculations]);
 
   // Check if data is present on mount to set appropriate loading state
   useEffect(() => {
     // Simulate loading to give context time to initialize
     const timer = setTimeout(() => {
-      setInitialLoading(false)
+      loadCachedResults(); // Load cached results as soon as component initializes
+      setInitialLoading(false);
     }, 500)
     
     return () => clearTimeout(timer)
-  }, [])
+  }, [loadCachedResults])
   
   // Update active tab when URL parameter changes
   useEffect(() => {
@@ -49,9 +105,42 @@ function FormationContent() {
     }
   }, [tabParam])
 
-  // Handle tab change with any needed logic
+  // Persist results to localStorage when they change
+  useEffect(() => {
+    if (drillCollarResults && drillCollarResults.length > 0) {
+      localStorage.setItem('drillCollarResults', JSON.stringify(drillCollarResults));
+    }
+    
+    if (drillCollarCalculations && drillCollarCalculations.length > 0) {
+      localStorage.setItem('drillCollarCalculations', JSON.stringify(drillCollarCalculations));
+    }
+  }, [drillCollarResults, drillCollarCalculations]);
+
+  // Handler for when tab changes
   const handleTabChange = (value: string) => {
-    setActiveTab(value)
+    // When switching to the drill-collar tab, ensure results are loaded from cache if needed
+    if (value === 'drill-collar') {
+      loadCachedResults();
+      // Verify section names on tab switch to ensure consistency
+      if (drillCollarResults && drillCollarResults.length > 0) {
+        const validatedResults = drillCollarResults.map((result: any, index: number) => {
+          // Make sure section names are correctly assigned
+          let section = result.section;
+          if (!section || section === "Unknown") {
+            // Assign section based on index if missing or unknown
+            if (index === 0) section = "Production";
+            else if (index === drillCollarResults.length - 1) section = "Surface";
+            else section = "Intermediate";
+          }
+          return {...result, section};
+        });
+        
+        if (JSON.stringify(validatedResults) !== JSON.stringify(drillCollarResults)) {
+          setDrillCollarResults(validatedResults);
+        }
+      }
+    }
+    setActiveTab(value);
   }
 
   if (initialLoading) {
