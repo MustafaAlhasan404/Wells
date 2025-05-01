@@ -220,7 +220,7 @@ function FormationContent() {
                     data-[state=active]:text-white"
                 >
                   <Settings className="h-4 w-4" />
-                  <span>Well Parameters</span>
+                  <span>Drill Pipes Design</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="drill-collar" 
@@ -250,7 +250,7 @@ function FormationContent() {
                     <div>
                       <div className="flex items-center space-x-2">
                         <Settings className="h-5 w-5 text-primary" />
-                        <CardTitle className="text-lg sm:text-xl text-primary/90">Well Parameters</CardTitle>
+                        <CardTitle className="text-lg sm:text-xl text-primary/90">Drill Pipes Design</CardTitle>
                       </div>
                       <CardDescription className="mt-1.5">
                         Enter essential parameters for your formation design

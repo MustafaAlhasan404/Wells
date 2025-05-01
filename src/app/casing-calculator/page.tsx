@@ -16,6 +16,7 @@ import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
 import { showToast } from "@/utils/toast-utils"
 import { motion } from "framer-motion"
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 
 interface CasingCalculatorProps {}
 
@@ -244,9 +245,12 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     >
       <div className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="initialDcsgAmount" className="text-base font-medium text-primary">
-            Initial DCSG Amount
-          </Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="initialDcsgAmount" className="text-base font-medium text-primary">
+              Initial DCSG Amount
+            </Label>
+            <HelpTooltip text="The outer diameter for casing at body" />
+          </div>
           <Input
             id="initialDcsgAmount"
             placeholder="Enter initial DCSG amount"
@@ -257,9 +261,12 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
         </div>
       
         <div className="space-y-2">
-          <Label htmlFor="iterations" className="text-base font-medium text-primary">
-            Number of Sections
-          </Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="iterations" className="text-base font-medium text-primary">
+              Number of Sections
+            </Label>
+            <HelpTooltip text="The sections drilled in the well" />
+          </div>
           <Select value={iterations} onValueChange={setIterations}>
             <SelectTrigger className="w-full focus:ring-1 focus:ring-primary">
               <SelectValue placeholder="Select number of sections" />
@@ -307,9 +314,12 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
               <h3 className="text-lg font-semibold mb-4 text-primary/90">{sectionName}</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor={`multiplier_${index}`} className="text-base font-medium text-primary">
-                    Multiplier
-                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`multiplier_${index}`} className="text-base font-medium text-primary">
+                      Multiplier
+                    </Label>
+                    <HelpTooltip text="Factor depends on geological factors and rocks hardness" />
+                  </div>
                   <Input
                     id={`multiplier_${index}`}
                     placeholder="Enter multiplier"
@@ -320,9 +330,12 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor={`metalType_${index}`} className="text-base font-medium text-primary">
-                    Metal Type
-                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`metalType_${index}`} className="text-base font-medium text-primary">
+                      Metal Type
+                    </Label>
+                    <HelpTooltip text="API metal casing grades" />
+                  </div>
                   <Select 
                     value={section.metalType} 
                     onValueChange={(value) => handleSectionInputChange(index, 'metalType', value)}
@@ -348,9 +361,12 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor={`depth_${index}`} className="text-base font-medium text-primary">
-                    Depth
-                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`depth_${index}`} className="text-base font-medium text-primary">
+                      Depth
+                    </Label>
+                    <HelpTooltip text="The total depth of each section" />
+                  </div>
                   <Input
                     id={`depth_${index}`}
                     placeholder="Enter depth"
@@ -390,7 +406,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                   Casing Design
                 </h1>
                 <p className="mt-2 text-muted-foreground max-w-xl">
-                  Design and calculate optimal casing parameters for well integrity and structural stability
+                  Calculate casing program and design the casing string for well integrity and structural stability
                 </p>
               </div>
               {/* Visual indicator of process step */}

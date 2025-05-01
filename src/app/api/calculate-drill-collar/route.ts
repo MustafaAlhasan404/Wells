@@ -178,7 +178,9 @@ export async function POST(req: NextRequest) {
           const instanceNum = instanceCalc.instance;
           
           // Parse values needed for L0c calculation
-          const WOB = parseFloat(formData2[`WOB_${instanceNum}`]);
+          const WOB_input = parseFloat(formData2[`WOB_${instanceNum}`]);
+          // Multiply by 1000 to maintain backward compatibility with previous calculations
+          const WOB = WOB_input * 1000;
           const C = parseFloat(formData2[`C_${instanceNum}`]);
           const qc = parseFloat(formData2[`qc_${instanceNum}`]);
           
@@ -246,7 +248,8 @@ export async function POST(req: NextRequest) {
           console.log(`===============================`);
           console.log(`L0c CALCULATION FOR INSTANCE ${instanceNum}:`);
           console.log(`Section: ${instanceNum === 1 ? "Production" : instanceNum === 2 ? "Intermediate" : "Surface"}`);
-          console.log(`WOB: ${WOB}`);
+          console.log(`WOB input (tons): ${WOB_input}`);
+          console.log(`WOB calculated (x1000): ${WOB}`);
           console.log(`C: ${C}`);
           console.log(`qc: ${qc}`);
           console.log(`gamma: ${gamma}`);
@@ -256,7 +259,7 @@ export async function POST(req: NextRequest) {
           
           if (isNaN(numberOfColumns)) {
             console.log(`WARNING: numberOfColumns is NaN!`);
-            console.log(`Check calculation inputs: ${!isNaN(WOB) ? "WOB is valid" : "WOB is invalid"}, ${!isNaN(C) ? "C is valid" : "C is invalid"}, ${!isNaN(qc) ? "qc is valid" : "qc is invalid"}, ${!isNaN(b) ? "b is valid" : "b is invalid"}`);
+            console.log(`Check calculation inputs: ${!isNaN(WOB_input) ? "WOB is valid" : "WOB is invalid"}, ${!isNaN(C) ? "C is valid" : "C is invalid"}, ${!isNaN(qc) ? "qc is valid" : "qc is invalid"}, ${!isNaN(b) ? "b is valid" : "b is invalid"}`);
           }
           
           // Find corresponding section in drillCollarResults
@@ -336,16 +339,24 @@ export async function POST(req: NextRequest) {
             const instanceNum = lastCalc.instance;
             
             // Get WOB, C, qc, gamma from the form data for this instance
-            const WOB = parseFloat(formData2[`WOB_${instanceNum}`] || '0');
+            const WOB_input = parseFloat(formData2[`WOB_${instanceNum}`] || '0');
+            // Multiply by 1000 to maintain backward compatibility with previous calculations
+            const WOB = WOB_input * 1000;
             const C = parseFloat(formData2[`C_${instanceNum}`] || '0');
             const qc = parseFloat(formData2[`qc_${instanceNum}`] || '0');
             const gamma = parseFloat(formData2[`γ_${instanceNum}`] || '0');
             
             // Validate values
-            if (isNaN(WOB) || isNaN(C) || isNaN(qc) || isNaN(gamma)) {
-              console.error(`Invalid values for calculating missing section numbers:`, { WOB, C, qc, gamma });
+            if (isNaN(WOB_input) || isNaN(C) || isNaN(qc) || isNaN(gamma)) {
+              console.error(`Invalid values for calculating missing section numbers:`, { WOB_input, C, qc, gamma });
             } else {
-              console.log(`Using values from instance ${instanceNum} for missing sections:`, { WOB, C, qc, gamma });
+              console.log(`Using values from instance ${instanceNum} for missing sections:`, { 
+                WOB_input, 
+                WOB_calculated: WOB,
+                C, 
+                qc, 
+                gamma 
+              });
               
               // Find b value for this gamma from Excel
               const gammaColumnName = findColumnName(rawData, ['γ', 'gamma', 'y']);

@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { motion } from "framer-motion"
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 
 export default function DataInputForm() {
   const [formData, setFormData] = useState<Record<string, string>>({})
@@ -32,11 +33,26 @@ export default function DataInputForm() {
         const savedData = localStorage.getItem('wellsAnalyzerData');
         if (savedData) {
           const data = JSON.parse(savedData);
-          setFormData(data);
+          
+          // Migrate existing WOB values from old format (12000) to new format (12)
+          const migratedData = { ...data };
+          for (const key in migratedData) {
+            if (key.startsWith('WOB_') && migratedData[key]) {
+              const value = parseFloat(migratedData[key]);
+              if (!isNaN(value) && value >= 1000) {
+                // If the value is 1000 or greater, it's likely in the old format
+                // Convert by dividing by 1000
+                migratedData[key] = (value / 1000).toString();
+                console.log(`Migrated WOB value from ${data[key]} to ${migratedData[key]}`);
+              }
+            }
+          }
+          
+          setFormData(migratedData);
           
           // Initialize the displayed dα value if it exists
-          if (data['dα']) {
-            setDisplayedDalphaValue((parseFloat(data['dα']) * 100000).toFixed(2));
+          if (migratedData['dα']) {
+            setDisplayedDalphaValue((parseFloat(migratedData['dα']) * 100000).toFixed(2));
           }
         }
         
@@ -78,7 +94,15 @@ export default function DataInputForm() {
         ...prev,
         [field]: (numValue / 100000).toString()
       }));
-    } else {
+    } 
+    // Handle WOB values - store as tons in the form (user enters 12 for 12 tons)
+    else if (field.startsWith('WOB_')) {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
+    else {
       setFormData(prev => ({
         ...prev,
         [field]: value
@@ -115,6 +139,7 @@ export default function DataInputForm() {
   
   // Handle single input change (propagate to all instances)
   const handleSingleInputChange = (field: string, value: string) => {
+    // No special handling needed for WOB here since we're already storing as tons
     setFormData(prev => ({
       ...prev,
       [`${field}_1`]: value,
@@ -152,11 +177,36 @@ export default function DataInputForm() {
         {fields.map(field => (
           <div key={field} className="space-y-3 bg-background/70 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
             <div className="flex justify-between items-center">
-              <Label className="text-base font-medium text-primary">{field}</Label>
               <div className="flex items-center gap-2">
-                <Label htmlFor={`toggle-${field}`} className="text-xs text-muted-foreground">
-                  Single value
+                <Label className="text-base font-medium text-primary">
+                  {field}
                 </Label>
+                {field === "WOB" && (
+                  <HelpTooltip text="Weight on Bit at each section (tons)" />
+                )}
+                {field === "C" && (
+                  <HelpTooltip text="Percentage of drilling collars weight that are applied at the drilling Bit" />
+                )}
+                {field === "qc" && (
+                  <HelpTooltip text="Weight per meter for drill collars" />
+                )}
+                {field === "qp" && (
+                  <HelpTooltip text="Weight per meter for drill pipes" />
+                )}
+                {field === "Lhw" && (
+                  <HelpTooltip text="Length of the heavy weight drill pipes" />
+                )}
+                {field === "P" && (
+                  <HelpTooltip text="Pressure loss within drilling pipes formation" />
+                )}
+              </div>
+              <div className="flex items-center">
+                <div className="flex items-center gap-1.5 mr-4">
+                  <Label htmlFor={`toggle-${field}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                    Single value
+                  </Label>
+                  <HelpTooltip text="Click when there is the same value for all sections" />
+                </div>
                 <Switch 
                   id={`toggle-${field}`} 
                   checked={!!singleInputFields[field]} 
@@ -174,7 +224,7 @@ export default function DataInputForm() {
                 </Label>
                 <Input
                   id={`${field}_single`}
-                  placeholder={`Enter ${field} (all instances)`}
+                  placeholder={field === "WOB" ? "Enter WOB in tons" : `Enter ${field} (all instances)`}
                   value={formData[`${field}_1`] || ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSingleInputChange(field, e.target.value)}
                   className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
@@ -182,20 +232,22 @@ export default function DataInputForm() {
               </div>
             ) : (
               // Multiple inputs mode
-              [1, 2, 3].map(instance => (
-                <div key={`${field}_${instance}`} className="space-y-1.5">
-                  <Label htmlFor={`${field}_${instance}`} className="text-xs text-muted-foreground">
-                    Instance {instance}
-                  </Label>
-                  <Input
-                    id={`${field}_${instance}`}
-                    placeholder={`Enter ${field} (${instance})`}
-                    value={formData[`${field}_${instance}`] || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${instance}`, e.target.value)}
-                    className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
-                  />
-                </div>
-              ))
+              <div className="space-y-3">
+                {[1, 2, 3].map(instance => (
+                  <div key={`${field}_${instance}`} className="space-y-1.5">
+                    <Label htmlFor={`${field}_${instance}`} className="text-xs text-muted-foreground">
+                      Instance {instance}
+                    </Label>
+                    <Input
+                      id={`${field}_${instance}`}
+                      placeholder={field === "WOB" ? "Enter WOB in tons" : `Enter ${field} (${instance})`}
+                      value={formData[`${field}_${instance}`] || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${instance}`, e.target.value)}
+                      className={`focus:ring-1 focus:ring-primary bg-background/80 border-border ${field === "WOB" ? "font-medium" : ""}`}
+                    />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         ))}
@@ -210,12 +262,17 @@ export default function DataInputForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {fields.map(field => (
           <div key={field} className="space-y-2 bg-background/70 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
-            <Label htmlFor={field} className="text-base font-medium text-primary">
-              {field}
-              {field === 'dα' && displayFormattedDalpha && (
-                <span className="text-xs ml-2 text-muted-foreground">(×10⁻⁵)</span>
+            <div className="flex items-center gap-2">
+              <Label htmlFor={field} className="text-base font-medium text-primary">
+                {field}
+                {field === 'dα' && displayFormattedDalpha && (
+                  <span className="text-xs ml-2 text-muted-foreground">(×10⁻⁵)</span>
+                )}
+              </Label>
+              {field === "Dep" && (
+                <HelpTooltip text="The total depth of each section" />
               )}
-            </Label>
+            </div>
             {field === 'dα' && displayFormattedDalpha ? (
               <Input
                 id={field}
