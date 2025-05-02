@@ -169,11 +169,129 @@ export default function DataInputForm() {
     }
   }
 
-  const renderBasicParameters = () => {
-    const fields = ["WOB", "C", "qc", "qp", "Lhw", "P", "γ", "H"]
+  const renderDrillingPipesCharacteristics = () => {
+    const fields = ["qp", "qc", "Lhw", "Dep", "Dhw", "qhw", "n", "dα"]
     
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        {fields.map(field => (
+          <div key={field} className="space-y-3 bg-background/70 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Label className="text-base font-medium text-primary">
+                  {field}
+                  {field === 'dα' && displayFormattedDalpha && (
+                    <span className="text-xs ml-2 text-muted-foreground">(×10⁻⁵)</span>
+                  )}
+                </Label>
+                {field === "qp" && (
+                  <HelpTooltip text="Weight per meter for drill pipes" />
+                )}
+                {field === "qc" && (
+                  <HelpTooltip text="Weight per meter for drill collars" />
+                )}
+                {field === "Lhw" && (
+                  <HelpTooltip text="Length of the heavy weight drill pipes" />
+                )}
+                {field === "Dep" && (
+                  <HelpTooltip text="The total depth of each section" />
+                )}
+                {field === "Dhw" && (
+                  <HelpTooltip text="The external diameter of the heavy drill pipes" />
+                )}
+                {field === "qhw" && (
+                  <HelpTooltip text="The weight per meter for heavy drill pipes" />
+                )}
+                {field === "n" && (
+                  <HelpTooltip text="Number of circles for the drill pipes" />
+                )}
+                {field === "dα" && (
+                  <HelpTooltip text="Factor that consider geometry of the well" />
+                )}
+              </div>
+              <div className="flex items-center">
+                <div className="flex items-center gap-1.5 mr-4">
+                  <Label htmlFor={`toggle-${field}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                    Single value
+                  </Label>
+                  <HelpTooltip text="Click when there is the same value for all sections" />
+                </div>
+                <Switch 
+                  id={`toggle-${field}`} 
+                  checked={!!singleInputFields[field]} 
+                  onCheckedChange={() => toggleSingleInput(field)}
+                />
+              </div>
+            </div>
+            
+            {field === 'dα' && displayFormattedDalpha ? (
+              <Input
+                id={field}
+                placeholder="Enter value (e.g., 18.8)"
+                value={displayedDalphaValue}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(field, e.target.value)}
+                className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
+                inputMode="decimal"
+              />
+            ) : singleInputFields[field] ? (
+              // Single input mode
+              <div className="space-y-2">
+                <Label htmlFor={`${field}_single`} className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Copy className="h-3 w-3" />
+                  Applied to all instances
+                </Label>
+                <Input
+                  id={`${field}_single`}
+                  placeholder={`Enter ${field} (all instances)`}
+                  value={formData[`${field}_1`] || ''}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSingleInputChange(field, e.target.value)}
+                  className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
+                />
+              </div>
+            ) : (
+              // Multiple inputs mode
+              <div className="space-y-3">
+                {[1, 2, 3].map(instance => (
+                  <div key={`${field}_${instance}`} className="space-y-1.5">
+                    <Label htmlFor={`${field}_${instance}`} className="text-xs text-muted-foreground">
+                      Instance {instance}
+                    </Label>
+                    <Input
+                      id={`${field}_${instance}`}
+                      placeholder={`Enter ${field} (${instance})`}
+                      value={formData[`${field}_${instance}`] || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${instance}`, e.target.value)}
+                      className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {field === 'dα' && (
+              <div className="flex items-center gap-2 mt-1">
+                <Switch
+                  id="toggle-dalpha-format"
+                  checked={displayFormattedDalpha}
+                  onCheckedChange={() => setDisplayFormattedDalpha(!displayFormattedDalpha)}
+                  className="scale-75 origin-left"
+                />
+                <Label htmlFor="toggle-dalpha-format" className="text-xs text-muted-foreground cursor-pointer">
+                  {displayFormattedDalpha ? "Using simplified format" : "Using raw value"}
+                </Label>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const renderDrillingParameters = () => {
+    const fields = ["WOB", "C", "P", "γ", "Hc"]
+    
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {fields.map(field => (
           <div key={field} className="space-y-3 bg-background/70 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
             <div className="flex justify-between items-center">
@@ -187,17 +305,14 @@ export default function DataInputForm() {
                 {field === "C" && (
                   <HelpTooltip text="Percentage of drilling collars weight that are applied at the drilling Bit" />
                 )}
-                {field === "qc" && (
-                  <HelpTooltip text="Weight per meter for drill collars" />
-                )}
-                {field === "qp" && (
-                  <HelpTooltip text="Weight per meter for drill pipes" />
-                )}
-                {field === "Lhw" && (
-                  <HelpTooltip text="Length of the heavy weight drill pipes" />
-                )}
                 {field === "P" && (
                   <HelpTooltip text="Pressure loss within drilling pipes formation" />
+                )}
+                {field === "γ" && (
+                  <HelpTooltip text="Specific weight" />
+                )}
+                {field === "Hc" && (
+                  <HelpTooltip text="Height Above Cementation (HAC)" />
                 )}
               </div>
               <div className="flex items-center">
@@ -255,61 +370,6 @@ export default function DataInputForm() {
     )
   }
 
-  const renderWellSpecifications = () => {
-    const fields = ["Dep", "Dhw", "qhw", "dα", "n"]
-    
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        {fields.map(field => (
-          <div key={field} className="space-y-2 bg-background/70 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
-            <div className="flex items-center gap-2">
-              <Label htmlFor={field} className="text-base font-medium text-primary">
-                {field}
-                {field === 'dα' && displayFormattedDalpha && (
-                  <span className="text-xs ml-2 text-muted-foreground">(×10⁻⁵)</span>
-                )}
-              </Label>
-              {field === "Dep" && (
-                <HelpTooltip text="The total depth of each section" />
-              )}
-            </div>
-            {field === 'dα' && displayFormattedDalpha ? (
-              <Input
-                id={field}
-                placeholder="Enter value (e.g., 18.8)"
-                value={displayedDalphaValue}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(field, e.target.value)}
-                className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
-                inputMode="decimal"
-              />
-            ) : (
-              <Input
-                id={field}
-                placeholder={`Enter ${field}`}
-                value={formData[field] || ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(field, e.target.value)}
-                className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
-              />
-            )}
-            {field === 'dα' && (
-              <div className="flex items-center gap-2 mt-1">
-                <Switch
-                  id="toggle-dalpha-format"
-                  checked={displayFormattedDalpha}
-                  onCheckedChange={() => setDisplayFormattedDalpha(!displayFormattedDalpha)}
-                  className="scale-75 origin-left"
-                />
-                <Label htmlFor="toggle-dalpha-format" className="text-xs text-muted-foreground cursor-pointer">
-                  {displayFormattedDalpha ? "Using simplified format" : "Using raw value"}
-                </Label>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )
-  }
-
   const renderConstants = () => {
     const fields = ["K1", "K2", "K3"]
     
@@ -317,7 +377,18 @@ export default function DataInputForm() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
         {fields.map(field => (
           <div key={field} className="space-y-2 bg-background/70 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
-            <Label htmlFor={field} className="text-base font-medium text-primary">{field}</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor={field} className="text-base font-medium text-primary">{field}</Label>
+              {field === "K1" && (
+                <HelpTooltip text="Factor that consider the friction of the drill pipes with wellbore, ranges (1.1-1.2)" />
+              )}
+              {field === "K2" && (
+                <HelpTooltip text="Factor that consider sticking of the drill pipes ranges (1.1-1.25)" />
+              )}
+              {field === "K3" && (
+                <HelpTooltip text="Factor that consider the acceleration of the drill pipes when raising ranges (1.02-1.04)" />
+              )}
+            </div>
             <Input
               id={field}
               placeholder={`Enter ${field}`}
@@ -375,13 +446,13 @@ export default function DataInputForm() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="h-5 w-1 bg-primary rounded-full"></div>
-                <h3 className="text-lg font-medium">Basic Parameters</h3>
+                <h3 className="text-lg font-medium">Drilling Pipes Characteristics</h3>
               </div>
               <div className="text-sm text-muted-foreground">
-                Enter the basic parameters for your well analysis
+                Enter the characteristics of your drilling pipes
               </div>
               <div className="mt-4">
-                {renderBasicParameters()}
+                {renderDrillingPipesCharacteristics()}
               </div>
             </div>
           </motion.div>
@@ -394,13 +465,13 @@ export default function DataInputForm() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="h-5 w-1 bg-primary rounded-full"></div>
-                <h3 className="text-lg font-medium">Well Specifications</h3>
+                <h3 className="text-lg font-medium">Constants</h3>
               </div>
               <div className="text-sm text-muted-foreground">
-                Enter the specifications for your well
+                Enter the constant values for calculations
               </div>
               <div className="mt-4">
-                {renderWellSpecifications()}
+                {renderConstants()}
               </div>
             </div>
           </motion.div>
@@ -413,13 +484,13 @@ export default function DataInputForm() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="h-5 w-1 bg-primary rounded-full"></div>
-                <h3 className="text-lg font-medium">Constants</h3>
+                <h3 className="text-lg font-medium">Drilling Parameters</h3>
               </div>
               <div className="text-sm text-muted-foreground">
-                Enter the constant values for calculations
+                Enter the drilling parameters for your well analysis
               </div>
               <div className="mt-4">
-                {renderConstants()}
+                {renderDrillingParameters()}
               </div>
             </div>
           </motion.div>

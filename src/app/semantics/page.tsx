@@ -284,19 +284,18 @@ interface DataInputValues {
 
 export default function SemanticsPage() {
   // Input parameters
-  const [hcValue, setHcValue] = useState<string>("");  // Hc state variable
-  const [gammaC, setGammaC] = useState<string>("");    // gammaC state variable
-  const [gammaW, setGammaW] = useState<string>("1");   // gammaW state variable with default of 1
-  const [gammaFC, setGammaFC] = useState<string>("");  // gammaFC state variable
-  const [gammaF, setGammaF] = useState<string>("");    // gammaF state variable
-  const [k1Value, setK1Value] = useState<string>("");  // K1 state variable
-  const [k2Value, setK2Value] = useState<string>("");  // K2 state variable
-  const [k3Value, setK3Value] = useState<string>("");  // K3 state variable
-  const [tfcValue, setTfcValue] = useState<string>(""); // tfc value (for compatibility only)
-  const [tfdValue, setTfdValue] = useState<string>(""); // tfd value (for compatibility only)
-  const [tdValue, setTdValue] = useState<string>("");   // td value
-  const [hValue, setHValue] = useState<string>("");     // h value for Vcf calculation
-  const [mValue, setMValue] = useState<string>("");     // m value for Gc calculation
+  const [k1Value, setK1Value] = useState("");
+  const [k2Value, setK2Value] = useState("");
+  const [k3Value, setK3Value] = useState("");
+  const [gammaC, setGammaC] = useState("");
+  const [gammaW, setGammaW] = useState("1"); // Fixed at 1
+  const [gammaFC, setGammaFC] = useState("");
+  const [gammaF, setGammaF] = useState("");
+  const [tfcValue, setTfcValue] = useState("");
+  const [tfdValue, setTfdValue] = useState("");
+  const [tdValue, setTdValue] = useState("");
+  const [hValue, setHValue] = useState("");
+  const [mValue, setMValue] = useState(""); // Re-add this line
   
   // Track which fields are using single input mode
   const [singleInputFields, setSingleInputFields] = useState<Record<string, boolean>>({});
@@ -373,29 +372,33 @@ export default function SemanticsPage() {
 
   // Save input data to localStorage
   const saveInputData = () => {
-    if (!initialLoadComplete) {
-      console.log("Skipping save during initial load");
-      return;
+    try {
+      // Combine all inputs into a single object
+      const inputData = {
+        gammaC,
+        gammaW,
+        gammaFC,
+        gammaF,
+        k1: k1Value,
+        k2: k2Value,
+        k3: k3Value,
+        tfc: tfcValue,
+        tfd: tfdValue,
+        td: tdValue,
+        h: hValue,
+        m: mValue, // Add mValue to input data
+        // Include instance values
+        instanceValues,
+        // Include single input preferences
+        singleInputFields
+      };
+      
+      localStorage.setItem('wellsAnalyzerSemanticData', JSON.stringify(inputData));
+      return true;
+    } catch (error) {
+      console.error('Failed to save data:', error);
+      return false;
     }
-    
-    const data = {
-      hc: hcValue,
-      gammaC: gammaC,
-      gammaW: gammaW,
-      gammaFC: gammaFC,
-      gammaF: gammaF,
-      k1: k1Value,
-      k2: k2Value,
-      k3: k3Value,
-      td: tdValue,
-      h: hValue,
-      instanceValues: instanceValues,
-      singleInputFields: singleInputFields
-    };
-    
-    const dataStr = JSON.stringify(data);
-    console.log("Saving input data:", data);
-    localStorage.setItem('wellsAnalyzerSemanticData', dataStr);
   };
 
   // Manual save function with feedback for save button
@@ -433,40 +436,39 @@ export default function SemanticsPage() {
   // Load input data from localStorage
   const loadInputData = () => {
     try {
-      const dataStr = localStorage.getItem('wellsAnalyzerSemanticData');
-      if (!dataStr) {
-        console.log("No saved data found in localStorage");
-        return;
+      const savedData = localStorage.getItem('wellsAnalyzerSemanticData');
+      
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        
+        // Load single values
+        if (data.gammaC !== undefined) setGammaC(data.gammaC);
+        if (data.gammaW !== undefined) setGammaW(data.gammaW);
+        if (data.gammaFC !== undefined) setGammaFC(data.gammaFC);
+        if (data.gammaF !== undefined) setGammaF(data.gammaF);
+        if (data.k1 !== undefined) setK1Value(data.k1);
+        if (data.k2 !== undefined) setK2Value(data.k2);
+        if (data.k3 !== undefined) setK3Value(data.k3);
+        if (data.tfc !== undefined) setTfcValue(data.tfc);
+        if (data.tfd !== undefined) setTfdValue(data.tfd);
+        if (data.td !== undefined) setTdValue(data.td);
+        if (data.h !== undefined) setHValue(data.h);
+        if (data.m !== undefined) setMValue(data.m); // Load mValue from data
+        
+        // Load instance values
+        if (data.instanceValues) {
+          setInstanceValues(data.instanceValues);
+        }
+        
+        // Load single input preferences
+        if (data.singleInputFields) {
+          setSingleInputFields(data.singleInputFields);
+        }
+        
+        console.log("Data loaded from localStorage:", data);
+        return true;
       }
-      
-      console.log("Loading input data from localStorage");
-      const data = JSON.parse(dataStr);
-      
-      // Load form values
-      if (data.hc) setHcValue(data.hc);
-      if (data.gammaC) setGammaC(data.gammaC);
-      if (data.gammaW) setGammaW(data.gammaW);
-      if (data.gammaFC) setGammaFC(data.gammaFC);
-      if (data.gammaF) setGammaF(data.gammaF);
-      if (data.k1) setK1Value(data.k1);
-      if (data.k2) setK2Value(data.k2);
-      if (data.k3) setK3Value(data.k3);
-      // Skip tfc and tfd - no longer used
-      if (data.td) setTdValue(data.td);
-      if (data.h) setHValue(data.h);
-      
-      // Load instance values
-      if (data.instanceValues) {
-        setInstanceValues(data.instanceValues);
-      }
-      
-      // Load single input preferences
-      if (data.singleInputFields) {
-        setSingleInputFields(data.singleInputFields);
-      }
-      
-      console.log("Data loaded from localStorage:", data);
-      return true;
+      return false;
     } catch (error) {
       console.error('Failed to load data:', error);
       return false;
@@ -547,7 +549,6 @@ export default function SemanticsPage() {
       localStorage.removeItem('wellsAnalyzerResultsHTML');
       
       // Reset state
-      setHcValue("");
       setGammaC("");
       setGammaW("1");
       setGammaFC("");
@@ -559,6 +560,7 @@ export default function SemanticsPage() {
       setTfdValue("");
       setTdValue("");
       setHValue("");
+      setMValue(""); // Reset mValue
       setInstanceValues({});
       setSingleInputFields({});
       setVcfResults([]);
@@ -577,10 +579,12 @@ export default function SemanticsPage() {
   const saveAllInputState = useCallback(() => {
     saveInputData();
   }, [
-    hcValue, gammaC, gammaW, gammaFC, gammaF,
+    gammaC, gammaW, gammaFC, gammaF,
     k1Value, k2Value, k3Value,
+    tfcValue,
+    tfdValue,
     tdValue,
-    hValue, instanceValues, singleInputFields
+    hValue, mValue, instanceValues, singleInputFields
   ]);
 
   // Update a field with single or multiple values
@@ -588,7 +592,6 @@ export default function SemanticsPage() {
     // If this is a single input field or no instance specified, update the main state
     if (singleInputFields[field] || !instance) {
       switch(field) {
-        case 'hc': updateHcValue(value); break;
         case 'gammaC': updateGammaC(value); break;
         case 'gammaFC': updateGammaFC(value); break;
         case 'gammaF': updateGammaF(value); break;
@@ -599,6 +602,7 @@ export default function SemanticsPage() {
         case 'tfd': updateTfdValue(value); break;
         case 'td': updateTdValue(value); break;
         case 'h': updateHValue(value); break;
+        case 'm': updateMValue(value); break; // Add this line
       }
       
       // If in single input mode, update all instances
@@ -651,16 +655,48 @@ export default function SemanticsPage() {
   // Calculate Vcf values
   const calculateVcf = () => {
     try {
-      // Check if we have Hc value either in the main field or in any of the instances
-      const hasHcValue = hcValue || 
-        (instanceValues['hc'] && (
-          instanceValues['hc'][1] || 
-          instanceValues['hc'][2] || 
-          instanceValues['hc'][3]
+      // Get formation data for Hc (HAC) values - store all three instances
+      let formationHcValues = [0, 0, 0]; // Initialize with 0 for each instance (index 0, 1, 2)
+      try {
+        const formationData = localStorage.getItem('wellsAnalyzerData');
+        if (formationData) {
+          const data = JSON.parse(formationData);
+          
+          // Check for Hc values from Formation Design (for each instance)
+          for (let i = 1; i <= 3; i++) {
+            // First try with the new Hc naming
+            if (data[`Hc_${i}`] && !isNaN(parseFloat(data[`Hc_${i}`]))) {
+              formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
+            } 
+            // Then fallback to the old H naming for backward compatibility
+            else if (data[`H_${i}`] && !isNaN(parseFloat(data[`H_${i}`]))) {
+              formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
+            }
+          }
+          
+          // If we have a single value (non-instance), use it for all instances as fallback
+          if (formationHcValues.every(v => v === 0)) {
+            if (data.Hc && !isNaN(parseFloat(data.Hc))) {
+              formationHcValues = [parseFloat(data.Hc), parseFloat(data.Hc), parseFloat(data.Hc)];
+            } else if (data.H && !isNaN(parseFloat(data.H))) {
+              formationHcValues = [parseFloat(data.H), parseFloat(data.H), parseFloat(data.H)];
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load Hc from Formation Design data:', error);
+      }
+      
+      // Check if we have height parameter value - different from Hc/HAC
+      const hasHeightValue = hValue || 
+        (instanceValues['h'] && (
+          instanceValues['h'][1] || 
+          instanceValues['h'][2] || 
+          instanceValues['h'][3]
         ));
       
-      if (!hasHcValue) {
-        showToast('error', "Please enter a value for Hc");
+      if (!hasHeightValue) {
+        showToast('error', "Please enter a value for h (height parameter)");
         return;
       }
       
@@ -679,22 +715,17 @@ export default function SemanticsPage() {
         ));
       
       if (!hasK1Value) {
-        // showToast('error', "K1 value not found. Please enter it above.");
         return;
       }
       
-      // Get Hc value - use main value or first available instance value
-      let Hc = 0;
-      if (hcValue && !isNaN(parseFloat(hcValue))) {
-        Hc = parseFloat(hcValue);
-      } else if (instanceValues['hc']) {
-        // Find the first available instance value
-        for (let i = 1; i <= 3; i++) {
-          if (instanceValues['hc'][i] && !isNaN(parseFloat(instanceValues['hc'][i]))) {
-            Hc = parseFloat(instanceValues['hc'][i]);
-            break;
-          }
-        }
+      // Check if at least one Hc value is available
+      if (formationHcValues.every(v => v === 0)) {
+        console.warn('No Hc values found in Formation Design data');
+        showToast('error', "Height Above Cementation (HAC) values not found", {
+          description: "Please enter HAC values in Formation Design - Drill Pipes Design tab first."
+        });
+        setIsLoading(false);
+        return;
       }
       
       // Get K1 value - use main value or first available instance value
@@ -711,29 +742,34 @@ export default function SemanticsPage() {
         }
       }
       
-      // Ensure we have valid values for Hc and K1
-      if (Hc === 0 || K1 === 0) {
-        // showToast('error', "Invalid or missing values for Hc or K1");
+      // Ensure we have valid values for Hc (at least one instance) and K1
+      if (formationHcValues.every(v => v === 0) || K1 === 0) {
         return;
       }
       
       // Create results array
       const results: VcfResult[] = [];
       
-      // Generate HTML for equations
+      // Generate HTML for equations - display the instance-specific Hc values
       let equations = `<div class="space-y-4">
                         <h3 class="text-xl font-bold text-primary">Vcf Equations</h3>
                         <div class="bg-muted/30 p-4 rounded-md border border-border/40">
                           <h4 class="font-medium mb-2">General Formula:</h4>
-                          <p class="font-mono text-sm bg-background/80 p-2 rounded">Vcf = [(K1 × Db² - de²) × Hc + di² × h]</p>
+                          <p class="font-mono text-sm bg-background/80 p-2 rounded">Vcf = (π/4) × [(K1 × Db² - de²) × Hc + di² × h]</p>
                           <p class="text-sm mt-2">Where:</p>
                           <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mt-2">
                             <div class="bg-background/50 p-2 rounded border border-border/30">
                               <span class="font-mono">K1 = ${K1.toFixed(4)} (coefficient)</span>
                             </div>
                             <div class="bg-background/50 p-2 rounded border border-border/30">
-                              <span class="font-mono">Hc = ${Hc.toFixed(4)} m</span>
+                              <span class="font-mono">Hc (Instance 1) = ${formationHcValues[0].toFixed(4)} m</span>
                             </div>
+                            ${formationHcValues[1] > 0 ? `<div class="bg-background/50 p-2 rounded border border-border/30">
+                              <span class="font-mono">Hc (Instance 2) = ${formationHcValues[1].toFixed(4)} m</span>
+                            </div>` : ''}
+                            ${formationHcValues[2] > 0 ? `<div class="bg-background/50 p-2 rounded border border-border/30">
+                              <span class="font-mono">Hc (Instance 3) = ${formationHcValues[2].toFixed(4)} m</span>
+                            </div>` : ''}
                             <div class="bg-background/50 p-2 rounded border border-border/30">
                               <span class="font-mono">Db = Bit diameter (m)</span>
                             </div>
@@ -786,14 +822,8 @@ export default function SemanticsPage() {
         console.log('Casing result:', result);
         console.log('Db:', Db, 'de:', de, 'di:', dimValue);
         
-        // Get instance-specific Hc value if available and not in single input mode
-        let instanceHc = Hc;
-        if (!singleInputFields['hc'] && 
-            instanceValues['hc'] && 
-            instanceValues['hc'][instanceNumber] && 
-            !isNaN(parseFloat(instanceValues['hc'][instanceNumber]))) {
-          instanceHc = parseFloat(instanceValues['hc'][instanceNumber]);
-        }
+        // Get instance-specific Hc value from the formation design
+        let instanceHc = formationHcValues[i] || formationHcValues[0]; // Use instance-specific value or fallback to first instance
         
         // Get instance-specific K1 value if available and not in single input mode
         let instanceK1 = K1;
@@ -825,32 +855,32 @@ export default function SemanticsPage() {
           h = parseFloat(dataInputValues[hKey]);
         }
         
-        // Calculate Vcf: [(k1Db^2-de^2).Hc+di^2.h]
-        const vcf = ((instanceK1 * (Db**2) - de**2) * instanceHc) + (dimValue**2) * h;
+        // Calculate Vcf using instance-specific Hc value and the formula
+        // Calculate Vcf using the formula: Vcf = (π/4) × [(K1 × Db² - de²) × Hc + di² × h]
+        // Calculate each term separately for clarity
+        const PI_OVER_4 = Math.PI / 4;
+        const k1_times_db_squared = instanceK1 * Math.pow(Db, 2);
+        const de_squared = Math.pow(de, 2);
+        const first_term = (k1_times_db_squared - de_squared) * instanceHc; // Using instanceHc from formation design
+        const di_squared = Math.pow(dimValue, 2);
+        const second_term = di_squared * h;
+        const vcf = PI_OVER_4 * (first_term + second_term);
         
         // Add to results
         results.push({
-          instance: i + 1,
-          db: Db * 1000,
-          de: de * 1000,
-          di: dimValue * 1000, // Store Dim as di for display
+          instance: instanceNumber,
+          db: Db * 1000, // Convert back to mm for display
+          de: de * 1000, // Convert back to mm for display
+          di: dimValue * 1000, // Convert back to mm for display
           h: h,
           vcf: vcf
         });
         
-        // Step by step calculation for this instance
-        const step1 = instanceK1 * (Db**2);
-        const step2 = step1 - (de**2);
-        const step3 = step2 * instanceHc;
-        const step4 = dimValue**2;
-        const step5 = step4 * h;
-        const step6 = step3 + step5;
-        
-        // Add equation steps for this instance
+        // Add calculation details to the equations HTML
         equations += `
           <div class="mt-6 border border-primary/20 rounded-md overflow-hidden">
             <div class="bg-primary/10 p-3 border-b border-primary/20">
-              <h4 class="font-semibold">Instance ${i+1} Calculation</h4>
+              <h4 class="font-semibold">Instance ${instanceNumber} Calculations</h4>
             </div>
             <div class="p-4 space-y-4 bg-muted/20">
               <div>
@@ -860,19 +890,19 @@ export default function SemanticsPage() {
                     <span class="font-mono">K1 = ${instanceK1.toFixed(4)}</span>
                   </div>
                   <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">Db = ${Db.toFixed(4)} m (${(Db*1000).toFixed(2)} mm)</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">de = ${de.toFixed(4)} m (${(de*1000).toFixed(2)} mm)</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
                     <span class="font-mono">Hc = ${instanceHc.toFixed(4)} m</span>
                   </div>
                   <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">di = ${dimValue.toFixed(4)} m (${(dimValue*1000).toFixed(2)} mm)</span>
+                    <span class="font-mono">h = ${h.toFixed(4)} m</span>
                   </div>
                   <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">h = ${h.toFixed(4)}</span>
+                    <span class="font-mono">Db = ${(Db * 1000).toFixed(4)} mm</span>
+                  </div>
+                  <div class="bg-background/50 p-2 rounded border border-border/30">
+                    <span class="font-mono">de = ${(de * 1000).toFixed(4)} mm</span>
+                  </div>
+                  <div class="bg-background/50 p-2 rounded border border-border/30">
+                    <span class="font-mono">di = ${(dimValue * 1000).toFixed(4)} mm</span>
                   </div>
                 </div>
               </div>
@@ -880,29 +910,23 @@ export default function SemanticsPage() {
               <div class="border-t border-border/30 pt-4">
                 <p class="font-medium">Vcf Calculation:</p>
                 <div class="mt-2 bg-background/60 p-3 rounded">
-                  <p class="font-mono text-sm">Vcf = [(k1Db^2-de^2).Hc+di^2.h]</p>
+                  <p class="font-mono text-sm">Vcf = (π/4) × [(K1 × Db² - de²) × Hc + di² × h]</p>
                   <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                    <li>K1 × Db² = ${instanceK1.toFixed(4)} × ${Db.toFixed(4)}² = ${step1.toFixed(6)}</li>
-                    <li>K1 × Db² - de² = ${step1.toFixed(6)} - ${de.toFixed(4)}² = ${step2.toFixed(6)}</li>
-                    <li>[(K1 × Db² - de²) × Hc = ${step2.toFixed(6)} × ${instanceHc.toFixed(4)} = ${step3.toFixed(6)}</li>
-                    <li>di² = ${dimValue.toFixed(4)}² = ${step4.toFixed(6)}</li>
-                    <li>di² × h = ${step4.toFixed(6)} × ${h.toFixed(4)} = ${step5.toFixed(6)}</li>
-                    <li>[(K1 × Db² - de²) × Hc + di² × h] = ${step3.toFixed(6)} + ${step5.toFixed(6)} = ${step6.toFixed(6)}</li>
+                    <li>K1 × Db² = ${instanceK1.toFixed(4)} × ${(Db * Db).toFixed(6)} = ${k1_times_db_squared.toFixed(6)}</li>
+                    <li>de² = ${(de * de).toFixed(6)}</li>
+                    <li>K1 × Db² - de² = ${k1_times_db_squared.toFixed(6)} - ${(de * de).toFixed(6)} = ${(k1_times_db_squared - de * de).toFixed(6)}</li>
+                    <li>(K1 × Db² - de²) × Hc = ${(k1_times_db_squared - de * de).toFixed(6)} × ${instanceHc.toFixed(4)} = ${first_term.toFixed(6)}</li>
+                    <li>di² = ${(dimValue * dimValue).toFixed(6)}</li>
+                    <li>di² × h = ${(dimValue * dimValue).toFixed(6)} × ${h.toFixed(4)} = ${second_term.toFixed(6)}</li>
+                    <li>(K1 × Db² - de²) × Hc + di² × h = ${first_term.toFixed(6)} + ${second_term.toFixed(6)} = ${(first_term + second_term).toFixed(6)}</li>
+                    <li>π/4 × [(K1 × Db² - de²) × Hc + di² × h] = ${PI_OVER_4.toFixed(6)} × ${(first_term + second_term).toFixed(6)} = ${vcf.toFixed(6)}</li>
                   </ol>
-                  <p class="font-mono text-sm mt-2 font-bold">Vcf = ${vcf.toFixed(6)}</p>
-                </div>
-              </div>
-              
-              <div class="mt-3 pt-3 border-t border-border/30">
-                <p class="text-center font-medium">Final Result:</p>
-                <div class="grid grid-cols-1 gap-2 mt-2">
-                  <div class="bg-primary/10 p-2 rounded border border-primary/30 text-center">
-                    <span class="font-mono text-sm">Vcf = ${vcf.toFixed(6)}</span>
-                  </div>
+                  <p class="font-mono text-sm mt-2 font-bold">Vcf = ${vcf.toFixed(4)} m³</p>
                 </div>
               </div>
             </div>
-          </div>`;
+          </div>
+        `;
       }
       
       // Using the updated methods to persist results
@@ -965,13 +989,42 @@ export default function SemanticsPage() {
   // Function to calculate Gc/G'c values
   const calculateGcGcInternal = () => {
     try {
-      // Check if we have required values in main fields or instances
-      const hasHcValue = hcValue || 
-        (instanceValues['hc'] && (
-          instanceValues['hc'][1] || 
-          instanceValues['hc'][2] || 
-          instanceValues['hc'][3]
-        ));
+      // Get formation data for Hc (HAC) values - store all three instances
+      let formationHcValues = [0, 0, 0]; // Initialize with 0 for each instance (index 0, 1, 2)
+      try {
+        const formationData = localStorage.getItem('wellsAnalyzerData');
+        if (formationData) {
+          const data = JSON.parse(formationData);
+          
+          // Check for Hc values from Formation Design (for each instance)
+          for (let i = 1; i <= 3; i++) {
+            // First try with the new Hc naming
+            if (data[`Hc_${i}`] && !isNaN(parseFloat(data[`Hc_${i}`]))) {
+              formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
+            } 
+            // Then fallback to the old H naming for backward compatibility
+            else if (data[`H_${i}`] && !isNaN(parseFloat(data[`H_${i}`]))) {
+              formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
+            }
+          }
+          
+          // If we have a single value (non-instance), use it for all instances as fallback
+          if (formationHcValues.every(v => v === 0)) {
+            if (data.Hc && !isNaN(parseFloat(data.Hc))) {
+              formationHcValues = [parseFloat(data.Hc), parseFloat(data.Hc), parseFloat(data.Hc)];
+            } else if (data.H && !isNaN(parseFloat(data.H))) {
+              formationHcValues = [parseFloat(data.H), parseFloat(data.H), parseFloat(data.H)];
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load Hc from Formation Design data:', error);
+      }
+      
+      // Check if we have at least one valid Hc value
+      const hasHcValue = formationHcValues.some(v => v > 0);
+      
+      // Rest of the validation
       const hasGammaC = gammaC || 
         (instanceValues['gammaC'] && (
           instanceValues['gammaC'][1] || 
@@ -987,25 +1040,28 @@ export default function SemanticsPage() {
       
       // Validate required inputs
       if (!hasHcValue || !hasGammaC || !hasGammaW || !vcfResults || vcfResults.length === 0) {
-        // showToast('error', "Missing required inputs", {
-        //   description: "Missing required inputs for Gc/G'c calculation",
-        //   icon: <AlertCircle className="h-4 w-4 text-destructive" />
-        // });
         return;
       }
       
-      // Get Hc value - use main value or first available instance value
-      let hc = 0;
-      if (hcValue && !isNaN(parseFloat(hcValue))) {
-        hc = parseFloat(hcValue);
-      } else if (instanceValues['hc']) {
-        // Find the first available instance value
-        for (let i = 1; i <= 3; i++) {
-          if (instanceValues['hc'][i] && !isNaN(parseFloat(instanceValues['hc'][i]))) {
-            hc = parseFloat(instanceValues['hc'][i]);
-            break;
-          }
-        }
+      // Check if all Hc values are 0
+      if (formationHcValues.every(v => v === 0)) {
+        console.warn('No Hc values found in Formation Design data');
+        showToast('error', "Height Above Cementation (HAC) values not found", {
+          description: "Please enter HAC values in Formation Design - Drill Pipes Design tab first."
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // Use formation design Hc value
+      let hc = formationHcValues[0]; // Use the first instance's Hc value
+      if (hc === 0) {
+        console.warn('No Hc value found in Formation Design data');
+        showToast('error', "Height Above Cementation (HAC) value not found", {
+          description: "Please enter HAC value in Formation Design - Drill Pipes Design tab first."
+        });
+        setIsLoading(false);
+        return;
       }
       
       // Get gammaC value - use main value or first available instance value
@@ -1115,7 +1171,8 @@ export default function SemanticsPage() {
                             </div>
                             <div>
                               <p class="font-medium">Pymax (maximum pressure at yield point):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = nc × γf × 9.81</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(Hc - h)(γfc - γf)]</p>
+                              <p class="text-xs mt-1">Where Hc is Height Above Cementation from Formation Design and h is the height parameter from the semantic screen</p>
                             </div>
                             <div>
                               <p class="font-medium">Pc (confining pressure):</p>
@@ -1123,7 +1180,7 @@ export default function SemanticsPage() {
                             </div>
                             <div>
                               <p class="font-medium">Ppmax (maximum pump pressure):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Ppmax = Pc + Pfr</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Ppmax = (Pymax + Pc + Pfr) / 10</p>
                               <p class="text-sm mt-1">Where Pfr (friction pressure) = 5 MPa (constant)</p>
                             </div>
                             <div>
@@ -1143,20 +1200,14 @@ export default function SemanticsPage() {
         const instanceNumber = vcfResult.instance;
         
         // Get instance-specific values if available
-        let instanceHc = hc;
+        // Use the instance-specific Hc value from formationHcValues
+        let instanceHc = formationHcValues[instanceNumber - 1] || formationHcValues[0]; // Fallback to first instance if current one isn't available
+        
         let instanceGc = gc;
         let instanceGw = gw;
         let instanceGfc = gfc;
         let instanceGf = gf;
         let instanceM = m;
-        
-        // Check for instance-specific hc
-        if (!singleInputFields['hc'] && 
-            instanceValues['hc'] && 
-            instanceValues['hc'][instanceNumber] && 
-            !isNaN(parseFloat(instanceValues['hc'][instanceNumber]))) {
-          instanceHc = parseFloat(instanceValues['hc'][instanceNumber]);
-        }
         
         // Check for instance-specific gammaC
         if (!singleInputFields['gammaC'] && 
@@ -1418,6 +1469,7 @@ export default function SemanticsPage() {
                   <p class="font-medium">Pymax (Max Pressure at Yield) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
                     <p class="font-mono text-sm">Pymax = 0.1[(Hc - h)(γfc - γf)]</p>
+                    <p class="text-xs text-muted-foreground mt-1">Where Hc is Height Above Cementation from Formation Design and h is the height parameter from semantic screen</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>Hc - h = ${instanceHc.toFixed(4)} - ${vcfResult.h.toFixed(4)} = ${(instanceHc - vcfResult.h).toFixed(4)}</li>
                       <li>γfc - γf = ${instanceGfc.toFixed(4)} - ${instanceGf.toFixed(4)} = ${(instanceGfc - instanceGf).toFixed(4)}</li>
@@ -1463,35 +1515,6 @@ export default function SemanticsPage() {
                       <li>Ceiling(tc/tad + 1) = ${n !== null ? n : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">n = ${n !== null ? n : "N/A"} pumps</p>
-                  </div>
-                </div>
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">Time Calculations:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">tfc+tfd = ((Vcf+Vfd)*10^3)/Q</p>
-                    <p class="font-mono text-sm">tc = tfc+tfd + td</p>
-                    <p class="font-mono text-sm">tad = 0.75 * tp, where tp = 60</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>tp = 60 (constant)</li>
-                      <li>tad = 0.75 * tp = 0.75 * 60 = ${tad.toFixed(2)}</li>
-                      <li>Vcf + Vfd = ${vcfValue.toFixed(4)} + ${vfd !== null ? vfd.toFixed(4) : "N/A"} = ${vfd !== null ? (vcfValue + vfd).toFixed(4) : "N/A"}</li>
-                      <li>(Vcf + Vfd) * 10^3 = ${vfd !== null ? (vcfValue + vfd).toFixed(4) : "N/A"} * 1000 = ${vfd !== null ? ((vcfValue + vfd) * 1000).toFixed(2) : "N/A"}</li>
-                      <li>Q (flow rate from pump) = ${Q > 0 ? Q.toFixed(2) : "N/A"}</li>
-                      <li>tfc+tfd = ((Vcf+Vfd)*10^3)/Q = ${vfd !== null && Q > 0 ? ((vcfValue + vfd) * 1000).toFixed(2) : "N/A"} / ${Q > 0 ? Q.toFixed(2) : "N/A"} = ${tfcPlusTfd > 0 ? tfcPlusTfd.toFixed(2) : "N/A"}</li>
-                      <li>tfc = (tfc+tfd)/2 = ${tfcPlusTfd > 0 ? (tfcPlusTfd/2).toFixed(2) : "N/A"}</li>
-                      <li>tfd = (tfc+tfd)/2 = ${tfcPlusTfd > 0 ? (tfcPlusTfd/2).toFixed(2) : "N/A"}</li>
-                      <li>td (additional time) = ${instanceTd.toFixed(2)}</li>
-                      <li>tc = tfc+tfd + td = ${tfcPlusTfd > 0 ? tfcPlusTfd.toFixed(2) : "N/A"} + ${instanceTd.toFixed(2)} = ${tc > 0 ? tc.toFixed(2) : "N/A"}</li>
-                    </ol>
-                    <div class="grid grid-cols-2 gap-2 mt-2">
-                      <p class="font-mono text-sm font-bold">tfc = ${tfc > 0 ? tfc.toFixed(2) : "N/A"}</p>
-                      <p class="font-mono text-sm font-bold">tfd = ${tfd > 0 ? tfd.toFixed(2) : "N/A"}</p>
-                      <p class="font-mono text-sm font-bold">tc = ${tc > 0 ? tc.toFixed(2) : "N/A"}</p>
-                      <p class="font-mono text-sm font-bold">td = ${instanceTd.toFixed(2)}</p>
-                      <p class="font-mono text-sm font-bold">tp = ${tp.toFixed(2)}</p>
-                      <p class="font-mono text-sm font-bold">tad = ${tad.toFixed(2)}</p>
-                    </div>
                   </div>
                 </div>
                 ` : ''}
@@ -1799,7 +1822,6 @@ export default function SemanticsPage() {
   // Get current value for a field
   const getFieldValue = (field: string): string => {
     switch(field) {
-      case 'hc': return hcValue;
       case 'gammaC': return gammaC;
       case 'gammaFC': return gammaFC;
       case 'gammaF': return gammaF;
@@ -1810,6 +1832,7 @@ export default function SemanticsPage() {
       case 'tfd': return tfdValue;
       case 'td': return tdValue;
       case 'h': return hValue;
+      case 'm': return mValue; // Add this line
       default: return '';
     }
   };
@@ -1873,10 +1896,12 @@ export default function SemanticsPage() {
     saveInputData();
   }, [
     initialLoadComplete,
-    hcValue, gammaC, gammaW, gammaFC, gammaF,
+    gammaC, gammaW, gammaFC, gammaF,
     k1Value, k2Value, k3Value,
+    tfcValue,
+    tfdValue,
     tdValue,
-    hValue, instanceValues, singleInputFields
+    hValue, mValue, instanceValues, singleInputFields
   ]);
   
   // Render input field with toggle
@@ -1979,13 +2004,6 @@ export default function SemanticsPage() {
     );
   };
 
-  // Save inputs to localStorage when they change
-  const updateHcValue = (value: string) => {
-    setHcValue(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
-  };
-
   const updateGammaC = (value: string) => {
     setGammaC(value);
     // Auto-save after changing value
@@ -2050,6 +2068,12 @@ export default function SemanticsPage() {
 
   const updateHValue = (value: string) => {
     setHValue(value);
+    // Auto-save after changing value
+    setTimeout(() => saveInputData(), 0);
+  };
+
+  const updateMValue = (value: string) => {
+    setMValue(value);
     // Auto-save after changing value
     setTimeout(() => saveInputData(), 0);
   };
@@ -2194,7 +2218,8 @@ export default function SemanticsPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="grid gap-6">
-                      {renderInputField('hc', 'Hc Value', hcValue, updateHcValue, 'm')}
+                      {/* Remove this line that renders the Hc field */}
+                      {/* {renderInputField('hc', 'Hc Value', hValue, updateHValue, 'm')} */}
 
                       <div className="grid grid-cols-2 gap-4">
                         {renderInputField('gammaC', 'γc', gammaC, updateGammaC)}
@@ -2587,15 +2612,15 @@ export default function SemanticsPage() {
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
                                           <div className="bg-background/50 p-2 rounded border border-border/30">
                                             <span className="text-xs text-muted-foreground">Cement Fill Time</span>
-                                            <p className="font-medium">{recommendedPump.tfc?.toFixed(2)} min</p>
+                                            <p className="font-medium">{recommendedPump.tfc?.toFixed(2) || "0.00"} min</p>
                                           </div>
                                           <div className="bg-background/50 p-2 rounded border border-border/30">
                                             <span className="text-xs text-muted-foreground">Displacement Time</span>
-                                            <p className="font-medium">{recommendedPump.tfd?.toFixed(2)} min</p>
+                                            <p className="font-medium">{recommendedPump.tfd?.toFixed(2) || "0.00"} min</p>
                                           </div>
                                           <div className="bg-background/50 p-2 rounded border border-border/30">
                                             <span className="text-xs text-muted-foreground">Total Time</span>
-                                            <p className="font-medium">{recommendedPump.tc?.toFixed(2)} min</p>
+                                            <p className="font-medium">{(recommendedPump.tc || 10).toFixed(2)} min</p>
                                           </div>
                                           <div className="bg-background/50 p-2 rounded border border-border/30">
                                             <span className="text-xs text-muted-foreground">Required Pressure</span>
@@ -2604,57 +2629,33 @@ export default function SemanticsPage() {
                                         </div>
                                       )}
                                       
-                                      {/* Add Accordion to show all available pumps */}
-                                      {pumpsForInstance.length > 1 && (
-                                        <Accordion type="single" collapsible className="mt-4 bg-muted/10 rounded-md border border-border/30">
-                                          <AccordionItem value="all-pumps" className="border-b-0">
-                                            <AccordionTrigger className="px-4 py-3 hover:bg-muted/10 hover:no-underline">
-                                              <span className="text-sm font-medium flex items-center gap-2">
-                                                <Layers className="h-4 w-4" />
-                                                Show All Available Pumps ({pumpsForInstance.length})
-                                          </span>
-                                            </AccordionTrigger>
-                                            <AccordionContent className="px-0">
-                                              <div className="overflow-x-auto">
-                                                <Table>
-                                                  <TableHeader>
-                                                    <TableRow>
-                                                      <TableHead>Type</TableHead>
-                                                      <TableHead>Speed</TableHead>
-                                                      <TableHead>Pressure</TableHead>
-                                                      <TableHead>Flow</TableHead>
-                                                      <TableHead>Fill Time</TableHead>
-                                                      <TableHead>Total Time</TableHead>
-                                                      <TableHead></TableHead>
-                                                    </TableRow>
-                                                  </TableHeader>
-                                                  <TableBody>
-                                                    {pumpsForInstance.map((pump, pumpIndex) => (
-                                                      <TableRow key={pumpIndex} className={pump.isRecommended ? "bg-primary/5" : ""}>
-                                                        <TableCell className="font-medium">{pump.type}</TableCell>
-                                                        <TableCell>{pump.speed}</TableCell>
-                                                        <TableCell>{pump.pressure} MPa</TableCell>
-                                                        <TableCell>{pump.flow} L/min</TableCell>
-                                                        <TableCell>{pump.tfc ? pump.tfc.toFixed(2) : "N/A"}</TableCell>
-                                                        <TableCell>{pump.tc ? pump.tc.toFixed(2) : "N/A"}</TableCell>
-                                                        <TableCell>
-                                                          {pump.isRecommended && (
-                                                            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
-                                                              Recommended
-                                                            </Badge>
-                                                          )}
-                                                        </TableCell>
-                                                      </TableRow>
-                                                    ))}
-                                                  </TableBody>
-                                                </Table>
-                            </div>
-                                            </AccordionContent>
-                                          </AccordionItem>
-                                        </Accordion>
-                                      )}
-                          </div>
-                        ) : (
+                                      <div className="grid grid-cols-3 md:grid-cols-3 gap-3 mt-3">
+                                        <div className="bg-background/50 p-2 rounded border border-border/30">
+                                          <span className="text-xs text-muted-foreground">tfc+tfd</span>
+                                          <p className="font-medium">{((recommendedPump?.tfc || 0) + (recommendedPump?.tfd || 0)).toFixed(2)} min</p>
+                                        </div>
+                                        <div className="bg-background/50 p-2 rounded border border-border/30">
+                                          <span className="text-xs text-muted-foreground">Additional Time (td)</span>
+                                          <p className="font-medium">10.00 min</p>
+                                        </div>
+                                        <div className="bg-background/50 p-2 rounded border border-border/30">
+                                          <span className="text-xs text-muted-foreground">tc = tfc+tfd + td</span>
+                                          <p className="font-medium">{(((recommendedPump?.tfc || 0) + (recommendedPump?.tfd || 0)) + 10).toFixed(2)} min</p>
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-2 md:grid-cols-2 gap-3 mt-2">
+                                        <div className="bg-background/50 p-2 rounded border border-border/30">
+                                          <span className="text-xs text-muted-foreground">Constant Time (tp)</span>
+                                          <p className="font-medium">60.00 min</p>
+                                        </div>
+                                        <div className="bg-background/50 p-2 rounded border border-border/30">
+                                          <span className="text-xs text-muted-foreground">Additional Time (tad)</span>
+                                          <p className="font-medium">45.00 min</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
                                     <p className="text-muted-foreground">No recommended pump found for this instance.</p>
                                   )}
                             </div>
