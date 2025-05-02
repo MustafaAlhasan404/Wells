@@ -8,15 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { NavBar } from "@/components/nav-bar"
-import { FileDown, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Edit2 } from "lucide-react"
+import { FileDown, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Edit2, Ruler } from "lucide-react"
 import { SectionInput } from "@/utils/casingCalculations"
 import CasingResults from "@/components/casing-results"
 import HADResults from "@/components/had-results"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
 import { showToast } from "@/utils/toast-utils"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { HelpTooltip } from "@/components/ui/help-tooltip"
+import { Switch } from "@/components/ui/switch"
 
 interface CasingCalculatorProps {}
 
@@ -36,9 +37,9 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
   const [initialDcsgAmount, setInitialDcsgAmount] = useState<string>("");
   const [iterations, setIterations] = useState<string>("3");
   const [sectionInputs, setSectionInputs] = useState<SectionInput[]>([
-    { multiplier: "", metalType: "K-55", depth: "" },
-    { multiplier: "", metalType: "P-110", depth: "" },
-    { multiplier: "", metalType: "K-55", depth: "" }
+    { multiplier: "", metalType: "K-55", depth: "", wallThickness: "", useWallThickness: false },
+    { multiplier: "", metalType: "P-110", depth: "", wallThickness: "", useWallThickness: false },
+    { multiplier: "", metalType: "K-55", depth: "", wallThickness: "", useWallThickness: false }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
       if (newCount > currentCount) {
         // Add new sections
         for (let i = 0; i < newCount - currentCount; i++) {
-          newSectionInputs.push({ multiplier: "", metalType: "K-55", depth: "" });
+          newSectionInputs.push({ multiplier: "", metalType: "K-55", depth: "", wallThickness: "", useWallThickness: false });
         }
       } else {
         // Remove sections
@@ -66,9 +67,12 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     }
   }, [iterations]);
 
-  const handleSectionInputChange = (index: number, field: keyof SectionInput, value: string) => {
+  const handleSectionInputChange = (index: number, field: keyof SectionInput, value: string | boolean) => {
     const updatedInputs = [...sectionInputs];
-    updatedInputs[index][field] = value;
+    updatedInputs[index] = {
+      ...updatedInputs[index],
+      [field]: value
+    };
     setSectionInputs(updatedInputs);
   };
 
@@ -101,6 +105,11 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
         formData.append(`multiplier_${index}`, section.multiplier);
         formData.append(`metalType_${index}`, section.metalType);
         formData.append(`depth_${index}`, section.depth);
+        formData.append(`useWallThickness_${index}`, section.useWallThickness ? 'true' : 'false');
+        // Only append wallThickness if it's not empty/undefined
+        if (section.wallThickness) {
+          formData.append(`wallThickness_${index}`, section.wallThickness);
+        }
       });
       
       const response = await fetch('/api/process-file', {
@@ -177,7 +186,7 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
           if (updatedInputs.length < iterationsCount) {
             // Add more sections if needed
             for (let i = updatedInputs.length; i < iterationsCount; i++) {
-              updatedInputs.push({ multiplier: "", metalType: "K-55", depth: "" });
+              updatedInputs.push({ multiplier: "", metalType: "K-55", depth: "", wallThickness: "", useWallThickness: false });
             }
           } else if (updatedInputs.length > iterationsCount) {
             // Remove extra sections if needed
@@ -374,6 +383,43 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                     className="focus:ring-1 focus:ring-primary"
                   />
                 </div>
+              </div>
+
+              {/* Wall Thickness Toggle and Input - Horizontal Layout */}
+              <div className="flex items-center gap-4 rounded-md px-3 py-2 mt-4">
+                <span className="text-sm font-medium text-primary flex items-center gap-2">
+                  Specify Wall Thickness
+                  <HelpTooltip text="Toggle to manually specify wall thickness for this section" />
+                </span>
+                <Switch
+                  checked={!!section.useWallThickness}
+                  onCheckedChange={(checked) => {
+                    setSectionInputs((prev) => {
+                      const updated = [...prev];
+                      updated[index] = {
+                        ...updated[index],
+                        useWallThickness: checked,
+                        wallThickness: checked ? updated[index].wallThickness : "",
+                      };
+                      return updated;
+                    });
+                  }}
+                  className="ml-2"
+                />
+                {section.useWallThickness && (
+                  <div className="flex items-center gap-2 ml-4">
+                    <Ruler className="w-4 h-4 text-primary" />
+                    <span className="text-xs text-muted-foreground">Wall Thickness</span>
+                    <Input
+                      id={`wallThickness_${index}`}
+                      placeholder="e.g. 10.36"
+                      value={section.wallThickness || ""}
+                      onChange={(e) => handleSectionInputChange(index, 'wallThickness', e.target.value)}
+                      className="w-24 h-8 text-sm border-primary/40"
+                    />
+                    <span className="text-xs text-muted-foreground ml-1">mm</span>
+                  </div>
+                )}
               </div>
             </div>
           );

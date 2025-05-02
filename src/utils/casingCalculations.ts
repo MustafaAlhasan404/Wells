@@ -52,6 +52,8 @@ export interface SectionInput {
   multiplier: string;
   metalType: string;
   depth: string;
+  wallThickness?: string; // Optional wall thickness parameter
+  useWallThickness?: boolean; // Flag to indicate if wall thickness should be used for this section
 }
 
 /**

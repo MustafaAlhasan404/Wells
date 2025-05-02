@@ -8,6 +8,7 @@ interface CasingResult {
   dcsg: string;
   atBody: string;
   internalDiameter: string;
+  specifiedWallThickness?: string;
 }
 
 interface CasingResultsProps {
@@ -241,7 +242,10 @@ const CasingResults: React.FC<CasingResultsProps> = ({ results, hadData }) => {
           ? parseFloat(dim)
           : extractNumericValue(internalDiameter);
         
-        if (dcsgValue > 0 && internalValue > 0) {
+        // If a wall thickness was specified during input, use that value instead of calculating
+        if (result.specifiedWallThickness) {
+          wallThickness = result.specifiedWallThickness + " (manual)"; // Indicate it was manually specified
+        } else if (dcsgValue > 0 && internalValue > 0) {
           const wallThicknessValue = (dcsgValue - internalValue) / 2;
           wallThickness = wallThicknessValue.toFixed(2) + " mm";
         }

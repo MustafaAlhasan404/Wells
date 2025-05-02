@@ -126,6 +126,10 @@ export async function POST(req: NextRequest) {
       const multiplier = formData.get(`multiplier_${i}`) as string;
       const metalType = formData.get(`metalType_${i}`) as string;
       const depth = formData.get(`depth_${i}`) as string;
+      // Optional wall thickness - use empty string as default
+      const wallThickness = formData.get(`wallThickness_${i}`)?.toString() || "";
+      // Check if wall thickness should be used for this section
+      const useWallThickness = formData.get(`useWallThickness_${i}`) === 'true';
       
       if (!multiplier || !metalType || !depth) {
         console.error(`Missing section input for section ${i+1}`, { multiplier, metalType, depth });
@@ -134,7 +138,7 @@ export async function POST(req: NextRequest) {
         }, { status: 400 });
       }
       
-      sectionInputs.push({ multiplier, metalType, depth });
+      sectionInputs.push({ multiplier, metalType, depth, wallThickness, useWallThickness });
     }
 
     // Debug Excel structure
@@ -176,8 +180,9 @@ export async function POST(req: NextRequest) {
         const multiplier = parseFloat(sectionInputs[i].multiplier);
         const metalType = sectionInputs[i].metalType;
         const depth = parseFloat(sectionInputs[i].depth);
+        const specifiedWallThickness = sectionInputs[i].wallThickness ? parseFloat(sectionInputs[i].wallThickness) : null;
         
-        console.log(`Section ${i+1} inputs:`, { multiplier, metalType, depth });
+        console.log(`Section ${i+1} inputs:`, { multiplier, metalType, depth, specifiedWallThickness });
 
         // First iteration - extract at_head_value
         if (i === 0) {
@@ -315,17 +320,21 @@ export async function POST(req: NextRequest) {
             const formattedAtBody = atBodyValue ? `${atBodyValue} mm (${formatMmWithInches(parseFloat(atBodyValue))})` : "-";
             const formattedInternalDiameter = internalDiameter !== null ? `${internalDiameter.toFixed(2)}` : "-";
             
-            // Add to result data with internal diameter
+            // Include wall thickness if specified and enabled
+            const wallThickness = sectionInputs[i].useWallThickness && sectionInputs[i].wallThickness ? parseFloat(sectionInputs[i].wallThickness) : null;
+            
+            // Add to result data with internal diameter and wall thickness
             resultData.push({
               section: sectionNames[i],
               nearestBitSize: formattedBitSize,
               dcsg: formattedDcsg,
               atBody: formattedAtBody,
-              internalDiameter: formattedInternalDiameter
+              internalDiameter: formattedInternalDiameter,
+              specifiedWallThickness: wallThickness ? `${wallThickness.toFixed(2)} mm` : null
             });
 
-            // Find reference for next iteration
-            console.log(`Finding reference for next iteration with internal diameter: ${internalDiameter}`);
+            // Find the next at_head_value (for the next iteration)
+            console.log(`Finding reference from internal diameter: ${internalDiameter}`);
             const [referenceResult, newAtHeadValue] = await findReferenceFromXlsx(arrayBuffer, internalDiameter);
             console.log(`Found next at_head_value: ${newAtHeadValue}`);
             
@@ -349,13 +358,23 @@ export async function POST(req: NextRequest) {
               
               for (const row of matchingRows) {
                 const hadValue = calculateHAD(row.externalPressure, row.metalType);
+                
+                // Adjust internal diameter if wall thickness is specified and enabled
+                let internalDiameter = row.internalDiameter;
+                if (sectionInputs[i].useWallThickness && specifiedWallThickness && specifiedWallThickness > 0) {
+                  console.log(`Using specified wall thickness: ${specifiedWallThickness} mm for section ${i+1}`);
+                  // If wall thickness is specified, recalculate internal diameter
+                  // ID = DCSG - (2 * Wall Thickness)
+                  internalDiameter = atHeadValue - (2 * specifiedWallThickness);
+                }
+                
                 const hadData: HADData = {
                   had: hadValue,
                   externalPressure: row.externalPressure,
                   metalType: row.metalType,
                   tensileStrength: row.tensileStrength,
                   unitWeight: row.unitWeight,
-                  internalDiameter: row.internalDiameter
+                  internalDiameter: internalDiameter
                 };
                 
                 // For Surface Section, cap HAD at inputted depth
@@ -378,32 +397,11 @@ export async function POST(req: NextRequest) {
                 }
               }
               
-              // Sort by HAD in ascending order
-              hadDataList.sort((a, b) => a.had - b.had);
-              
-              // Add to HAD data
-              const roundedAtHead = Math.round(atHeadValue * 100) / 100;
-              
-              // Initialize if this is the first time for this section/atHead
-              if (!hadData[sectionName]) {
-                hadData[sectionName] = {};
+              // Store in HAD data object
+              if (hadDataList.length > 0) {
+                hadData[sectionName][dcsgAmount] = hadDataList;
+                console.log(`Added ${hadDataList.length} HAD rows for ${sectionName} at ${dcsgAmount}`);
               }
-              
-              // Store HAD data for this section/atHead combination
-              hadData[sectionName][roundedAtHead] = hadDataList;
-              
-              // Check if HAD is sufficient for depth
-              if (!hadSufficient) {
-                console.error(`No suitable HAD value found for depth: ${depth} in ${sectionName}`);
-                return NextResponse.json({ 
-                  error: `No suitable HAD value found for depth: ${depth} in ${sectionName}. Consider using a different metal type or casing size.` 
-                }, { status: 400 });
-              }
-            } else {
-              console.error(`No matching rows found for at_head: ${atHeadValue}, metal_type: ${metalType}`);
-              return NextResponse.json({ 
-                error: `No matching data found for outer diameter: ${atHeadValue} with metal type: ${metalType}. Please check your Excel file data.` 
-              }, { status: 400 });
             }
             
             // Prepare for next iteration if not the last
