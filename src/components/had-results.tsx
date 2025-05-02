@@ -98,6 +98,7 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Row</TableHead>
                         <TableHead>HAD</TableHead>
                         <TableHead>External Pressure (MPa)</TableHead>
                         <TableHead>Internal Diameter (mm)</TableHead>
@@ -111,8 +112,9 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {data.map((item, index) => (
+                      {data.slice().reverse().map((item, index, arr) => (
                         <TableRow key={index}>
+                          <TableCell>{arr.length - index}</TableCell>
                           <TableCell>{item.had.toFixed(2)}</TableCell>
                           <TableCell>{item.externalPressure.toFixed(2)}</TableCell>
                           <TableCell>{item.internalDiameter !== undefined ? item.internalDiameter.toFixed(2) : '-'}</TableCell>
@@ -138,10 +140,20 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                               (item.y1 !== undefined ? item.y1.toFixed(2) : '-') : 
                              item.L2 !== undefined ? 
                               (item.y2 !== undefined ? item.y2.toFixed(2) : '-') : 
+                             item.L3 !== undefined ? 
+                              (item.y3 !== undefined ? item.y3.toFixed(2) : '-') : 
+                             item.L4 !== undefined ? 
+                              (item.y4 !== undefined ? item.y4.toFixed(2) : '-') : 
                              '-'}
                             {showDebug && 
                               <div className="text-xs text-gray-500 mt-1">
-                                Row: {index}
+                                {item.L1 !== undefined && item.y1 !== undefined ? 
+                                  `y₁ = (H-L₁)/HAD₂` : 
+                                 item.L2 !== undefined && item.y2 !== undefined ? 
+                                  `y₂ = (H-L₁-L₂)/HAD₃` : 
+                                 item.L3 !== undefined && item.y3 !== undefined ? 
+                                  `y₃ = (H-L₁-L₂-L₃)/HAD₄` : 
+                                 ''}
                               </div>
                             }
                           </TableCell>
@@ -150,7 +162,22 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                               (item.z1 !== undefined ? item.z1.toFixed(2) : '-') : 
                              item.L2 !== undefined ? 
                               (item.z2 !== undefined ? item.z2.toFixed(2) : '-') : 
+                             item.L3 !== undefined ? 
+                              (item.z3 !== undefined ? item.z3.toFixed(2) : '-') : 
+                             item.L4 !== undefined ? 
+                              (item.z4 !== undefined ? item.z4.toFixed(2) : '-') : 
                              '-'}
+                            {showDebug && 
+                              <div className="text-xs text-gray-500 mt-1">
+                                {item.L1 !== undefined && item.z1 !== undefined ? 
+                                  `z₁ = (L₁×UW₁×1.488)/(TS₂×1000)` : 
+                                 item.L2 !== undefined && item.z2 !== undefined ? 
+                                  `z₂ = (L₂×UW₂×1.488)/(TS₃×1000)` : 
+                                 item.L3 !== undefined && item.z3 !== undefined ? 
+                                  `z₃ = (L₃×UW₃×1.488)/(TS₄×1000)` : 
+                                 ''}
+                              </div>
+                            }
                           </TableCell>
                           <TableCell>
                             {(item.L1 !== undefined || item.L2 !== undefined) && item.conditionCheck !== undefined ? (
@@ -165,6 +192,11 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                                     Invalid
                                   </Badge>
                                 )}
+                                {showDebug && item.L1 !== undefined && item.L2 !== undefined && 
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    y₂² + y₁×z₂ + z₁² = 1
+                                  </div>
+                                }
                               </div>
                             ) : '-'}
                           </TableCell>
@@ -182,6 +214,19 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
       {showDebug && (
         <div className="mt-8 p-4 border border-gray-300 rounded-md bg-slate-100">
           <h3 className="text-lg font-semibold mb-4">Debug Information</h3>
+          
+          <div className="mb-4">
+            <h4 className="text-md font-medium mb-2">Calculation Formulas:</h4>
+            <div className="bg-white p-3 rounded-md border border-gray-200 space-y-2">
+              <p><strong>y₁ formula:</strong> y₁ = (H - L₁) / HAD₂</p>
+              <p><strong>z₁ formula:</strong> z₁ = (L₁ × UnitWeight₁ × 1.488) / (TensileStrength₂ × 1000)</p>
+              <p><strong>y₂ formula:</strong> y₂ = (H - L₁ - L₂) / HAD₃</p>
+              <p><strong>z₂ formula:</strong> z₂ = (L₂ × UnitWeight₂ × 1.488) / (TensileStrength₃ × 1000)</p>
+              <p><strong>Objective:</strong> y₂² + y₁×z₂ + z₁² = 1</p>
+              <p className="text-xs text-gray-500 mt-2">Values are calculated iteratively to find L₁ and L₂ that make the objective equation as close to 1 as possible.</p>
+            </div>
+          </div>
+          
           <pre className="text-xs overflow-auto max-h-96 p-4 bg-slate-800 text-white rounded" style={{color: 'white !important'}}>
             {JSON.stringify(processedData, null, 2)}
           </pre>

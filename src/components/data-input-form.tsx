@@ -172,6 +172,17 @@ export default function DataInputForm() {
   const renderDrillingPipesCharacteristics = () => {
     const fields = ["qp", "qc", "Lhw", "Dep", "Dhw", "qhw", "n", "dα"]
     
+    const fieldLabels: Record<string, string> = {
+      "qp": "qp (Weight)",
+      "qc": "qc (Weight)",
+      "Lhw": "Lhw (Length)",
+      "Dep": "Dep (Depth)",
+      "Dhw": "Dhw (Diameter)",
+      "qhw": "qhw (Weight)",
+      "n": "n (Circles)",
+      "dα": "dα (Factor)"
+    }
+    
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {fields.map(field => (
@@ -179,7 +190,7 @@ export default function DataInputForm() {
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Label className="text-base font-medium text-primary">
-                  {field}
+                  {fieldLabels[field] || field}
                   {field === 'dα' && displayFormattedDalpha && (
                     <span className="text-xs ml-2 text-muted-foreground">(×10⁻⁵)</span>
                   )}
