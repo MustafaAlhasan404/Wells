@@ -23,7 +23,7 @@ export function HelpTooltip({ text, className }: HelpTooltipProps) {
             <HelpCircle className="h-4 w-4" />
           </button>
         </TooltipTrigger>
-        <TooltipContent className="max-w-xs" side="top">
+        <TooltipContent className="max-w-[300px]" side="right" align="start">
           <p className="text-sm">{text}</p>
         </TooltipContent>
       </TooltipRoot>
