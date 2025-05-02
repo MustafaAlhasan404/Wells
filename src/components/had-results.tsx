@@ -182,24 +182,67 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                           <TableCell>
                             {(item.L1 !== undefined || item.L2 !== undefined) && item.conditionCheck !== undefined ? (
                               <div className="flex items-center gap-2">
-                                <span>{item.conditionCheck.toFixed(2)}</span>
-                                {item.conditionMet ? (
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                    Valid
-                                  </Badge>
+                                {/* Calculate the objective value from displayed y and z values */}
+                                {item.L1 !== undefined && item.y1 !== undefined && item.z1 !== undefined ? (
+                                  <>
+                                    <span>{Math.pow(item.y1, 2) + item.y1 * item.z1 + Math.pow(item.z1, 2)}</span>
+                                    {Math.abs(Math.pow(item.y1, 2) + item.y1 * item.z1 + Math.pow(item.z1, 2) - 1) < 0.001 ? (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                        Valid
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                        Invalid
+                                      </Badge>
+                                    )}
+                                  </>
+                                ) : item.L2 !== undefined && item.y2 !== undefined && item.z2 !== undefined ? (
+                                  <>
+                                    <span>{Math.pow(item.y2, 2) + item.y2 * item.z2 + Math.pow(item.z2, 2)}</span>
+                                    {Math.abs(Math.pow(item.y2, 2) + item.y2 * item.z2 + Math.pow(item.z2, 2) - 1) < 0.001 ? (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                        Valid
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                        Invalid
+                                      </Badge>
+                                    )}
+                                  </>
                                 ) : (
-                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                    Invalid
-                                  </Badge>
+                                  <>
+                                    <span>{item.conditionCheck}</span>
+                                    {item.conditionMet ? (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                        Valid
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                        Invalid
+                                      </Badge>
+                                    )}
+                                  </>
                                 )}
                                 {showDebug && item.L1 !== undefined && 
                                   <div className="text-xs text-gray-500 mt-1">
                                     y₁² + y₁×z₁ + z₁² = 1
+                                    {item.y1 !== undefined && item.z1 !== undefined && (
+                                      <div>
+                                        = {item.y1*item.y1} + {item.y1*item.z1} + {item.z1*item.z1}
+                                        = {Math.pow(item.y1, 2) + item.y1*item.z1 + Math.pow(item.z1, 2)}
+                                      </div>
+                                    )}
                                   </div>
                                 }
                                 {showDebug && item.L2 !== undefined && 
                                   <div className="text-xs text-gray-500 mt-1">
                                     y₂² + y₂×z₂ + z₂² = 1
+                                    {item.y2 !== undefined && item.z2 !== undefined && (
+                                      <div>
+                                        = {item.y2*item.y2} + {item.y2*item.z2} + {item.z2*item.z2}
+                                        = {Math.pow(item.y2, 2) + item.y2*item.z2 + Math.pow(item.z2, 2)}
+                                      </div>
+                                    )}
                                   </div>
                                 }
                               </div>
@@ -227,9 +270,97 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
               <p><strong>z₁ formula:</strong> z₁ = (L₁ × UnitWeight₁ × 1.488) / (TensileStrength₂ × 1000)</p>
               <p><strong>y₂ formula:</strong> y₂ = (H - L₁ - L₂) / HAD₃</p>
               <p><strong>z₂ formula:</strong> z₂ = (L₂ × UnitWeight₂ × 1.488) / (TensileStrength₃ × 1000)</p>
-              <p><strong>Objective for L₁:</strong> y₁² + y₁×z₁ + z₁² = 1</p>
-              <p><strong>Objective for L₂:</strong> y₂² + y₂×z₂ + z₂² = 1</p>
+              <p><strong>Objective for L₁:</strong> y₁² + y₁×z₁ + z₁² = 1 (using y₁ and z₁ values from row 1)</p>
+              <p><strong>Objective for L₂:</strong> y₂² + y₂×z₂ + z₂² = 1 (using y₂ and z₂ values from row 2)</p>
               <p className="text-xs text-gray-500 mt-2">Values are calculated iteratively to find L₁ and L₂ that make the objective equation as close to 1 as possible.</p>
+              <p className="text-xs text-gray-500">Condition is considered valid when the objective value is within ±0.001 of 1 (0.999 to 1.001).</p>
+            </div>
+          </div>
+          
+          <div className="mb-4">
+            <h4 className="text-md font-medium mb-2">Verification Calculations:</h4>
+            <div className="bg-white p-3 rounded-md border border-gray-200">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">Row</th>
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">y</th>
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">z</th>
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">y²</th>
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">y×z</th>
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">z²</th>
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">y² + y×z + z²</th>
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">Valid?</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {Object.entries(processedData).flatMap(([section, atHeadObj]) => 
+                    Object.entries(atHeadObj).flatMap(([atHead, data]) => 
+                      data.map((item, index) => {
+                        // For row with L1
+                        if (item.y1 !== undefined && item.z1 !== undefined) {
+                          const y = item.y1;
+                          const z = item.z1;
+                          const ySquared = Math.pow(y, 2);
+                          const yz = y * z;
+                          const zSquared = Math.pow(z, 2);
+                          const result = ySquared + yz + zSquared;
+                          const isValid = Math.abs(result - 1) < 0.001;
+                          
+                          return (
+                            <tr key={`${section}-${atHead}-${index}-L1`} className="bg-gray-50">
+                              <td className="px-2 py-1 text-xs">{section} - {atHead} - Row {index+1} (L1)</td>
+                              <td className="px-2 py-1 text-xs">{y.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs">{z.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs">{ySquared.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs">{yz.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs">{zSquared.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs font-semibold">{result}</td>
+                              <td className={`px-2 py-1 text-xs ${isValid ? 'text-green-600' : 'text-red-600'}`}>
+                                {isValid ? 'Valid' : 'Invalid'}
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return null;
+                      }).filter(Boolean)
+                    )
+                  )}
+
+                  {Object.entries(processedData).flatMap(([section, atHeadObj]) => 
+                    Object.entries(atHeadObj).flatMap(([atHead, data]) => 
+                      data.map((item, index) => {
+                        // For row with L2
+                        if (item.y2 !== undefined && item.z2 !== undefined) {
+                          const y = item.y2;
+                          const z = item.z2;
+                          const ySquared = Math.pow(y, 2);
+                          const yz = y * z;
+                          const zSquared = Math.pow(z, 2);
+                          const result = ySquared + yz + zSquared;
+                          const isValid = Math.abs(result - 1) < 0.001;
+                          
+                          return (
+                            <tr key={`${section}-${atHead}-${index}-L2`} className="bg-white">
+                              <td className="px-2 py-1 text-xs">{section} - {atHead} - Row {index+1} (L2)</td>
+                              <td className="px-2 py-1 text-xs">{y.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs">{z.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs">{ySquared.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs">{yz.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs">{zSquared.toFixed(4)}</td>
+                              <td className="px-2 py-1 text-xs font-semibold">{result}</td>
+                              <td className={`px-2 py-1 text-xs ${isValid ? 'text-green-600' : 'text-red-600'}`}>
+                                {isValid ? 'Valid' : 'Invalid'}
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return null;
+                      }).filter(Boolean)
+                    )
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
           
