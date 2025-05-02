@@ -113,8 +113,28 @@ export async function findAtBodyValue(
                   atBodyValue = atBodyValue.split(' ').pop() || atBodyValue;
                 }
                 
-                console.log(`Found at_body value: "${atBodyValue}" for at_head: ${rowAtHead}`);
-                return atBodyValue;
+                // Validate that the at_body value is different from the at_head value
+                // and contains valid numeric data
+                let numericAtBodyValue: number | null = null;
+                try {
+                  // Try to extract numeric part
+                  const match = atBodyValue.match(/(\d+(?:\.\d+)?)/);
+                  if (match) {
+                    numericAtBodyValue = parseFloat(match[1]);
+                  }
+                } catch (e) {
+                  console.error(`Error parsing at_body value: ${atBodyValue}`, e);
+                }
+                
+                // Ensure we have a valid numeric value and it's different from at_head
+                if (numericAtBodyValue !== null && !isNaN(numericAtBodyValue) && 
+                    Math.abs(numericAtBodyValue - atHeadValue) >= 0.1) {
+                  console.log(`Found valid at_body value: "${atBodyValue}" for at_head: ${rowAtHead}`);
+                  return atBodyValue;
+                } else {
+                  console.log(`Found invalid or duplicate at_body value: "${atBodyValue}" for at_head: ${rowAtHead}`);
+                  // Continue searching since this at_body value is the same as at_head or invalid
+                }
               }
             }
           }

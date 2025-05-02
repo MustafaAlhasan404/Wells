@@ -12,26 +12,49 @@ import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
 import { EnhancedTable } from "@/components/ui/enhanced-table"
 import { showToast } from "@/utils/toast-utils"
-import { formatMmWithInches } from "@/utils/casingCalculations"
+import { formatMmWithInches, calculateDim } from "@/utils/casingCalculations"
 import { motion } from "framer-motion"
+
+// Define types for drill collar results
+interface DrillCollarResult {
+  section: string;
+  atHead: number;
+  nearestBitSize: number;
+  drillCollars: string;
+  bitSize: number;
+  drillCollar: number;
+  numberOfColumns: number;
+}
+
+// Define types for calculation instances - rename to avoid conflict
+interface DrillCollarCalculation {
+  section: string;
+  drillPipeMetalGrade: string;
+  Lmax: number;
+  instance?: number;
+}
 
 interface DrillCollarCalculatorProps {}
 
 export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   // Use the file upload context for file state and results
   const { 
-    casingResults,
-    setCasingResults,
+    drillCollarFile, 
+    drillCollarFileName, 
+    setDrillCollarFile, 
+    setDrillCollarFileName,
     drillCollarResults: contextDrillCollarResults,
     setDrillCollarResults: setContextDrillCollarResults,
-    drillCollarCalculations,
-    setDrillCollarCalculations
+    drillCollarCalculations: contextDrillCollarCalculations,
+    setDrillCollarCalculations,
+    casingResults,
+    hadData
   } = useFileUpload();
   
-  // Local state for UI management
-  const [localDrillCollarResults, setLocalDrillCollarResults] = useState<any[]>([]);
-  const [calculations, setCalculations] = useState<any[]>([]);
-  const [drillCollarData, setDrillCollarData] = useState<any>(null);
+  // Local state for drill collar results
+  const [localDrillCollarResults, setLocalDrillCollarResults] = useState<DrillCollarResult[]>([]);
+  const [calculations, setCalculations] = useState<DrillCollarCalculation[]>([]);
+  const [drillCollarData, setDrillCollarData] = useState<any>({});
   const [bValueDebugInfo, setBValueDebugInfo] = useState<{
     instance: number;
     gamma: number;
@@ -42,16 +65,21 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   const [error, setError] = useState<string | null>(null);
   const [isCalculated, setIsCalculated] = useState(false);
   
+  // Get casingResults from the context
+  const isCasingReady = casingResults && casingResults.length > 0;
+  
   // Load stored results on mount
   useEffect(() => {
     if (contextDrillCollarResults && contextDrillCollarResults.length > 0) {
-      setLocalDrillCollarResults(contextDrillCollarResults);
+      // Use type assertion to handle the type mismatch
+      setLocalDrillCollarResults(contextDrillCollarResults as unknown as DrillCollarResult[]);
       
-      if (drillCollarCalculations && drillCollarCalculations.length > 0) {
-        setCalculations(drillCollarCalculations);
+      if (contextDrillCollarCalculations && contextDrillCollarCalculations.length > 0) {
+        // Use type assertion to handle the type mismatch
+        setCalculations(contextDrillCollarCalculations as unknown as DrillCollarCalculation[]);
       }
     }
-  }, [contextDrillCollarResults, drillCollarCalculations]);
+  }, [contextDrillCollarResults, contextDrillCollarCalculations]);
   
   // Save drill collar results to localStorage to persist across page refreshes
   useEffect(() => {
@@ -89,7 +117,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           return {...result, section};
         });
         
-        setLocalDrillCollarResults(validatedResults);
+        setLocalDrillCollarResults(validatedResults as DrillCollarResult[]);
         setContextDrillCollarResults(validatedResults);
         
         // Show toast notification to inform user that data was loaded
@@ -98,7 +126,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         });
       }
       
-      if (savedCalculations && (!drillCollarCalculations || drillCollarCalculations.length === 0)) {
+      if (savedCalculations && (!contextDrillCollarCalculations || contextDrillCollarCalculations.length === 0)) {
         const parsedCalculations = JSON.parse(savedCalculations);
         
         // Ensure each calculation has a valid section
@@ -113,7 +141,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           return calc;
         });
         
-        setCalculations(validatedCalculations);
+        setCalculations(validatedCalculations as DrillCollarCalculation[]);
         setDrillCollarCalculations(validatedCalculations);
       }
     } catch (error) {
@@ -358,7 +386,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       });
       
       // Update state with the validated results
-      setLocalDrillCollarResults(validatedResults);
+      setLocalDrillCollarResults(validatedResults as DrillCollarResult[]);
       setContextDrillCollarResults(validatedResults); // Update context too
       setDrillCollarData(data.drillCollarData || {});
       
@@ -373,7 +401,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         return calc;
       });
       
-      setCalculations(validatedCalculations);
+      setCalculations(validatedCalculations as DrillCollarCalculation[]);
       setDrillCollarCalculations(validatedCalculations); // Update context too
       
       setIsLoading(false);
@@ -517,16 +545,79 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Section</th>
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Metal Grade</th>
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Max Length (Lmax)</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Wall Thickness</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {calculations.map((calc, index) => (
-                      <tr key={index} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3">{formatSection(calc.section)}</td>
-                        <td className="px-4 py-3 font-medium text-primary">{calc.drillPipeMetalGrade}</td>
-                        <td className="px-4 py-3">{calc.Lmax} m</td>
-                      </tr>
-                    ))}
+                    {calculations.map((calc, index) => {
+                      // Find corresponding casing result to get wall thickness
+                      let wallThickness = "-";
+                      
+                      try {
+                        if (casingResults && casingResults.length > 0) {
+                          // Find matching section
+                          const matchingCasing = casingResults.find(result => 
+                            result.section.toLowerCase().includes(calc.section.toLowerCase()));
+                            
+                          if (matchingCasing) {
+                            // Extract DCSG value (external diameter)
+                            const dcsgMatch = matchingCasing.dcsg.match(/(\d+(?:\.\d+)?)/);
+                            const dcsgValue = dcsgMatch ? parseFloat(dcsgMatch[1]) : 0;
+                            
+                            // Get internal diameter 
+                            let internalDiameter = 0;
+                            
+                            // First try to get from HAD data for more accurate calculations
+                            if (hadData) {
+                              const sectionName = matchingCasing.section.toLowerCase().includes("production")
+                                ? "Production Section"
+                                : matchingCasing.section.toLowerCase().includes("surface")
+                                  ? "Surface Section"
+                                  : "Intermediate Section";
+                                  
+                              const sectionData = hadData[sectionName];
+                              if (sectionData) {
+                                const atHeadKeys = Object.keys(sectionData);
+                                if (atHeadKeys.length > 0) {
+                                  // Use the Dim calculation from HAD data
+                                  const hadRows = sectionData[atHeadKeys[0]];
+                                  // Note: we're using the imported calculateDim function here
+                                  const dimValue = parseFloat(calculateDim(hadRows));
+                                  if (!isNaN(dimValue) && dimValue > 0) {
+                                    internalDiameter = dimValue;
+                                  }
+                                }
+                              }
+                            }
+                            
+                            // Fallback to the internal diameter from casing results if HAD data wasn't available
+                            if (internalDiameter === 0 && matchingCasing.internalDiameter) {
+                              const idMatch = matchingCasing.internalDiameter.match(/(\d+(?:\.\d+)?)/);
+                              internalDiameter = idMatch ? parseFloat(idMatch[1]) : 0;
+                            }
+                            
+                            // Calculate wall thickness if we have both values
+                            if (dcsgValue > 0 && internalDiameter > 0) {
+                              wallThickness = ((dcsgValue - internalDiameter) / 2).toFixed(2) + " mm";
+                            }
+                          }
+                        }
+                      } catch (error) {
+                        console.error("Error calculating wall thickness:", error);
+                      }
+                      
+                      // Convert Lmax to number to ensure toFixed works
+                      const lmaxValue = typeof calc.Lmax === 'number' ? calc.Lmax : Number(calc.Lmax);
+                      
+                      return (
+                        <tr key={index} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-3">{formatSection(calc.section)}</td>
+                          <td className="px-4 py-3 font-medium text-primary">{calc.drillPipeMetalGrade}</td>
+                          <td className="px-4 py-3">{!isNaN(lmaxValue) ? lmaxValue.toFixed(2) : '0.00'} m</td>
+                          <td className="px-4 py-3">{wallThickness}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

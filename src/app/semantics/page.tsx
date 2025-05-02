@@ -47,6 +47,7 @@ interface VcfResult {
   di: number;  // di (mm)
   h: number;   // h
   vcf: number; // Vcf
+  wallThickness: number; // Wall thickness (mm)
 }
 
 interface GcResult {
@@ -804,11 +805,10 @@ export default function SemanticsPage() {
           if (sectionData) {
             const atHeadKeys = Object.keys(sectionData);
             if (atHeadKeys.length > 0) {
-              const hadRows = sectionData[atHeadKeys[0]];
-              const dimStr = calculateDim(hadRows);
-              const dimNum = parseFloat(dimStr);
-              if (!isNaN(dimNum)) {
-                dimValue = dimNum / 1000; // Convert mm to m
+              // Use original calculateDim without external diameter parameter
+              const dimStr = calculateDim(sectionData[atHeadKeys[0]]);
+              if (dimStr !== "-") {
+                dimValue = parseFloat(dimStr);
               }
             }
           }
@@ -818,9 +818,12 @@ export default function SemanticsPage() {
           dimValue = parseFloat(result.internalDiameter || '0') / 1000;
         }
         
+        // Calculate wall thickness (in mm)
+        const wallThickness = (de * 1000 - dimValue * 1000) / 2;
+        
         // Add logging to debug
         console.log('Casing result:', result);
-        console.log('Db:', Db, 'de:', de, 'di:', dimValue);
+        console.log('Db:', Db, 'de:', de, 'di:', dimValue, 'wallThickness:', wallThickness);
         
         // Get instance-specific Hc value from the formation design
         let instanceHc = formationHcValues[i] || formationHcValues[0]; // Use instance-specific value or fallback to first instance
@@ -873,7 +876,8 @@ export default function SemanticsPage() {
           de: de * 1000, // Convert back to mm for display
           di: dimValue * 1000, // Convert back to mm for display
           h: h,
-          vcf: vcf
+          vcf: vcf,
+          wallThickness: wallThickness
         });
         
         // Add calculation details to the equations HTML
@@ -1517,7 +1521,39 @@ export default function SemanticsPage() {
                     <p class="font-mono text-sm mt-2 font-bold">n = ${n !== null ? n : "N/A"} pumps</p>
                   </div>
                 </div>
-                ` : ''}
+                                ` : ''}
+                
+                <div class="border-t border-border/30 pt-4">
+                  <p class="font-medium">m Variable Calculation:</p>
+                  <div class="mt-2 bg-background/60 p-3 rounded">
+                    <p class="font-mono text-sm">m = (γw × (γc - γfc)) / (γc × (γfc - γw))</p>
+                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
+                      ${instanceGfc ? `
+                      <li>γw × (γc - γfc) = ${instanceGw.toFixed(4)} × (${instanceGc.toFixed(4)} - ${instanceGfc.toFixed(4)}) = ${instanceGw.toFixed(4)} × ${(instanceGc - instanceGfc).toFixed(4)} = ${(instanceGw * (instanceGc - instanceGfc)).toFixed(4)}</li>
+                      <li>γc × (γfc - γw) = ${instanceGc.toFixed(4)} × (${instanceGfc.toFixed(4)} - ${instanceGw.toFixed(4)}) = ${instanceGc.toFixed(4)} × ${(instanceGfc - instanceGw).toFixed(4)} = ${(instanceGc * (instanceGfc - instanceGw)).toFixed(4)}</li>
+                      <li>(γw × (γc - γfc)) / (γc × (γfc - γw)) = ${(instanceGw * (instanceGc - instanceGfc)).toFixed(4)} / ${(instanceGc * (instanceGfc - instanceGw)).toFixed(4)} = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
+                      ` : `<li>Cannot calculate m: missing γfc value</li>`}
+                    </ol>
+                    <p class="font-mono text-sm mt-2 font-bold">Calculated m = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</p>
+                    <p class="text-xs text-muted-foreground mt-1">Calculated m value is used for water volume calculations</p>
+                  </div>
+                </div>
+                
+                <div class="border-t border-border/30 pt-4">
+                  <p class="font-medium">Vw (Water Volume) Calculation:</p>
+                  <div class="mt-2 bg-background/60 p-3 rounded">
+                    <p class="font-mono text-sm">Vw = (K3 × m × Gc × Vfc) / γw</p>
+                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
+                      <li>K3 = ${instanceK3.toFixed(4)}</li>
+                      <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
+                      <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gc_value.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value * vcfValue).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
+                    </ol>
+                    <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
+                  </div>
+                </div>
               </div>
               
               <div class="mt-3 pt-3 border-t border-border/30">

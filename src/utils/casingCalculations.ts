@@ -259,7 +259,7 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       if (calculationRows.length < 3) return { y2: 0, z2: 0, condition: 999 };
       
       const y2 = (H - L1 - L2) / calculationRows[2].had;
-      const z2 = (L2 * calculationRows[1].unitWeight * 1.488) / 
+      const z2 = ((L1 * calculationRows[0].unitWeight * 1.488) + (L2 * calculationRows[1].unitWeight * 1.488)) /
                 (calculationRows[2].tensileStrength * 1000);
       
       const condition = calculateObjective(y2, z2);
@@ -674,10 +674,10 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
         // Search L3 from 10m to remainingDepth-10m (to leave at least 10m for L4)
         for (let testL3 = 10; testL3 <= remainingDepth - 10; testL3 += 0.1) {
           const y3 = (H - L1 - L2 - testL3) / calculationRows[3].had;
-          const z3 = (L1 * calculationRows[0].unitWeight * 1.488 + 
-                      L2 * calculationRows[1].unitWeight * 1.488 + 
-                      testL3 * calculationRows[2].unitWeight * 1.488) / 
-                      (calculationRows[3].tensileStrength * 1000);
+          const z3 = ((L1 * calculationRows[0].unitWeight * 1.488) + 
+                     (L2 * calculationRows[1].unitWeight * 1.488) + 
+                     (testL3 * calculationRows[2].unitWeight * 1.488)) / 
+                     (calculationRows[3].tensileStrength * 1000);
           const condition3 = calculateObjective(y3, z3);
           const diff = Math.abs(condition3 - 1);
           if (diff < bestDiff) {
@@ -719,9 +719,10 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
         // For 3-row case with no 4th row, do not calculate y3, z3, or condition check
         if (calculationRows.length >= 4) {
           const y3 = (H - L1 - L2 - L3) / calculationRows[3].had;
-          const z3 = (L1 * calculationRows[0].unitWeight * 1.488 + 
-                     L2 * calculationRows[1].unitWeight * 1.488 + 
-                     L3 * calculationRows[2].unitWeight * 1.488) / 
+          // Updated z3 formula: sum weighted L1, L2, and L3 in numerator
+          const z3 = ((L1 * calculationRows[0].unitWeight * 1.488) + 
+                     (L2 * calculationRows[1].unitWeight * 1.488) + 
+                     (L3 * calculationRows[2].unitWeight * 1.488)) / 
                      (calculationRows[3].tensileStrength * 1000);
           rows[2].y3 = y3;
           rows[2].z3 = z3;
@@ -799,6 +800,7 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
  */
 export function calculateDim(hadSectionData: HADData[] | undefined): string {
   if (!hadSectionData || hadSectionData.length === 0) return "-";
+  
   // Collect all Lvalues and their corresponding internal diameters
   const pairs: { L: number, di: number }[] = [];
   hadSectionData.forEach(row => {
@@ -807,12 +809,42 @@ export function calculateDim(hadSectionData: HADData[] | undefined): string {
     if (row.L3 && row.internalDiameter) pairs.push({ L: row.L3, di: row.internalDiameter });
     if (row.L4 && row.internalDiameter) pairs.push({ L: row.L4, di: row.internalDiameter });
   });
+  
   // Remove zero or negative L values
   const filtered = pairs.filter(p => p.L > 0);
   if (filtered.length === 0) return "-";
-  if (filtered.length === 1) return filtered[0].di.toFixed(2);
-  const numerator = filtered.reduce((sum, p) => sum + p.L * p.di, 0);
-  const denominator = filtered.reduce((sum, p) => sum + p.L, 0);
-  if (denominator === 0) return "-";
-  return (numerator / denominator).toFixed(2);
+  
+  // Multiple L values - calculate weighted average
+  if (filtered.length > 1) {
+    const numerator = filtered.reduce((sum, p) => sum + p.L * p.di, 0);
+    const denominator = filtered.reduce((sum, p) => sum + p.L, 0);
+    if (denominator === 0) return "-";
+    return (numerator / denominator).toFixed(2);
+  } 
+  
+  // For single L value, we'll use the internal diameter as is from the data
+  // Note: The actual calculation of Di = de - 2*Wall Thickness should be handled
+  // in the CasingResults component where we have access to both the external diameter
+  // and wall thickness values.
+  return filtered[0].di.toFixed(2);
+}
+
+/**
+ * Calculate Wall Thickness from external (DCSG) and internal diameters
+ * @param externalDiameter External diameter in mm
+ * @param internalDiameter Internal diameter in mm
+ * @returns Wall thickness as a string with 2 decimal places, or "-" if calculation is not possible
+ */
+export function calculateWallThickness(externalDiameter: number | string, internalDiameter: number | string): string {
+  // Parse values if strings
+  const extValue = typeof externalDiameter === 'string' ? parseFloat(externalDiameter) : externalDiameter;
+  const intValue = typeof internalDiameter === 'string' ? parseFloat(internalDiameter) : internalDiameter;
+  
+  // Validate inputs
+  if (isNaN(extValue) || isNaN(intValue) || intValue <= 0 || extValue <= 0 || intValue >= extValue) {
+    return "-";
+  }
+  
+  // Wall thickness = (OD - ID) / 2
+  return ((extValue - intValue) / 2).toFixed(2);
 } 

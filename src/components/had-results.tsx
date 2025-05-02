@@ -172,9 +172,9 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                                 {item.L1 !== undefined && item.z1 !== undefined ? 
                                   `z₁ = (L₁×UW₁×1.488)/(TS₂×1000)` : 
                                  item.L2 !== undefined && item.z2 !== undefined ? 
-                                  `z₂ = (L₂×UW₂×1.488)/(TS₃×1000)` : 
+                                  `z₂ = (L₁×UW₁×1.488 + L₂×UW₂×1.488)/(TS₃×1000)` : 
                                  item.L3 !== undefined && item.z3 !== undefined ? 
-                                  `z₃ = (L₃×UW₃×1.488)/(TS₄×1000)` : 
+                                  `z₃ = (L₁×UW₁×1.488 + L₂×UW₂×1.488 + L₃×UW₃×1.488)/(TS₄×1000)` : 
                                  ''}
                               </div>
                             }
@@ -269,10 +269,13 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
               <p><strong>y₁ formula:</strong> y₁ = (H - L₁) / HAD₂</p>
               <p><strong>z₁ formula:</strong> z₁ = (L₁ × UnitWeight₁ × 1.488) / (TensileStrength₂ × 1000)</p>
               <p><strong>y₂ formula:</strong> y₂ = (H - L₁ - L₂) / HAD₃</p>
-              <p><strong>z₂ formula:</strong> z₂ = (L₂ × UnitWeight₂ × 1.488) / (TensileStrength₃ × 1000)</p>
+              <p><strong>z₂ formula:</strong> z₂ = (L₁ × UnitWeight₁ × 1.488 + L₂ × UnitWeight₂ × 1.488) / (TensileStrength₃ × 1000)</p>
+              <p><strong>y₃ formula:</strong> y₃ = (H - L₁ - L₂ - L₃) / HAD₄</p>
+              <p><strong>z₃ formula:</strong> z₃ = (L₁ × UnitWeight₁ × 1.488 + L₂ × UnitWeight₂ × 1.488 + L₃ × UnitWeight₃ × 1.488) / (TensileStrength₄ × 1000)</p>
               <p><strong>Objective for L₁:</strong> y₁² + y₁×z₁ + z₁² = 1 (using y₁ and z₁ values from row 1)</p>
               <p><strong>Objective for L₂:</strong> y₂² + y₂×z₂ + z₂² = 1 (using y₂ and z₂ values from row 2)</p>
-              <p className="text-xs text-gray-500 mt-2">Values are calculated iteratively to find L₁ and L₂ that make the objective equation as close to 1 as possible.</p>
+              <p><strong>Objective for L₃:</strong> y₃² + y₃×z₃ + z₃² = 1 (using y₃ and z₃ values from row 3)</p>
+              <p className="text-xs text-gray-500 mt-2">Values are calculated iteratively to find L₁, L₂, and L₃ that make the objective equation as close to 1 as possible.</p>
               <p className="text-xs text-gray-500">Condition is considered valid when the objective value is within ±0.001 of 1 (0.999 to 1.001).</p>
             </div>
           </div>
