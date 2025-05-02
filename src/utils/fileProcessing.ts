@@ -987,6 +987,9 @@ export async function extractAdditionalInfo(
     }
     
     // Find matching rows
+    const validMetalTypes = [
+      'K-55', 'L-80', 'N-80', 'C-90', 'T-95', 'P-110', 'Q-125', 'V-150'
+    ];
     const matchingRows: AdditionalInfo[] = [];
     
     for (let rowIdx = 1; rowIdx < data.length; rowIdx++) {
@@ -997,7 +1000,7 @@ export async function extractAdditionalInfo(
         const rowAtHead = parseFloat(row[atHeadCol]);
         const rowMetalType = String(row[metalTypeCol]).trim();
         
-        if (Math.abs(rowAtHead - atHeadValue) < 0.01 && rowMetalType === metalType) {
+        if (Math.abs(rowAtHead - atHeadValue) < 0.01 && rowMetalType === metalType && validMetalTypes.includes(rowMetalType)) {
           const externalPressure = parseFloat(row[externalPressureCol]);
           const tensileStrength = parseFloat(row[tensileStrengthCol]);
           const unitWeight = parseFloat(row[unitWeightCol]);

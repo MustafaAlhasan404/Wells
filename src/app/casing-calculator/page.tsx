@@ -347,12 +347,11 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
                       <SelectValue placeholder="Select metal type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="H-40">H-40</SelectItem>
-                      <SelectItem value="J-55">J-55</SelectItem>
                       <SelectItem value="K-55">K-55</SelectItem>
-                      <SelectItem value="N-80">N-80</SelectItem>
                       <SelectItem value="L-80">L-80</SelectItem>
-                      <SelectItem value="C-95">C-95</SelectItem>
+                      <SelectItem value="N-80">N-80</SelectItem>
+                      <SelectItem value="C-90">C-90</SelectItem>
+                      <SelectItem value="T-95">T-95</SelectItem>
                       <SelectItem value="P-110">P-110</SelectItem>
                       <SelectItem value="Q-125">Q-125</SelectItem>
                       <SelectItem value="V-150">V-150</SelectItem>

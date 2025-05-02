@@ -127,12 +127,11 @@ export function calculateHAD(externalPressure: number, metalType: string): numbe
     'K-55': 1.05,
     'L-80': 1.08,
     'N-80': 1.08,
+    'C-90': 1.125,
+    'T-95': 1.125,
     'P-110': 1.125,
     'Q-125': 1.125,
-    'T-95': 1.125,
-    'C-90': 1.125,
-    'H-40': 1.05,
-    'J-55': 1.05
+    'V-150': 1.125
   };
 
   // Get S value for the metal type or use default 1.08
@@ -286,10 +285,10 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       const targetCondition = 1.0;
       const tolerance = 0.0001; // Tighter tolerance for better precision
       
-      let bestL1 = 0;
+    let bestL1 = 0;
       let bestDiff = Number.MAX_VALUE;
-      let bestY1 = 0;
-      let bestZ1 = 0;
+    let bestY1 = 0;
+    let bestZ1 = 0;
       
       // Binary search for optimal L1
       let minL1 = 10; // Minimum reasonable L1
@@ -298,7 +297,7 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       // First, do a coarse-grained search to find a good starting point
       const step = (maxL1 - minL1) / 100; // 100 steps across the range
       for (let L1 = minL1; L1 <= maxL1; L1 += step) {
-        const { y1, z1 } = calculateY1Z1(L1);
+      const { y1, z1 } = calculateY1Z1(L1);
         const condition = calculateObjective(y1, z1);
         const diff = Math.abs(condition - targetCondition);
         
@@ -311,9 +310,9 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
           // Early exit if we find an excellent match
           if (diff < tolerance) {
             console.log(`[COARSE SEARCH] Found excellent L1 match: ${L1}, condition=${condition.toFixed(6)}, diff=${diff.toFixed(6)}`);
-            break;
-          }
+          break;
         }
+      }
       }
       
       // Now do binary search for more precision, starting from our best approximation
@@ -537,7 +536,7 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
             maxL2 = midL2;
           } else if (rightDiff < midDiff) {
             minL2 = midL2;
-          } else {
+      } else {
             // The minimum is likely in between left and right
             minL2 = leftL2;
             maxL2 = rightL2;
@@ -666,22 +665,34 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
         console.log(`Three-row case: Assigning remaining ${L3.toFixed(2)}m to L3`);
       } 
       else if (rows.length >= 4) {
-        // For 4+ rows, calculate L3 using the formula and give the rest to L4
-        L3 = Math.min(remainingDepth, calculateL3(L1, L2));
-        
-        // Ensure L3 is positive and not too small
-        if (L3 < 10) {
-          // If L3 is too small, allocate half of remaining depth to L3
-          L3 = remainingDepth / 2;
-          console.log(`L3 was too small, allocating half of remaining depth: ${L3.toFixed(2)}m`);
+        // For 4+ rows, optimize L3 so that the condition check for row 3 is as close to 1 as possible
+        let bestL3 = 0;
+        let bestDiff = Number.MAX_VALUE;
+        let bestY3 = 0;
+        let bestZ3 = 0;
+        let bestCondition3 = 0;
+        // Search L3 from 10m to remainingDepth-10m (to leave at least 10m for L4)
+        for (let testL3 = 10; testL3 <= remainingDepth - 10; testL3 += 0.1) {
+          const y3 = (H - L1 - L2 - testL3) / calculationRows[3].had;
+          const z3 = (L1 * calculationRows[0].unitWeight * 1.488 + 
+                      L2 * calculationRows[1].unitWeight * 1.488 + 
+                      testL3 * calculationRows[2].unitWeight * 1.488) / 
+                      (calculationRows[3].tensileStrength * 1000);
+          const condition3 = calculateObjective(y3, z3);
+          const diff = Math.abs(condition3 - 1);
+          if (diff < bestDiff) {
+            bestL3 = testL3;
+            bestY3 = y3;
+            bestZ3 = z3;
+            bestCondition3 = condition3;
+            bestDiff = diff;
+            if (diff < 0.001) break; // Early exit if perfect match
+          }
         }
-        
-        // Ensure L3 is at most the remaining depth (protection against calculation errors)
-        L3 = Math.min(L3, remainingDepth);
-        
+        L3 = bestL3;
         // Assign the rest to L4
         L4 = remainingDepth - L3;
-        console.log(`Four-row case: L3=${L3.toFixed(2)}m, L4=${L4.toFixed(2)}m`);
+        console.log(`Four-row case: Optimized L3=${L3.toFixed(2)}m (condition3=${bestCondition3.toFixed(6)}), L4=${L4.toFixed(2)}m`);
       }
       
       console.log(`======= MULTI-ROW OPTIMIZATION COMPLETED =======`);
@@ -694,45 +705,45 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       rows[0].L1 = L1;
       rows[0].y1 = y1;
       rows[0].z1 = z1;
-      rows[0].conditionCheck = condition1;
-      rows[0].conditionMet = Math.abs(condition1 - 1) < 0.001;
-      
+        rows[0].conditionCheck = condition1;
+        rows[0].conditionMet = Math.abs(condition1 - 1) < 0.001;
+        
       rows[1].L2 = L2;
       rows[1].y2 = y2;
       rows[1].z2 = z2;
-      rows[1].conditionCheck = condition2;
-      rows[1].conditionMet = Math.abs(condition2 - 1) < 0.001;
-      
+        rows[1].conditionCheck = condition2;
+        rows[1].conditionMet = Math.abs(condition2 - 1) < 0.001;
+        
       if (rows.length >= 3 && L3 > 0) {
         rows[2].L3 = L3;
-        
-        // Calculate y3 and z3 values
+        // For 3-row case with no 4th row, do not calculate y3, z3, or condition check
         if (calculationRows.length >= 4) {
           const y3 = (H - L1 - L2 - L3) / calculationRows[3].had;
-          const z3 = (L3 * calculationRows[2].unitWeight * 1.488) / 
-                    (calculationRows[3].tensileStrength * 1000);
-          
+          const z3 = (L1 * calculationRows[0].unitWeight * 1.488 + 
+                     L2 * calculationRows[1].unitWeight * 1.488 + 
+                     L3 * calculationRows[2].unitWeight * 1.488) / 
+                     (calculationRows[3].tensileStrength * 1000);
           rows[2].y3 = y3;
           rows[2].z3 = z3;
-          
           const condition3 = calculateObjective(y3, z3);
           rows[2].conditionCheck = condition3;
           rows[2].conditionMet = Math.abs(condition3 - 1) < 0.001;
         } else {
-          // If we don't have a 4th row for calculations, set y3 to 0 (end of string)
-          rows[2].y3 = 0;
-          rows[2].z3 = (L3 * calculationRows[2].unitWeight * 1.488) / 
-                       (calculationRows[2].tensileStrength * 1000);
+          // If we don't have a 4th row for calculations, do not calculate y3, z3, or condition check
+          rows[2].y3 = undefined;
+          rows[2].z3 = undefined;
+          rows[2].conditionCheck = undefined;
+          rows[2].conditionMet = undefined;
         }
       }
       
       if (rows.length >= 4 && L4 > 0) {
         rows[3].L4 = L4;
-        
-        // For L4, set y4 to 0 (this is the final section)
-        rows[3].y4 = 0;
-        rows[3].z4 = (L4 * calculationRows[3].unitWeight * 1.488) / 
-                     (calculationRows[3].tensileStrength * 1000);
+        // For 4-row case, do not calculate y4, z4, or condition check
+        rows[3].y4 = undefined;
+        rows[3].z4 = undefined;
+        rows[3].conditionCheck = undefined;
+        rows[3].conditionMet = undefined;
       }
     }
   } 
@@ -746,8 +757,8 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
   updatedData.forEach(item => {
     // For special sections with depth, use that depth directly
     if (item.depth && !item.L1 && !item.L2 && !item.L3 && !item.L4) {
-      item.L1 = item.depth;
-    }
+        item.L1 = item.depth;
+      }
   });
   
   // Verify total depth coverage
