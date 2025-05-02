@@ -88,7 +88,7 @@ export interface HADData {
   z3?: number;    // z value for L3 condition check
   y4?: number;    // y value for L4 condition check
   z4?: number;    // z value for L4 condition check
-  conditionCheck?: number; // (y_i^2 + y_i) × (z_i^2 + z_i) value
+  conditionCheck?: number; // y_i^2 + y_i*z_i + z_i^2 value for each row i
   conditionMet?: boolean;  // Whether condition is within [0.9, 1.1]
 }
 
@@ -245,8 +245,8 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       const z2 = (L2 * calculationRows[1].unitWeight * 1.488) / 
                 (calculationRows[2].tensileStrength * 1000);
       
-      // Calculate objective function: y2^2 + y1*z2 + z1^2 = 1
-      const condition = y2*y2 + y1*z2 + z1*z1;
+      // Fix: Calculate objective function for L2: y2^2 + y2*z2 + z2^2 = 1
+      const condition = y2*y2 + y2*z2 + z2*z2;
       
       return { y2, z2, condition };
     };
@@ -298,7 +298,8 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       
       // For single-row evaluation of L1 (when we don't have L2)
       if (calculationRows.length < 3) {
-        const condition = y1*y1 + z1*z1;
+        // Fix: Calculate objective function for L1: y1^2 + y1*z1 + z1^2 = 1
+        const condition = y1*y1 + y1*z1 + z1*z1;
         console.log(`[SEARCH] Testing L1=${L1} (${percentage * 100}% of H=${H}), y1=${y1.toFixed(6)}, z1=${z1.toFixed(6)}, condition=${condition.toFixed(6)}, diff=${Math.abs(condition-1).toFixed(6)}`);
         
         if (Math.abs(condition - 1) < Math.abs(bestCondition - 1)) {
@@ -608,7 +609,7 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
         // Calculate condition for display
         const y1 = rows[0].y1 || 0;
         const z1 = rows[0].z1 || 0;
-        const condition = y2*y2 + y1*z2 + z1*z1;
+        const condition = y2*y2 + y2*z2 + z2*z2;
         
         rows[0].conditionCheck = condition;
         rows[0].conditionMet = Math.abs(condition - 1) < 0.01;
@@ -658,7 +659,7 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
         // Recalculate condition check with new values
         const y1 = rows[0].y1 || 0;
         const z1 = rows[0].z1 || 0;
-        const newCondition = y2*y2 + y1*z2 + z1*z1;
+        const newCondition = y2*y2 + y2*z2 + z2*z2;
         
         rows[0].conditionCheck = newCondition;
         rows[0].conditionMet = Math.abs(newCondition - 1) < 0.01;
@@ -699,7 +700,7 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
           // Recalculate condition check with new values
           const y1 = rows[0].y1 || 0;
           const z1 = rows[0].z1 || 0;
-          const newCondition = y2*y2 + y1*z2 + z1*z1;
+          const newCondition = y2*y2 + y2*z2 + z2*z2;
           
           rows[0].conditionCheck = newCondition;
           rows[0].conditionMet = Math.abs(newCondition - 1) < 0.01;
@@ -745,8 +746,8 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
         const y2 = (H - testL1 - testL2) / nextHad;
         const z2 = (testL2 * calculationRows[1].unitWeight * 1.488) / (nextTensile * 1000);
         
-        // Calculate objective function: y2^2 + y1*z2 + z1^2 = 1
-        const condition = y2*y2 + y1*z2 + z1*z1;
+        // Fix: Calculate objective function for L2: y2^2 + y2*z2 + z2^2 = 1
+        const condition = y2*y2 + y2*z2 + z2*z2;
         
         return { y2, z2, condition };
       };

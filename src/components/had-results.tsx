@@ -192,9 +192,14 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                                     Invalid
                                   </Badge>
                                 )}
-                                {showDebug && item.L1 !== undefined && item.L2 !== undefined && 
+                                {showDebug && item.L1 !== undefined && 
                                   <div className="text-xs text-gray-500 mt-1">
-                                    y₂² + y₁×z₂ + z₁² = 1
+                                    y₁² + y₁×z₁ + z₁² = 1
+                                  </div>
+                                }
+                                {showDebug && item.L2 !== undefined && 
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    y₂² + y₂×z₂ + z₂² = 1
                                   </div>
                                 }
                               </div>
@@ -222,7 +227,8 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
               <p><strong>z₁ formula:</strong> z₁ = (L₁ × UnitWeight₁ × 1.488) / (TensileStrength₂ × 1000)</p>
               <p><strong>y₂ formula:</strong> y₂ = (H - L₁ - L₂) / HAD₃</p>
               <p><strong>z₂ formula:</strong> z₂ = (L₂ × UnitWeight₂ × 1.488) / (TensileStrength₃ × 1000)</p>
-              <p><strong>Objective:</strong> y₂² + y₁×z₂ + z₁² = 1</p>
+              <p><strong>Objective for L₁:</strong> y₁² + y₁×z₁ + z₁² = 1</p>
+              <p><strong>Objective for L₂:</strong> y₂² + y₂×z₂ + z₂² = 1</p>
               <p className="text-xs text-gray-500 mt-2">Values are calculated iteratively to find L₁ and L₂ that make the objective equation as close to 1 as possible.</p>
             </div>
           </div>
