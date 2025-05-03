@@ -1292,7 +1292,10 @@ export default function SemanticsPage() {
         }
         
         // Calculate Gc using instance-specific values - gc = (γc.γw)/(m.γc + γw)
-        const gc_value = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
+        // Ensure proper calculation by breaking it down
+        const numerator = instanceGc * instanceGw;
+        const denominator = instanceM * instanceGc + instanceGw;
+        const gc_value = numerator / denominator;
         
         // Get K2 value for this instance
         let instanceK2 = 0;
@@ -1470,7 +1473,7 @@ export default function SemanticsPage() {
                       <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
                       <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
                       <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
-                      <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)).toFixed(4)}</li>
+                      <li>(γc.γw)/(m.γc + γw) = ${numerator.toFixed(4)} / ${denominator.toFixed(4)} = ${gc_value.toFixed(4)}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Gc = ${gc_value.toFixed(4)} tonf/m3</p>
                   </div>
