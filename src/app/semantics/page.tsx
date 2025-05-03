@@ -1011,6 +1011,13 @@ export default function SemanticsPage() {
   // Function to calculate Gc/G'c values
   const calculateGcGcInternal = () => {
     try {
+      // Helper function to ensure we use calculated values consistently
+      const fixTemplateOutput = (html: string): string => {
+        // Replace all instances where Gc = 3.1500 occurs in the HTML template
+        return html.replace(/Gc = \${gcDirectCalculation\.toFixed\(4\)}/g, 'Gc = ${calculatedGc.toFixed(4)}')
+                  .replace(/\${gcDirectCalculation\.toFixed\(4\)}/g, '${calculatedGc.toFixed(4)}');
+      };
+
       // Get formation data for Hc (HAC) values - store all three instances
       let formationHcValues = [0, 0, 0]; // Initialize with 0 for each instance (index 0, 1, 2)
       try {
@@ -1536,12 +1543,13 @@ const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">G'c Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
+                    <!-- Debug: raw instanceGc = ${instanceGc}, gcDirectCalculation = ${gcDirectCalculation}, calculatedGc = ${calculatedGc} -->
                     <p class="font-mono text-sm">G'c = K2.Gc.Vfc</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>K2 = ${instanceK2.toFixed(4)}</li>
-                      <li>Gc = ${gcDirectCalculation.toFixed(4)} (calculated cement grade from above)</li>
-                      <li>K2.Gc = ${instanceK2.toFixed(4)} × ${gcDirectCalculation.toFixed(4)} = ${(instanceK2 * gcDirectCalculation).toFixed(4)}</li>
-                      <li>K2.Gc.Vfc = ${(instanceK2 * gcDirectCalculation).toFixed(4)} × ${vcfValue.toFixed(4)} = ${Number(gc_prime).toFixed(4)}</li>
+                      <li>Gc = ${calculatedGc.toFixed(4)} (calculated cement grade from above)</li>
+                      <li>K2.Gc = ${instanceK2.toFixed(4)} × ${calculatedGc.toFixed(4)} = ${(instanceK2 * calculatedGc).toFixed(4)}</li>
+                      <li>K2.Gc.Vfc = ${(instanceK2 * calculatedGc).toFixed(4)} × ${vcfValue.toFixed(4)} = ${Number(gc_prime).toFixed(4)}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">G'c = ${Number(gc_prime).toFixed(4)}</p>
                   </div>
@@ -1562,15 +1570,16 @@ const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">Vw (Water Volume) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
+                    <!-- Debug: instanceGc = ${instanceGc}, gcDirectCalculation = ${gcDirectCalculation}, calculatedGc = ${calculatedGc} -->
                     <p class="font-mono text-sm">Vw = (K3 × m × Gc × Vfc) / γw</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>K3 = ${instanceK3.toFixed(4)}</li>
                       <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
                       <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
-                      <li>Gc = ${gcDirectCalculation.toFixed(4)} (calculated cement grade)</li>
-                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gcDirectCalculation.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
+                      <li>Gc = ${calculatedGc.toFixed(4)} (calculated cement grade)</li>
+                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${calculatedGc.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedGc).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedGc).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedGc * vcfValue).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedGc * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
                   </div>
@@ -1690,7 +1699,7 @@ const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
                 <p class="text-center font-medium">Final Results:</p>
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2">
                   <div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">Gc = ${((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)).toFixed(4)}</span>
+                    <span class="font-mono text-sm">Gc = ${calculatedGc.toFixed(4)}</span>
                   </div>
                   <div class="bg-primary/10 p-2 rounded border border-primary/30">
                     <span class="font-mono text-sm">G'c = ${gc_prime.toFixed(4)}</span>
@@ -1745,9 +1754,9 @@ const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
       
       // Update the equation HTML with the enhanced version
       if (equationHTML) {
-        updateEquationHTML(equationHTML + gcEquations);
+        updateEquationHTML(fixTemplateOutput(equationHTML + gcEquations));
       } else {
-        updateEquationHTML(gcEquations);
+        updateEquationHTML(fixTemplateOutput(gcEquations));
       }
       
       // Update state with calculated results
