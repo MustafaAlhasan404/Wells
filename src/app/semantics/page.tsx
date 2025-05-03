@@ -1301,17 +1301,37 @@ export default function SemanticsPage() {
         }
         
         // Calculate Gc using instance-specific values - gc = (γc.γw)/(m.γc + γw)
-        // Calculate direct Gc value
-        const gcValue = (Number(instanceGc) * Number(instanceGw)) / 
-                       ((Number(instanceM) * Number(instanceGc)) + Number(instanceGw));
-        
-        console.log(`[Instance ${instanceNumber}] Gc calculation:`, {
+        console.log(`[Instance ${instanceNumber}] Debug - Before Gc calculation:`, {
           instanceGc,
           instanceGw,
           instanceM,
-          gcValue,
-          formula: `(${instanceGc} * ${instanceGw}) / ((${instanceM} * ${instanceGc}) + ${instanceGw})`
+          numerator: (instanceGc * instanceGw),
+          denominator: (instanceM * instanceGc + instanceGw)
         });
+        
+        // SIMPLIFIED AND FIXED Gc calculation
+        let gc_value = 0;
+        const numerator = Number(instanceGc) * Number(instanceGw);
+        const denominator = (Number(instanceM) * Number(instanceGc)) + Number(instanceGw);
+        
+        console.log(`[Instance ${instanceNumber}] Raw division values:`, {
+          numerator,
+          denominator,
+          divisionResult: numerator / denominator,
+          directCalculation: (Number(instanceGc) * Number(instanceGw)) / ((Number(instanceM) * Number(instanceGc)) + Number(instanceGw))
+        });
+        
+        // Simplified calculation with just basic validation
+        if (denominator !== 0 && !isNaN(denominator) && instanceGc > 0 && instanceGw > 0 && instanceM > 0) {
+          // Direct calculation without any additional checks
+          gc_value = numerator / denominator;
+          console.log(`[Instance ${instanceNumber}] Basic Gc calculation: ${numerator} / ${denominator} = ${gc_value}`);
+        } else {
+          console.error(`[Instance ${instanceNumber}] Error: Invalid values for Gc calculation:`, {instanceGc, instanceGw, instanceM, denominator});
+          gc_value = 0;
+        }
+        
+        console.log(`[Instance ${instanceNumber}] Debug - Final Gc value:`, gc_value);
         
         // Get K2 value for this instance
         let instanceK2 = 0;
@@ -1323,16 +1343,22 @@ export default function SemanticsPage() {
           instanceK2 = parseFloat(instanceValues['k2'][instanceNumber]);
         }
         
-        // Calculate G'c using the direct Gc value - G'c = K2.Gc.Vfc
-        const gc_prime = Number(instanceK2) * gcValue * Number(vcfValue);
+        // Calculate G'c using instance-specific values - G'c = K2.Gc.Vfc
+        // Use direct Gc calculation instead of gc_value
+        const gcDirectCalculation = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
         
-        console.log(`[Instance ${instanceNumber}] G'c calculation:`, {
-          instanceK2,
-          gcValue, 
-          vcfValue,
-          gc_prime,
-          formula: `${instanceK2} * ${gcValue} * ${vcfValue}`
+        // Add debugging for G'c calculation
+        console.log(`[Instance ${instanceNumber}] G'c calculation debug:`, {
+          instanceGc: `γc=${instanceGc}`,
+          instanceGw: `γw=${instanceGw}`,
+          instanceM: `m=${instanceM}`,
+          instanceK2: `K2=${instanceK2}`,
+          Gc: gcDirectCalculation,
+          gcFormula: `Gc = (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw}) = ${gcDirectCalculation}`,
+          gcPrimeFormula: `G'c = ${instanceK2} * ${gcDirectCalculation} * ${vcfValue}`,
         });
+        
+        const gc_prime = Number(instanceK2) * gcDirectCalculation * Number(vcfValue);
         
         // Calculate nc in sacks - always use the formula: nc = (G'c * 1000) / 50
         const nc = (Number(gc_prime) * 1000) / 50;
@@ -1362,7 +1388,7 @@ export default function SemanticsPage() {
         // Calculate Vw (water volume) using the new formula with calculated m
         // Only calculate if we have a valid calculated m value
         const vw = (calculatedM !== null && instanceGw > 0) ? 
-                  (instanceK3 * calculatedM * gcValue * vcfValue) / instanceGw : null;
+                  (instanceK3 * calculatedM * gcDirectCalculation * vcfValue) / instanceGw : null;
         
         // Calculate Vfd (volume of fluid displacement)
         // Using the formula: Vfd = (π/4) × di² × (H - h)
@@ -1506,12 +1532,12 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">G'c Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">G'c = K2.gc.Vfc</p>
-                    <!-- Debug: gcValue = ${gcValue}, instanceGc = ${instanceGc} -->
+                    <p class="font-mono text-sm">G'c = K2.Gc.Vfc</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>K2 = ${instanceK2.toFixed(4)}</li>
-                      <li>K2.gc = ${instanceK2.toFixed(4)} × ${gcValue.toFixed(4)} = ${(instanceK2 * gcValue).toFixed(4)}</li>
-                      <li>K2.gc.Vfc = ${(instanceK2 * gcValue).toFixed(4)} × ${vcfValue.toFixed(4)} = ${Number(gc_prime).toFixed(4)}</li>
+                      <li>Gc = ${gcDirectCalculation.toFixed(4)} (calculated cement grade from above)</li>
+                      <li>K2.Gc = ${instanceK2.toFixed(4)} × ${gcDirectCalculation.toFixed(4)} = ${(instanceK2 * gcDirectCalculation).toFixed(4)}</li>
+                      <li>K2.Gc.Vfc = ${(instanceK2 * gcDirectCalculation).toFixed(4)} × ${vcfValue.toFixed(4)} = ${Number(gc_prime).toFixed(4)}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">G'c = ${Number(gc_prime).toFixed(4)}</p>
                   </div>
@@ -1537,9 +1563,10 @@ export default function SemanticsPage() {
                       <li>K3 = ${instanceK3.toFixed(4)}</li>
                       <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
                       <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gcValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gcValue).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcValue * vcfValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gcValue * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
+                      <li>Gc = ${gcDirectCalculation.toFixed(4)} (calculated cement grade)</li>
+                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gcDirectCalculation.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
                   </div>
@@ -1645,9 +1672,10 @@ export default function SemanticsPage() {
                       <li>K3 = ${instanceK3.toFixed(4)}</li>
                       <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
                       <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gcValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gcValue).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcValue * vcfValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gcValue * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
+                      <li>Gc = ${gcDirectCalculation.toFixed(4)} (calculated cement grade)</li>
+                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gcDirectCalculation.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
                   </div>
