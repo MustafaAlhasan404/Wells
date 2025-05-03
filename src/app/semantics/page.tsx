@@ -1311,11 +1311,26 @@ export default function SemanticsPage() {
         
         // Calculate Gc with safeguards
         let gc_value = 0;
-        const denominator = (instanceM * instanceGc + instanceGw);
+        const numerator = Number(instanceGc) * Number(instanceGw);
+        const denominator = (Number(instanceM) * Number(instanceGc)) + Number(instanceGw);
+        
+        console.log(`[Instance ${instanceNumber}] Raw division values:`, {
+          numerator,
+          denominator,
+          divisionResult: numerator / denominator,
+          directCalculation: (Number(instanceGc) * Number(instanceGw)) / ((Number(instanceM) * Number(instanceGc)) + Number(instanceGw))
+        });
         
         if (denominator !== 0 && !isNaN(denominator) && instanceGc > 0 && instanceGw > 0 && instanceM > 0) {
           // Apply the correct formula with validation
-          gc_value = (instanceGc * instanceGw) / denominator;
+          gc_value = numerator / denominator;
+          
+          // Additional check - explicitly verify the calculation matches our expectation
+          const expectedGc = (Number(instanceGc) * Number(instanceGw)) / ((Number(instanceM) * Number(instanceGc)) + Number(instanceGw));
+          if (Math.abs(gc_value - expectedGc) > 0.0001) {
+            console.error(`[Instance ${instanceNumber}] Calculation mismatch - gc_value: ${gc_value}, expected: ${expectedGc}`);
+            gc_value = expectedGc; // Force to the expected value
+          }
           
           // Sanity check - if gc_value equals instanceGc, something is likely wrong
           if (Math.abs(gc_value - instanceGc) < 0.0001) {
@@ -1364,10 +1379,10 @@ export default function SemanticsPage() {
         }
         
         // Calculate G'c using instance-specific values - G'c = K2.gc.Vfc
-        const gc_prime = instanceK2 * gc_value * vcfValue;
+        const gc_prime = Number(instanceK2) * Number(gc_value) * Number(vcfValue);
         
         // Calculate nc in sacks - always use the formula: nc = (G'c * 1000) / 50
-        const nc = (gc_prime * 1000) / 50;
+        const nc = (Number(gc_prime) * 1000) / 50;
         
         // Get K3 value for this instance
         let instanceK3 = 0;
@@ -1529,9 +1544,9 @@ export default function SemanticsPage() {
                       <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
                       <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
                       <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
-                      <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${gc_value.toFixed(4)}</li>
+                      <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${Number((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)).toFixed(4)}</li>
                     </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Gc = ${gc_value.toFixed(4)} tonf/m3</p>
+                    <p class="font-mono text-sm mt-2 font-bold">Gc = ${Number(gc_value).toFixed(4)} tonf/m3</p>
                   </div>
                 </div>
                 
@@ -1541,10 +1556,10 @@ export default function SemanticsPage() {
                     <p class="font-mono text-sm">G'c = K2.gc.Vfc</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>K2 = ${instanceK2.toFixed(4)}</li>
-                      <li>K2.gc = ${instanceK2.toFixed(4)} × ${gc_value.toFixed(4)} = ${(instanceK2 * gc_value).toFixed(4)}</li>
-                      <li>K2.gc.Vfc = ${(instanceK2 * gc_value).toFixed(4)} × ${vcfValue.toFixed(4)} = ${gc_prime.toFixed(4)}</li>
+                      <li>K2.gc = ${instanceK2.toFixed(4)} × ${Number(gc_value).toFixed(4)} = ${Number(instanceK2 * gc_value).toFixed(4)}</li>
+                      <li>K2.gc.Vfc = ${Number(instanceK2 * gc_value).toFixed(4)} × ${vcfValue.toFixed(4)} = ${Number(gc_prime).toFixed(4)}</li>
                     </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">G'c = ${gc_prime.toFixed(4)}</p>
+                    <p class="font-mono text-sm mt-2 font-bold">G'c = ${Number(gc_prime).toFixed(4)}</p>
                   </div>
                 </div>
                 
@@ -1553,10 +1568,10 @@ export default function SemanticsPage() {
                   <div class="mt-2 bg-background/60 p-3 rounded">
                     <p class="font-mono text-sm">nc = (G'c × 1000) / 50</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>G'c × 1000 = ${gc_prime.toFixed(4)} × 1000 = ${(gc_prime * 1000).toFixed(4)}</li>
-                      <li>(G'c × 1000) / 50 = ${(gc_prime * 1000).toFixed(4)} / 50 = ${nc !== null ? nc.toFixed(4) : "N/A"}</li>
+                      <li>G'c × 1000 = ${Number(gc_prime).toFixed(4)} × 1000 = ${Number(gc_prime * 1000).toFixed(4)}</li>
+                      <li>(G'c × 1000) / 50 = ${Number(gc_prime * 1000).toFixed(4)} / 50 = ${nc !== null ? Number(nc).toFixed(4) : "N/A"}</li>
                     </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">nc = ${nc !== null ? nc.toFixed(4) : "N/A"} sacks</p>
+                    <p class="font-mono text-sm mt-2 font-bold">nc = ${nc !== null ? Number(nc).toFixed(4) : "N/A"} sacks</p>
                   </div>
                 </div>
                 
@@ -1689,7 +1704,7 @@ export default function SemanticsPage() {
                 <p class="text-center font-medium">Final Results:</p>
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2">
                   <div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">Gc = ${gc_value.toFixed(4)}</span>
+                    <span class="font-mono text-sm">Gc = ${Number(gc_value).toFixed(4)}</span>
                   </div>
                   <div class="bg-primary/10 p-2 rounded border border-primary/30">
                     <span class="font-mono text-sm">G'c = ${gc_prime.toFixed(4)}</span>
