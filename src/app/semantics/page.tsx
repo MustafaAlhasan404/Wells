@@ -47,7 +47,6 @@ interface VcfResult {
   di: number;  // di (mm)
   h: number;   // h
   vcf: number; // Vcf
-  wallThickness: number; // Wall thickness (mm)
 }
 
 interface GcResult {
@@ -794,7 +793,7 @@ export default function SemanticsPage() {
         
         // Get values from the casing table
         const Db = parseFloat(result.nearestBitSize || '0') / 1000; // Nearest bit size in m
-        const de = parseFloat(result.dcsg || '0') / 1000; // dcsg in m
+        const de = parseFloat(result.atBody || '0') / 1000; // Using atBody (DCSG') for de instead of dcsg
         // const di = parseFloat(result.internalDiameter || '0') / 1000; // Internal diameter in m
 
         // --- Get Dim from HAD data ---
@@ -816,14 +815,14 @@ export default function SemanticsPage() {
         // Fallback to di if Dim is not available
         if (dimValue === null) {
           dimValue = parseFloat(result.internalDiameter || '0') / 1000;
+        } else {
+          // If we got dimValue from HAD data, convert from mm to meters
+          dimValue = dimValue / 1000;
         }
-        
-        // Calculate wall thickness (in mm)
-        const wallThickness = (de * 1000 - dimValue * 1000) / 2;
         
         // Add logging to debug
         console.log('Casing result:', result);
-        console.log('Db:', Db, 'de:', de, 'di:', dimValue, 'wallThickness:', wallThickness);
+        console.log('Db:', Db, 'de:', de, 'di:', dimValue);
         
         // Get instance-specific Hc value from the formation design
         let instanceHc = formationHcValues[i] || formationHcValues[0]; // Use instance-specific value or fallback to first instance
@@ -876,8 +875,7 @@ export default function SemanticsPage() {
           de: de * 1000, // Convert back to mm for display
           di: dimValue * 1000, // Convert back to mm for display
           h: h,
-          vcf: vcf,
-          wallThickness: wallThickness
+          vcf: vcf
         });
         
         // Add calculation details to the equations HTML
@@ -1155,15 +1153,15 @@ export default function SemanticsPage() {
                           <div class="space-y-4">
                             <div>
                               <p class="font-medium">Gc (cement grade):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Gc = (γc.γw)/(m.γc + γw)</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Gc = (γc·γw)/(m·γc + γw)</p>
                             </div>
                             <div>
                               <p class="font-medium">G'c (modified cement grade):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">G'c = K2.gc.Vfc</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">G'c = K2·Gc·Vfc</p>
                             </div>
                             <div>
                               <p class="font-medium">nc (number of cement sacks):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">nc = (Vcf × Gc) / m</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">nc = (G'c × 1000) / 50</p>
                             </div>
                             <div>
                               <p class="font-medium">Vw (water volume):</p>
@@ -1171,7 +1169,7 @@ export default function SemanticsPage() {
                             </div>
                             <div>
                               <p class="font-medium">Vfd (volume of fluid displacement):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Vfd = Vcf × (γfc / γf) × (1 - (γw / γc))</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Vfd = (π/4) × di² × (H - h)</p>
                             </div>
                             <div>
                               <p class="font-medium">Pymax (maximum pressure at yield point):</p>
@@ -1180,11 +1178,12 @@ export default function SemanticsPage() {
                             </div>
                             <div>
                               <p class="font-medium">Pc (confining pressure):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Pc = Pymax × 0.85</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Pc = 0.2H + (8 or 16)</p>
+                              <p class="text-xs mt-1">Where H is the depth and 8 is used if H < 2000, otherwise 16 is used</p>
                             </div>
                             <div>
                               <p class="font-medium">Ppmax (maximum pump pressure):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Ppmax = (Pymax + Pc + Pfr) / 10</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Ppmax = Pymax + Pc + Pfr</p>
                               <p class="text-sm mt-1">Where Pfr (friction pressure) = 5 MPa (constant)</p>
                             </div>
                             <div>
@@ -1269,12 +1268,8 @@ export default function SemanticsPage() {
         // Calculate G'c using instance-specific values - G'c = K2.gc.Vfc
         const gc_prime = instanceK2 * gc_value * vcfValue;
         
-        // Calculate nc in sacks
-        // Use G'c-based formula when m is zero: nc = (G'c * 1000) / 50
-        // Otherwise use the original formula: nc = (Vcf * gc_value) / m
-        const nc = instanceM > 0 
-                  ? (vcfValue * gc_value) / instanceM 
-                  : (gc_prime * 1000) / 50; // When m is 0, use G'c for calculation
+        // Calculate nc in sacks - always use the formula: nc = (G'c * 1000) / 50
+        const nc = (gc_prime * 1000) / 50;
         
         // Get K3 value for this instance
         let instanceK3 = 0;
@@ -1299,23 +1294,53 @@ export default function SemanticsPage() {
                   (instanceK3 * calculatedM * gc_value * vcfValue) / instanceGw : null;
         
         // Calculate Vfd (volume of fluid displacement)
-        const vfd = (instanceGfc && instanceGf) ? 
-                   vcfValue * (instanceGfc / instanceGf) * (1 - (instanceGw / instanceGc)) : null;
+        // Using the formula: Vfd = (π/4) × di² × (H - h)
+        // Where di is the casing inner diameter in meters, H is instanceHc, and h is vcfResult.h
+        
+        // Get the correct H value based on the instance (reverse mapping)
+        // Instance 1 (Production) should use the highest H value
+        // Instance 3 (Surface) should use the lowest H value
+        let hValue;
+        
+        // Try to get H from formation data - instance mapping is reversed for H values
+        // Instance 1 (Production) should use the highest H value
+        // Instance 3 (Surface) should use the lowest H value
+        // This approach gets H from the appropriate section based on reversed instance
+        let correctH;
+        if (instanceNumber === 1) {
+          // Production (instance 1) should use the H value from instance 3 or the highest available
+          correctH = formationHcValues[formationHcValues.length - 1] || instanceHc;
+        } else if (instanceNumber === 3) {
+          // Surface (instance 3) should use the H value from instance 1 or the lowest available
+          correctH = formationHcValues[0] || instanceHc;
+        } else {
+          // For intermediate (instance 2), use the middle value or the current one
+          correctH = formationHcValues[1] || instanceHc;
+        }
+        
+        // Convert di from mm to meters for the calculation
+        const diInMeters = vcfResult.di / 1000;
+        
+        // Calculate Vfd using the formula with the correct H value
+        const vfd = (Math.PI / 4) * Math.pow(diInMeters, 2) * (correctH - vcfResult.h);
         
         // Calculate Pymax (maximum pressure at yield point) - using the new formula from the image
         // Pymax = 0.1[(Hc - h)(γfc - γf)]
         const pymax = (instanceGfc && instanceGf && vcfResult.h) ? 
                       0.1 * (instanceHc - vcfResult.h) * (instanceGfc - instanceGf) : null;
         
-        // Calculate Pc (confining pressure)
-        const pc = pymax ? pymax * 0.85 : null; // Typical value is 85% of Pymax
+        // Calculate Pc (confining pressure) using the correct formula:
+        // Pc = 0.2H + (8 or 16), where 8 is used if H < 2000, otherwise 16 is used
+        // Use the same H value as in Vfd calculation
+        const constantValue = correctH >= 2000 ? 16 : 8;
+        const pc = 0.2 * correctH + constantValue;
         
         // Pfr remains constant at 5 usually
         const pfr = 5;
         
-        // Calculate Ppmax (maximum pump pressure) based on the image formula
-        // Ppmax = (Pymax + Pc + Pfr) / 10
-        const ppmax = (pymax && pc) ? (pymax + pc + pfr) / 10 : null;
+        // Calculate Ppmax (maximum pump pressure) based on the formula
+        // Ppmax = Pymax + Pc + Pfr
+        const ppmax = (pymax && pc) ? ((pymax + pc + pfr) / 10) : null;
         
         // Calculate n (number of pumps) using tc/tad + 1 formula
         // Get td value - from input
@@ -1423,14 +1448,10 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">nc (Cement Sacks) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">${instanceM > 0 ? 'nc = (Vcf × Gc) / m' : 'nc = (G\'c × 1000) / 50'}</p>
+                    <p class="font-mono text-sm">nc = (G'c × 1000) / 50</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      ${instanceM > 0 ? 
-                      `<li>Vcf × Gc = ${vcfValue.toFixed(4)} × ${gc_value.toFixed(4)} = ${(vcfValue * gc_value).toFixed(4)}</li>
-                      <li>(Vcf × Gc) / m = ${(vcfValue * gc_value).toFixed(4)} / ${instanceM.toFixed(4)} = ${nc !== null ? nc.toFixed(4) : "N/A"}</li>` 
-                      : 
-                      `<li>G'c × 1000 = ${gc_prime.toFixed(4)} × 1000 = ${(gc_prime * 1000).toFixed(4)}</li>
-                      <li>(G'c × 1000) / 50 = ${(gc_prime * 1000).toFixed(4)} / 50 = ${nc !== null ? nc.toFixed(4) : "N/A"}</li>`}
+                      <li>G'c × 1000 = ${gc_prime.toFixed(4)} × 1000 = ${(gc_prime * 1000).toFixed(4)}</li>
+                      <li>(G'c × 1000) / 50 = ${(gc_prime * 1000).toFixed(4)} / 50 = ${nc !== null ? nc.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">nc = ${nc !== null ? nc.toFixed(4) : "N/A"} sacks</p>
                   </div>
@@ -1456,14 +1477,15 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">Vfd (Fluid Displacement) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Vfd = Vcf × (γfc / γf) × (1 - (γw / γc))</p>
+                    <p class="font-mono text-sm">Vfd = (π/4) × di² × (H - h)</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>γfc / γf = ${instanceGfc.toFixed(4)} / ${instanceGf.toFixed(4)} = ${(instanceGfc / instanceGf).toFixed(4)}</li>
-                      <li>γw / γc = ${instanceGw.toFixed(4)} / ${instanceGc.toFixed(4)} = ${(instanceGw / instanceGc).toFixed(4)}</li>
-                      <li>1 - (γw / γc) = 1 - ${(instanceGw / instanceGc).toFixed(4)} = ${(1 - (instanceGw / instanceGc)).toFixed(4)}</li>
-                      <li>Vcf × (γfc / γf) × (1 - (γw / γc)) = ${vcfValue.toFixed(4)} × ${(instanceGfc / instanceGf).toFixed(4)} × ${(1 - (instanceGw / instanceGc)).toFixed(4)} = ${vfd !== null ? vfd.toFixed(4) : "N/A"}</li>
+                      <li>di = ${(vcfResult.di / 1000).toFixed(4)} m (${vcfResult.di.toFixed(4)} mm)</li>
+                      <li>di² = ${Math.pow(vcfResult.di / 1000, 2).toFixed(6)}</li>
+                      <li>H - h = ${correctH.toFixed(4)} - ${vcfResult.h.toFixed(4)} = ${(correctH - vcfResult.h).toFixed(4)}</li>
+                      <li>π/4 = ${(Math.PI / 4).toFixed(6)}</li>
+                      <li>(π/4) × di² × (H - h) = ${(Math.PI / 4).toFixed(6)} × ${Math.pow(vcfResult.di / 1000, 2).toFixed(6)} × ${(correctH - vcfResult.h).toFixed(4)} = ${vfd.toFixed(4)}</li>
                     </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Vfd = ${vfd !== null ? vfd.toFixed(4) : "N/A"}</p>
+                    <p class="font-mono text-sm mt-2 font-bold">Vfd = ${vfd.toFixed(4)}</p>
                   </div>
                 </div>
                 ` : ''}
@@ -1486,11 +1508,15 @@ export default function SemanticsPage() {
                 <div class="border-t border-border/30 pt-4">
                   <p class="font-medium">Pc (Confining Pressure) Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Pc = Pymax × 0.85</p>
+                    <p class="font-mono text-sm">Pc = 0.2H + (8 or 16)</p>
+                    <p class="font-mono text-sm mt-1">Where H is the depth and 8 is used if H < 2000, otherwise 16 is used</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>Pymax × 0.85 = ${pymax !== null ? pymax.toFixed(4) : "N/A"} × 0.85 = ${pc !== null ? pc.toFixed(4) : "N/A"}</li>
+                      <li>H = ${correctH.toFixed(4)}</li>
+                      <li>Constant value = ${correctH >= 2000 ? '16 (since H ≥ 2000)' : '8 (since H < 2000)'}</li>
+                      <li>0.2 × H = 0.2 × ${correctH.toFixed(4)} = ${(0.2 * correctH).toFixed(4)}</li>
+                      <li>0.2H + ${constantValue} = ${(0.2 * correctH).toFixed(4)} + ${constantValue} = ${pc.toFixed(4)}</li>
                     </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Pc = ${pc !== null ? pc.toFixed(4) : "N/A"} MPa</p>
+                    <p class="font-mono text-sm mt-2 font-bold">Pc = ${pc.toFixed(4)} MPa</p>
                   </div>
                 </div>
                 
@@ -1656,7 +1682,7 @@ export default function SemanticsPage() {
       // Also extract diameters for each instance
       const instanceDiametersToSend: number[] = [];
       
-      // Extract Ppmax values from GC results and convert from MPa/10 to MPa
+      // Extract Ppmax values from GC results in MPa/10 units
       // Also use instance-specific diameters if enabled
       gcResults.forEach(result => {
         if (result.ppmax !== null) {
@@ -2406,7 +2432,7 @@ export default function SemanticsPage() {
                               <TableCell className="text-center">{result.pymax?.toFixed(2) || "N/A"}</TableCell>
                               <TableCell className="text-center">{result.pc?.toFixed(2) || "N/A"}</TableCell>
                               <TableCell className="text-center">{result.pfr?.toFixed(2) || "N/A"}</TableCell>
-                              <TableCell className="text-center">{result.ppmax?.toFixed(2) || "N/A"}</TableCell>
+                              <TableCell className="text-center">{result.ppmax?.toFixed(2) || "N/A"} MPa/10</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -2660,7 +2686,7 @@ export default function SemanticsPage() {
                                           </div>
                                           <div className="bg-background/50 p-2 rounded border border-border/30">
                                             <span className="text-xs text-muted-foreground">Required Pressure</span>
-                                            <p className="font-medium">{recommendedPump.ppmax.toFixed(2)} MPa</p>
+                                            <p className="font-medium">{recommendedPump.ppmax.toFixed(2)} MPa/10</p>
                                           </div>
                                         </div>
                                       )}

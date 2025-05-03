@@ -13,15 +13,21 @@ import { SectionInput } from "@/utils/casingCalculations"
 import CasingResults from "@/components/casing-results"
 import HADResults from "@/components/had-results"
 import { useFileUpload } from "@/context/FileUploadContext"
+import { useWellType } from "@/context/WellTypeContext"
 import { cn } from "@/lib/utils"
 import { showToast } from "@/utils/toast-utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { HelpTooltip } from "@/components/ui/help-tooltip"
 import { Switch } from "@/components/ui/switch"
+import { useRouter } from "next/navigation"
 
 interface CasingCalculatorProps {}
 
 export default function CasingCalculator({}: CasingCalculatorProps) {
+  const router = useRouter();
+  // Get well type context
+  const { isFirstVisit } = useWellType();
+  
   // Use the file upload context for file state and results
   const { 
     casingFile, 
@@ -45,6 +51,13 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
   const [error, setError] = useState<string | null>(null);
   const [showInput, setShowInput] = useState(!casingResults || casingResults.length === 0);
 
+  // Redirect to mode selection page if this is the first visit
+  useEffect(() => {
+    if (isFirstVisit) {
+      router.push('/mode');
+    }
+  }, [isFirstVisit, router]);
+  
   // Update sectionInputs when iterations change
   useEffect(() => {
     const newCount = parseInt(iterations);

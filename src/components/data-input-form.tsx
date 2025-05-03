@@ -12,6 +12,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { motion } from "framer-motion"
 import { HelpTooltip } from "@/components/ui/help-tooltip"
+import { useWellType } from "@/context/WellTypeContext"
 
 export default function DataInputForm() {
   const [formData, setFormData] = useState<Record<string, string>>({})
@@ -23,6 +24,8 @@ export default function DataInputForm() {
   const [displayFormattedDalpha, setDisplayFormattedDalpha] = useState(true)
   // Track the displayed dα value separately
   const [displayedDalphaValue, setDisplayedDalphaValue] = useState('')
+  // Get the well type from context
+  const { wellType } = useWellType()
 
   // Load saved data on component mount
   useEffect(() => {
@@ -46,6 +49,14 @@ export default function DataInputForm() {
                 console.log(`Migrated WOB value from ${data[key]} to ${migratedData[key]}`);
               }
             }
+          }
+          
+          // For exploration wells, set γ values to 1.08
+          if (wellType === 'exploration') {
+            // Set γ for all instances to 1.08
+            migratedData['γ_1'] = '1.08';
+            migratedData['γ_2'] = '1.08';
+            migratedData['γ_3'] = '1.08';
           }
           
           setFormData(migratedData);
@@ -73,7 +84,7 @@ export default function DataInputForm() {
     }
 
     loadSavedData()
-  }, [])
+  }, [wellType])
 
   const handleInputChange = (field: string, value: string) => {
     // Special handling for dα
@@ -151,6 +162,16 @@ export default function DataInputForm() {
   const saveData = async () => {
     setIsLoading(true)
     try {
+      // For exploration wells, ensure γ is always 1.08
+      if (wellType === 'exploration') {
+        setFormData(prev => ({
+          ...prev,
+          'γ_1': '1.08',
+          'γ_2': '1.08',
+          'γ_3': '1.08'
+        }));
+      }
+      
       // Save to localStorage instead of API
       localStorage.setItem('wellsAnalyzerData', JSON.stringify(formData));
       
@@ -299,7 +320,10 @@ export default function DataInputForm() {
   }
 
   const renderDrillingParameters = () => {
-    const fields = ["WOB", "C", "P", "γ", "Hc"]
+    // Filter out γ if we're in exploration mode
+    const fields = wellType === 'exploration' 
+      ? ["WOB", "C", "P", "Hc"] 
+      : ["WOB", "C", "P", "γ", "Hc"];
     
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -354,6 +378,7 @@ export default function DataInputForm() {
                   value={formData[`${field}_1`] || ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSingleInputChange(field, e.target.value)}
                   className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
+                  disabled={wellType === 'exploration' && field === 'γ'}
                 />
               </div>
             ) : (
@@ -367,9 +392,10 @@ export default function DataInputForm() {
                     <Input
                       id={`${field}_${instance}`}
                       placeholder={field === "WOB" ? "Enter WOB in tons" : `Enter ${field} (${instance})`}
-                      value={formData[`${field}_${instance}`] || ''}
+                      value={wellType === 'exploration' && field === 'γ' ? '1.08' : (formData[`${field}_${instance}`] || '')}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${instance}`, e.target.value)}
                       className={`focus:ring-1 focus:ring-primary bg-background/80 border-border ${field === "WOB" ? "font-medium" : ""}`}
+                      disabled={wellType === 'exploration' && field === 'γ'}
                     />
                   </div>
                 ))}
@@ -377,6 +403,30 @@ export default function DataInputForm() {
             )}
           </div>
         ))}
+        
+        {/* Add the fixed gamma field for exploration well type */}
+        {wellType === 'exploration' && (
+          <div className="space-y-3 bg-background/70 p-4 rounded-lg border border-border/50">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Label className="text-base font-medium text-primary">
+                  γ (Fixed)
+                </Label>
+                <HelpTooltip text="Specific weight (fixed at 1.08 for exploration wells)" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">
+                Fixed value for exploration wells
+              </Label>
+              <Input
+                value="1.08"
+                disabled
+                className="focus:ring-1 bg-muted border-border opacity-80"
+              />
+            </div>
+          </div>
+        )}
       </div>
     )
   }

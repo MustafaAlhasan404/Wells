@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
 import { FileUploadProvider } from "@/context/FileUploadContext";
+import { WellTypeProvider } from "@/context/WellTypeContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,12 +27,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <FileUploadProvider>
-            <main className="min-h-screen flex flex-col">
-              {children}
-            </main>
-            <Toaster position="top-right" closeButton richColors />
-          </FileUploadProvider>
+          <WellTypeProvider>
+            <FileUploadProvider>
+              <main className="min-h-screen flex flex-col">
+                {children}
+              </main>
+              <Toaster position="top-right" closeButton richColors />
+            </FileUploadProvider>
+          </WellTypeProvider>
         </ThemeProvider>
       </body>
     </html>
