@@ -77,6 +77,7 @@ export interface HADData {
   tensileStrength: number;
   unitWeight: number;
   internalDiameter?: number; // Internal diameter for this row
+  wallThickness?: number;    // Wall thickness in mm from Excel
   depth?: number; // Optional depth for Surface Section
   L1?: number;    // Length of section 1
   L2?: number;    // Length of section 2
@@ -113,6 +114,7 @@ export interface AdditionalInfo {
   tensileStrength: number;
   unitWeight: number;
   internalDiameter: number; // Internal diameter for this row
+  wallThickness?: number;  // Wall thickness in mm from Excel
 }
 
 /**

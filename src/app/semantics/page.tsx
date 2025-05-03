@@ -39,6 +39,7 @@ import { Slider } from "@/components/ui/slider"
 // import { useToast } from "@/components/ui/use-toast"
 import { calculateDim, HADResults } from "@/utils/casingCalculations";
 import { motion } from "framer-motion"
+import { useWellType } from "@/context/WellTypeContext";
 
 interface VcfResult {
   instance: number;
@@ -290,7 +291,7 @@ export default function SemanticsPage() {
   const [gammaC, setGammaC] = useState("");
   const [gammaW, setGammaW] = useState("1"); // Fixed at 1
   const [gammaFC, setGammaFC] = useState("");
-  const [gammaF, setGammaF] = useState("");
+  const [gammaF, setGammaF] = useState(""); // Will be set to 1.08 for exploration wells in useEffect
   const [tfcValue, setTfcValue] = useState("");
   const [tfdValue, setTfdValue] = useState("");
   const [tdValue, setTdValue] = useState("");
@@ -2127,8 +2128,23 @@ export default function SemanticsPage() {
     setTimeout(() => saveInputData(), 0);
   };
 
+  // Add wellType context
+  const { wellType } = useWellType();
+  
+  // Set fixed gammaF value for exploration wells on initial load and when wellType changes
+  useEffect(() => {
+    if (wellType === 'exploration') {
+      setGammaF("1.08");
+    }
+  }, [wellType]);
+  
   const updateGammaF = (value: string) => {
-    setGammaF(value);
+    // For exploration wells, gammaF should be fixed at 1.08
+    if (wellType === 'exploration') {
+      setGammaF("1.08");
+    } else {
+      setGammaF(value);
+    }
     // Auto-save after changing value
     setTimeout(() => saveInputData(), 0);
   };
@@ -2338,7 +2354,20 @@ export default function SemanticsPage() {
                           />
                         </div>
                         {renderInputField('gammaFC', 'γfc', gammaFC, updateGammaFC)}
-                        {renderInputField('gammaF', 'γf', gammaF, updateGammaF)}
+                        {wellType === 'exploration' ? (
+  <div className="space-y-2">
+    <Label htmlFor="gamma-f" className="text-sm font-medium">γf (fixed at 1.08 for exploration wells)</Label>
+    <Input
+      id="gamma-f"
+      placeholder="Enter γf"
+      value="1.08"
+      className="focus:ring-1 focus:ring-primary bg-background/80 border-border text-muted-foreground"
+      disabled={true}
+    />
+  </div>
+) : (
+  renderInputField('gammaF', 'γf', gammaF, updateGammaF)
+)}
                       </div>
 
                       {renderInputField('h', 'h (height parameter)', hValue, updateHValue, 'm')}

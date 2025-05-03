@@ -377,6 +377,21 @@ export async function POST(req: NextRequest) {
                   internalDiameter: internalDiameter
                 };
                 
+                // Add wall thickness from the extracted data if available
+                if (row.wallThickness !== undefined) {
+                  hadData.wallThickness = row.wallThickness;
+                  console.log(`Using wall thickness from Excel: ${row.wallThickness} mm for HAD data`);
+                } 
+                // If wall thickness isn't in the extracted data but we have both internal and external diameters,
+                // calculate it
+                else if (internalDiameter && atHeadValue) {
+                  const calculatedWallThickness = (atHeadValue - internalDiameter) / 2;
+                  if (!isNaN(calculatedWallThickness) && calculatedWallThickness > 0) {
+                    hadData.wallThickness = calculatedWallThickness;
+                    console.log(`Using calculated wall thickness: ${calculatedWallThickness.toFixed(2)} mm for HAD data`);
+                  }
+                }
+                
                 // For Surface Section, cap HAD at inputted depth
                 if (sectionName === "Surface Section") {
                   hadData.depth = depth;

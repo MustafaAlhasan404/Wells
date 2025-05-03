@@ -1054,67 +1054,10 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Section</th>
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Metal Grade</th>
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Max Length (Lmax)</th>
-                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Wall Thickness</th>
                     </tr>
                   </thead>
                   <tbody>
                     {calculations.map((calc, index) => {
-                      // Find corresponding casing result to get wall thickness
-                      let wallThickness = "-";
-                      
-                      try {
-                        if (casingResults && casingResults.length > 0) {
-                          // Find matching section
-                          const matchingCasing = casingResults.find(result => 
-                            result.section.toLowerCase().includes(calc.section.toLowerCase()));
-                            
-                          if (matchingCasing) {
-                            // Extract DCSG value (external diameter)
-                            const dcsgMatch = matchingCasing.dcsg.match(/(\d+(?:\.\d+)?)/);
-                            const dcsgValue = dcsgMatch ? parseFloat(dcsgMatch[1]) : 0;
-                            
-                            // Get internal diameter 
-                            let internalDiameter = 0;
-                            
-                            // First try to get from HAD data for more accurate calculations
-                            if (hadData) {
-                              const sectionName = matchingCasing.section.toLowerCase().includes("production")
-                                ? "Production Section"
-                                : matchingCasing.section.toLowerCase().includes("surface")
-                                  ? "Surface Section"
-                                  : "Intermediate Section";
-                                  
-                              const sectionData = hadData[sectionName];
-                              if (sectionData) {
-                                const atHeadKeys = Object.keys(sectionData);
-                                if (atHeadKeys.length > 0) {
-                                  // Use the Dim calculation from HAD data
-                                  const hadRows = sectionData[atHeadKeys[0]];
-                                  // Note: we're using the imported calculateDim function here
-                                  const dimValue = parseFloat(calculateDim(hadRows));
-                                  if (!isNaN(dimValue) && dimValue > 0) {
-                                    internalDiameter = dimValue;
-                                  }
-                                }
-                              }
-                            }
-                            
-                            // Fallback to the internal diameter from casing results if HAD data wasn't available
-                            if (internalDiameter === 0 && matchingCasing.internalDiameter) {
-                              const idMatch = matchingCasing.internalDiameter.match(/(\d+(?:\.\d+)?)/);
-                              internalDiameter = idMatch ? parseFloat(idMatch[1]) : 0;
-                            }
-                            
-                            // Calculate wall thickness if we have both values
-                            if (dcsgValue > 0 && internalDiameter > 0) {
-                              wallThickness = ((dcsgValue - internalDiameter) / 2).toFixed(2) + " mm";
-                            }
-                          }
-                        }
-                      } catch (error) {
-                        console.error("Error calculating wall thickness:", error);
-                      }
-                      
                       // Convert Lmax to number to ensure toFixed works
                       const lmaxValue = typeof calc.Lmax === 'number' ? calc.Lmax : Number(calc.Lmax);
                       
@@ -1123,7 +1066,6 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                           <td className="px-4 py-3">{formatSection(calc.section)}</td>
                           <td className="px-4 py-3 font-medium text-primary">{calc.drillPipeMetalGrade}</td>
                           <td className="px-4 py-3">{!isNaN(lmaxValue) ? lmaxValue.toFixed(2) : '0.00'} m</td>
-                          <td className="px-4 py-3">{wallThickness}</td>
                         </tr>
                       );
                     })}

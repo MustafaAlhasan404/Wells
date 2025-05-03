@@ -1,6 +1,6 @@
 import React from "react";
 import { EnhancedTable } from "@/components/ui/enhanced-table";
-import { HADResults, HADData, calculateDim, calculateWallThickness } from "@/utils/casingCalculations";
+import { HADResults, HADData, calculateDim } from "@/utils/casingCalculations";
 
 interface CasingResult {
   section: string;
@@ -168,8 +168,26 @@ const CasingResults: React.FC<CasingResultsProps> = ({ results, hadData }) => {
             const matchingResult = results.find(r => r.section === section);
             if (matchingResult) {
               const dcsgValue = extractNumericValue(matchingResult.dcsg);
-              const internalValue = extractNumericValue(matchingResult.internalDiameter);
               
+              // First try to get the wall thickness directly from HAD data
+              if (hadSectionData && hadSectionData.length > 0) {
+                const firstHadRow = hadSectionData[0];
+                
+                if (firstHadRow.wallThickness !== undefined) {
+                  // Use wall thickness from HAD data
+                  const wallThickness = firstHadRow.wallThickness;
+                  // Calculate Di = DE - 2*Wall Thickness
+                  const di = dcsgValue - (2 * wallThickness);
+                  return di.toFixed(2);
+                }
+                // If HAD data has internal diameter but no wall thickness
+                else if (firstHadRow.internalDiameter !== undefined && dcsgValue > 0) {
+                  return firstHadRow.internalDiameter.toFixed(2);
+                }
+              }
+              
+              // Fallback to calculating from internal diameter if HAD wall thickness is not available
+              const internalValue = extractNumericValue(matchingResult.internalDiameter);
               if (dcsgValue > 0 && internalValue > 0) {
                 // Calculate wall thickness: (DE - DI) / 2
                 const wallThickness = (dcsgValue - internalValue) / 2;
@@ -188,25 +206,12 @@ const CasingResults: React.FC<CasingResultsProps> = ({ results, hadData }) => {
     return "-";
   };
 
-  // Function to extract external diameter from dcsg
-  const getExternalDiameter = (section: string): number => {
-    if (!results) return 0;
-    
-    const matchingResult = results.find(r => r.section === section);
-    if (matchingResult && matchingResult.dcsg) {
-      const match = matchingResult.dcsg.match(/(\d+(?:\.\d+)?)/);
-      return match ? parseFloat(match[1]) : 0;
-    }
-    return 0;
-  };
-
   return (
     <EnhancedTable
-      headers={["Section", "Nearest Bit Size", "DCSG", "DCSG'", "Internal Diameter", "Dim", "Wall Thickness"]}
+      headers={["Section", "Nearest Bit Size", "DCSG", "DCSG'", "Internal Diameter", "Dim"]}
       rows={results.map(result => {
         let dim = "-";
         let internalDiameter = result.internalDiameter;
-        let wallThickness = "-";
         
         // Validate and potentially fix the DCSG' (atBody) value
         const validatedAtBody = validateAtBody(result);
@@ -236,35 +241,15 @@ const CasingResults: React.FC<CasingResultsProps> = ({ results, hadData }) => {
         // but not display the internal diameter
         const showInternalDiameter = !result.section.toLowerCase().includes("production");
         
-        // Calculate wall thickness and display it
-        const dcsgValue = extractNumericValue(result.dcsg);
-        const internalValue = dim !== "-" && !dim.includes("(Di)") 
-          ? parseFloat(dim)
-          : extractNumericValue(internalDiameter);
-        
-        // If a wall thickness was specified during input, use that value instead of calculating
-        if (result.specifiedWallThickness) {
-          wallThickness = result.specifiedWallThickness + " (manual)"; // Indicate it was manually specified
-        } else if (dcsgValue > 0 && internalValue > 0) {
-          const wallThicknessValue = (dcsgValue - internalValue) / 2;
-          wallThickness = wallThicknessValue.toFixed(2) + " mm";
-        }
-        
         return [
           result.section,
           result.nearestBitSize,
           result.dcsg,
-          validatedAtBody, // Use the validated DCSG' value
-          showInternalDiameter ? internalDiameter : "-", // Hide internal diameter for production
-          dim,
-          wallThickness // Add wall thickness to the display
+          validatedAtBody,
+          showInternalDiameter ? internalDiameter : "-",
+          dim
         ];
       })}
-      rounded={true}
-      highlightOnHover={true}
-      alternateRows={true}
-      showBorders={true}
-      className="shadow-sm"
     />
   );
 };

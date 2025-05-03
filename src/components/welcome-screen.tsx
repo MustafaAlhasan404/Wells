@@ -54,6 +54,10 @@ export function WelcomeScreen() {
               </li>
               <li className="flex items-start">
                 <span className="font-medium mr-2">•</span>
+                <span>Fixed γ value of 1.08 in Cementing</span>
+              </li>
+              <li className="flex items-start">
+                <span className="font-medium mr-2">•</span>
                 <span>Simplified design process</span>
               </li>
               <li className="flex items-start">

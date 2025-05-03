@@ -724,71 +724,31 @@ export async function findNearestBitSizeAndInternalDiameter(
       }
     }
     
-    // Special handling for formatted Excel files - check column positions
-    if (bitSizeCol === -1 || internalDiameterCol === -1) {
-      console.log("Trying to determine columns by common positions");
-      
-      if (data.length > 5) {
-        // In many templates, bit size might be in column 3-5 and ID in column 6-8
-        const potentialRows = data.slice(0, 5);
+    // Special case for the exact Excel format from the image (Wall Thickness in column G)
+    if (internalDiameterCol === -1) {
+      console.log("Trying special case detection for wall thickness in column G");
+      // Check for headers that might contain "wall thickness" or just "wall" in early rows
+      for (let rowIdx = 0; rowIdx < 10 && internalDiameterCol === -1; rowIdx++) {
+        const row = data[rowIdx];
+        if (!row || row.length < 7) continue;
         
-        for (const row of potentialRows) {
-          if (row && row.length >= 8) {
-            // Check for potential bit size column
-            if (bitSizeCol === -1) {
-              for (let i = 2; i <= 5; i++) {
-                if (i < row.length && row[i] !== null && row[i] !== undefined) {
-                  const cellValue = typeof row[i] === 'string' ? row[i].toLowerCase() : String(row[i]).toLowerCase();
-                  
-                  if (cellValue.includes('size') || cellValue.includes('diameter') || 
-                      cellValue.includes('hole') || cellValue.includes('bit')) {
-                    bitSizeCol = i;
-                    console.log(`Found likely bit size column at position ${i} with value: "${cellValue}"`);
-                    break;
-                  }
-                }
-              }
-            }
-            
-            // Check for potential internal diameter column
-            if (internalDiameterCol === -1) {
-              for (let i = 5; i <= 8; i++) {
-                if (i < row.length && row[i] !== null && row[i] !== undefined) {
-                  const cellValue = typeof row[i] === 'string' ? row[i].toLowerCase() : String(row[i]).toLowerCase();
-                  
-                  if (cellValue.includes('id') || cellValue.includes('internal') || 
-                      cellValue.includes('inner') || cellValue.includes('inside')) {
-                    internalDiameterCol = i;
-                    console.log(`Found likely internal diameter column at position ${i} with value: "${cellValue}"`);
-                    break;
-                  }
-                }
-              }
-            }
-            
-            if (bitSizeCol !== -1 && internalDiameterCol !== -1) {
-              break;
-            }
+        const cellG = row[6]; // Column G is index 6 (0-based)
+        if (cellG) {
+          const cellText = typeof cellG === 'string' ? cellG.toLowerCase() : String(cellG).toLowerCase();
+          if (cellText.includes('wall') || cellText.includes('thickness')) {
+            internalDiameterCol = 6;
+            console.log(`Special case: Found wall thickness in column G (index 6) with text: "${cellText}"`);
+            break;
           }
         }
       }
     }
     
-    // Last resort: if we have more than 6 columns, try to use columns 3 and 6 
-    // These are common positions in standard templates
-    if ((bitSizeCol === -1 || internalDiameterCol === -1) && data.length > 0) {
-      const firstDataRow = data.find(row => row && row.length > 6);
-      if (firstDataRow) {
-        if (bitSizeCol === -1) {
-          bitSizeCol = 3; // Common position for bit size
-          console.log(`Last resort: Using column 3 for bit size`);
-        }
-        
-        if (internalDiameterCol === -1) {
-          internalDiameterCol = 6; // Common position for internal diameter
-          console.log(`Last resort: Using column 6 for internal diameter`);
-        }
-      }
+    // As a last resort, if we still haven't found the wall thickness column but found other columns,
+    // try to use column G as wall thickness column
+    if (internalDiameterCol === -1 && bitSizeCol !== -1) {
+      internalDiameterCol = 6; // Column G
+      console.log("Last resort: Using column G (index 6) for wall thickness");
     }
     
     if (bitSizeCol === -1 || internalDiameterCol === -1) {
@@ -970,6 +930,7 @@ export async function extractAdditionalInfo(
     let tensileStrengthCol = -1;
     let unitWeightCol = -1;
     let internalDiameterCol = -1;
+    let wallThicknessCol = -1;
     
     // Find column indexes
     for (let rowIdx = 0; rowIdx < data.length; rowIdx++) {
@@ -978,32 +939,105 @@ export async function extractAdditionalInfo(
       
       const rowText = row.map(cell => typeof cell === 'string' ? cell.trim().toLowerCase() : String(cell).trim().toLowerCase());
       
+      // Log row for debugging
+      if (rowIdx < 10) {
+        console.log(`Row ${rowIdx} headers:`, rowText);
+      }
+      
       if (rowText.includes('at head')) {
         atHeadCol = rowText.indexOf('at head');
+        console.log('Found at_head column at index', atHeadCol);
       }
       if (rowText.includes('external pressure mpa')) {
         externalPressureCol = rowText.indexOf('external pressure mpa');
+        console.log('Found external pressure column at index', externalPressureCol);
       }
       if (rowText.includes('metal type')) {
         metalTypeCol = rowText.indexOf('metal type');
+        console.log('Found metal type column at index', metalTypeCol);
       }
       if (rowText.includes('tensile strength at body tonf')) {
         tensileStrengthCol = rowText.indexOf('tensile strength at body tonf');
+        console.log('Found tensile strength column at index', tensileStrengthCol);
       }
       if (rowText.includes('unit weight length lbs/ft')) {
         unitWeightCol = rowText.indexOf('unit weight length lbs/ft');
+        console.log('Found unit weight column at index', unitWeightCol);
       }
       if (rowText.includes('internal diameter')) {
         internalDiameterCol = rowText.indexOf('internal diameter');
+        console.log('Found internal diameter column at index', internalDiameterCol);
+      }
+      // Wall thickness column detection with improved logging
+      if (rowText.includes('wall thickness mm')) {
+        wallThicknessCol = rowText.indexOf('wall thickness mm');
+        console.log('Found wall thickness column at index', wallThicknessCol, 'with exact match: wall thickness mm');
+      }
+      // Add more variations for wall thickness column detection
+      else if (rowText.includes('wall thickness')) {
+        wallThicknessCol = rowText.indexOf('wall thickness');
+        console.log('Found wall thickness column at index', wallThicknessCol, 'with partial match: wall thickness');
+      }
+      else if (rowText.includes('thickness mm')) {
+        wallThicknessCol = rowText.indexOf('thickness mm');
+        console.log('Found wall thickness column at index', wallThicknessCol, 'with partial match: thickness mm');
+      }
+      else if (rowText.includes('wall') && rowText.some(cell => cell.includes('mm'))) {
+        // Look for a cell that contains "wall"
+        for (let i = 0; i < rowText.length; i++) {
+          if (rowText[i].includes('wall')) {
+            wallThicknessCol = i;
+            console.log('Found wall thickness column at index', wallThicknessCol, 'with term: wall');
+            break;
+          }
+        }
+      }
+      // Search for more generic variations
+      else {
+        // Try to find any column containing "wall" or "thickness"
+        for (let i = 0; i < rowText.length; i++) {
+          const cellText = rowText[i].toLowerCase();
+          if (cellText.includes('wall') || cellText.includes('thickness')) {
+            wallThicknessCol = i;
+            console.log('Found wall thickness column at index', wallThicknessCol, 'with text:', rowText[i]);
+            break;
+          }
+        }
       }
       
-      if (atHeadCol !== -1 && externalPressureCol !== -1 && metalTypeCol !== -1 && tensileStrengthCol !== -1 && unitWeightCol !== -1 && internalDiameterCol !== -1) {
+      // Special case for "Wall Thickness mm" in column G (index 6)
+      if (wallThicknessCol === -1 && rowText.length > 6) {
+        const colGText = rowText[6]; // Column G is index 6 (0-based)
+        if (colGText && (colGText.includes('wall') || colGText.includes('thickness'))) {
+          wallThicknessCol = 6;
+          console.log(`Special case: Found wall thickness column in column G (index 6) with text: "${colGText}"`);
+        }
+      }
+      
+      if (atHeadCol !== -1 && externalPressureCol !== -1 && metalTypeCol !== -1 && 
+          tensileStrengthCol !== -1 && unitWeightCol !== -1 && internalDiameterCol !== -1) {
+        console.log('Column detection summary:', {
+          atHeadCol,
+          externalPressureCol,
+          metalTypeCol,
+          tensileStrengthCol,
+          unitWeightCol,
+          internalDiameterCol,
+          wallThicknessCol
+        });
         break;
       }
     }
     
-    if (atHeadCol === -1 || externalPressureCol === -1 || metalTypeCol === -1 || tensileStrengthCol === -1 || unitWeightCol === -1 || internalDiameterCol === -1) {
+    if (atHeadCol === -1 || externalPressureCol === -1 || metalTypeCol === -1 || 
+        tensileStrengthCol === -1 || unitWeightCol === -1 || internalDiameterCol === -1) {
       return [];
+    }
+    
+    // Last resort fallback for wall thickness - if we still don't have it, use column G (index 6)
+    if (wallThicknessCol === -1) {
+      wallThicknessCol = 6; // Column G (index 6)
+      console.log("Fallback: Using column G (index 6) for wall thickness as last resort");
     }
     
     // Find matching rows
@@ -1026,14 +1060,56 @@ export async function extractAdditionalInfo(
           const unitWeight = parseFloat(row[unitWeightCol]);
           const internalDiameter = parseFloat(row[internalDiameterCol]);
           
-          matchingRows.push({
+          const additionalInfo: AdditionalInfo = {
             atHead: rowAtHead,
             externalPressure,
             metalType: rowMetalType,
             tensileStrength,
             unitWeight,
             internalDiameter
-          });
+          };
+          
+          // Add wall thickness if the column exists and has a valid value
+          if (wallThicknessCol !== -1 && row[wallThicknessCol] !== undefined) {
+            try {
+              // More flexible parsing for wall thickness
+              let wallThicknessValue = row[wallThicknessCol];
+              let wallThickness: number;
+              
+              if (typeof wallThicknessValue === 'number') {
+                wallThickness = wallThicknessValue;
+              } else {
+                // Try to extract numeric part from string
+                const numStr = String(wallThicknessValue).replace(/[^\d.]/g, '');
+                wallThickness = parseFloat(numStr);
+              }
+              
+              console.log(`Row ${rowIdx}: Parsed wall thickness value: ${wallThickness} from original: "${row[wallThicknessCol]}"`);
+              
+              if (!isNaN(wallThickness)) {
+                additionalInfo.wallThickness = wallThickness;
+              }
+            } catch (error) {
+              console.warn('Could not parse wall thickness value:', row[wallThicknessCol]);
+            }
+          } else {
+            // If wall thickness not found but we have internalDiameter and external diameter (atHead),
+            // calculate wall thickness
+            if (additionalInfo.internalDiameter && additionalInfo.atHead) {
+              try {
+                // Wall thickness = (OD - ID) / 2
+                const calculatedWallThickness = (additionalInfo.atHead - additionalInfo.internalDiameter) / 2;
+                if (!isNaN(calculatedWallThickness) && calculatedWallThickness > 0) {
+                  console.log(`Row ${rowIdx}: Calculated wall thickness: ${calculatedWallThickness.toFixed(2)} mm from OD: ${additionalInfo.atHead} mm and ID: ${additionalInfo.internalDiameter} mm`);
+                  additionalInfo.wallThickness = calculatedWallThickness;
+                }
+              } catch (error) {
+                console.warn('Error calculating wall thickness:', error);
+              }
+            }
+          }
+          
+          matchingRows.push(additionalInfo);
         }
       } catch (e) {
         continue;

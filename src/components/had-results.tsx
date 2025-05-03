@@ -9,7 +9,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { HADData, calculateLValues } from "@/utils/casingCalculations"
+import { HADData, calculateLValues, calculateWallThickness } from "@/utils/casingCalculations"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect } from "react"
 
@@ -19,9 +19,10 @@ interface HADResultsProps {
       [atHead: string]: HADData[];
     };
   };
+  casingResults?: any[]; // Add casingResults prop
 }
 
-const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
+const HADResults: React.FC<HADResultsProps> = ({ hadData, casingResults = [] }) => {
   const [processedData, setProcessedData] = useState<{
     [section: string]: {
       [atHead: string]: HADData[];
@@ -69,6 +70,27 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
     );
   }
 
+  // Helper function to get external diameter from casing results for a section
+  const getExternalDiameter = (sectionName: string, atHead?: string): number => {
+    if (!casingResults || casingResults.length === 0) return 0;
+    
+    // Extract section identifier (Production, Surface, Intermediate X)
+    const sectionIdentifier = sectionName.replace(' Section', '').trim();
+    
+    // Find matching casing result
+    const matchingResult = casingResults.find(result => 
+      result.section.toLowerCase().includes(sectionIdentifier.toLowerCase())
+    );
+    
+    if (matchingResult && matchingResult.dcsg) {
+      // Extract numeric value from DCSG string (e.g., "244.5 mm (9 5/8")")
+      const match = matchingResult.dcsg.match(/(\d+(?:\.\d+)?)/);
+      return match ? parseFloat(match[1]) : 0;
+    }
+    
+    return 0;
+  };
+
   return (
     <>
       <div className="flex justify-end mb-4">
@@ -105,6 +127,7 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                         <TableHead>Metal Type</TableHead>
                         <TableHead>Tensile Strength (MPa)</TableHead>
                         <TableHead>Unit Weight (kg/m)</TableHead>
+                        <TableHead>Wall Thickness (mm)</TableHead>
                         <TableHead>Lvalue (m)</TableHead>
                         <TableHead>y value</TableHead>
                         <TableHead>z value</TableHead>
@@ -112,144 +135,169 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData }) => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {data.slice().reverse().map((item, index, arr) => (
-                        <TableRow key={index}>
-                          <TableCell>{arr.length - index}</TableCell>
-                          <TableCell>{item.had.toFixed(2)}</TableCell>
-                          <TableCell>{item.externalPressure.toFixed(2)}</TableCell>
-                          <TableCell>{item.internalDiameter !== undefined ? item.internalDiameter.toFixed(2) : '-'}</TableCell>
-                          <TableCell>{item.metalType}</TableCell>
-                          <TableCell>{item.tensileStrength.toFixed(2)}</TableCell>
-                          <TableCell>{item.unitWeight.toFixed(2)}</TableCell>
-                          <TableCell>
-                            {item.L1 !== undefined ? item.L1.toFixed(2) :
-                             item.L2 !== undefined ? item.L2.toFixed(2) :
-                             item.L3 !== undefined ? item.L3.toFixed(2) :
-                             item.L4 !== undefined ? item.L4.toFixed(2) : '-'}
-                            {showDebug && 
-                              <div className="text-xs text-gray-500 mt-1">
-                                {item.L1 !== undefined ? 'L1' : 
-                                 item.L2 !== undefined ? 'L2' : 
-                                 item.L3 !== undefined ? 'L3' : 
-                                 item.L4 !== undefined ? 'L4' : '-'}
-                              </div>
-                            }
-                          </TableCell>
-                          <TableCell>
-                            {item.L1 !== undefined ? 
-                              (item.y1 !== undefined ? item.y1.toFixed(2) : '-') : 
-                             item.L2 !== undefined ? 
-                              (item.y2 !== undefined ? item.y2.toFixed(2) : '-') : 
-                             item.L3 !== undefined ? 
-                              (item.y3 !== undefined ? item.y3.toFixed(2) : '-') : 
-                             item.L4 !== undefined ? 
-                              (item.y4 !== undefined ? item.y4.toFixed(2) : '-') : 
-                             '-'}
-                            {showDebug && 
-                              <div className="text-xs text-gray-500 mt-1">
-                                {item.L1 !== undefined && item.y1 !== undefined ? 
-                                  `y₁ = (H-L₁)/HAD₂` : 
-                                 item.L2 !== undefined && item.y2 !== undefined ? 
-                                  `y₂ = (H-L₁-L₂)/HAD₃` : 
-                                 item.L3 !== undefined && item.y3 !== undefined ? 
-                                  `y₃ = (H-L₁-L₂-L₃)/HAD₄` : 
-                                 ''}
-                              </div>
-                            }
-                          </TableCell>
-                          <TableCell>
-                            {item.L1 !== undefined ? 
-                              (item.z1 !== undefined ? item.z1.toFixed(2) : '-') : 
-                             item.L2 !== undefined ? 
-                              (item.z2 !== undefined ? item.z2.toFixed(2) : '-') : 
-                             item.L3 !== undefined ? 
-                              (item.z3 !== undefined ? item.z3.toFixed(2) : '-') : 
-                             item.L4 !== undefined ? 
-                              (item.z4 !== undefined ? item.z4.toFixed(2) : '-') : 
-                             '-'}
-                            {showDebug && 
-                              <div className="text-xs text-gray-500 mt-1">
-                                {item.L1 !== undefined && item.z1 !== undefined ? 
-                                  `z₁ = (L₁×UW₁×1.488)/(TS₂×1000)` : 
-                                 item.L2 !== undefined && item.z2 !== undefined ? 
-                                  `z₂ = (L₁×UW₁×1.488 + L₂×UW₂×1.488)/(TS₃×1000)` : 
-                                 item.L3 !== undefined && item.z3 !== undefined ? 
-                                  `z₃ = (L₁×UW₁×1.488 + L₂×UW₂×1.488 + L₃×UW₃×1.488)/(TS₄×1000)` : 
-                                 ''}
-                              </div>
-                            }
-                          </TableCell>
-                          <TableCell>
-                            {(item.L1 !== undefined || item.L2 !== undefined) && item.conditionCheck !== undefined ? (
-                              <div className="flex items-center gap-2">
-                                {/* Calculate the objective value from displayed y and z values */}
-                                {item.L1 !== undefined && item.y1 !== undefined && item.z1 !== undefined ? (
-                                  <>
-                                    <span>{Math.pow(item.y1, 2) + item.y1 * item.z1 + Math.pow(item.z1, 2)}</span>
-                                    {Math.abs(Math.pow(item.y1, 2) + item.y1 * item.z1 + Math.pow(item.z1, 2) - 1) < 0.001 ? (
-                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                        Valid
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                        Invalid
-                                      </Badge>
-                                    )}
-                                  </>
-                                ) : item.L2 !== undefined && item.y2 !== undefined && item.z2 !== undefined ? (
-                                  <>
-                                    <span>{Math.pow(item.y2, 2) + item.y2 * item.z2 + Math.pow(item.z2, 2)}</span>
-                                    {Math.abs(Math.pow(item.y2, 2) + item.y2 * item.z2 + Math.pow(item.z2, 2) - 1) < 0.001 ? (
-                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                        Valid
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                        Invalid
-                                      </Badge>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <span>{item.conditionCheck}</span>
-                                    {item.conditionMet ? (
-                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                        Valid
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                        Invalid
-                                      </Badge>
-                                    )}
-                                  </>
-                                )}
-                                {showDebug && item.L1 !== undefined && 
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    y₁² + y₁×z₁ + z₁² = 1
-                                    {item.y1 !== undefined && item.z1 !== undefined && (
-                                      <div>
-                                        = {item.y1*item.y1} + {item.y1*item.z1} + {item.z1*item.z1}
-                                        = {Math.pow(item.y1, 2) + item.y1*item.z1 + Math.pow(item.z1, 2)}
-                                      </div>
-                                    )}
-                                  </div>
-                                }
-                                {showDebug && item.L2 !== undefined && 
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    y₂² + y₂×z₂ + z₂² = 1
-                                    {item.y2 !== undefined && item.z2 !== undefined && (
-                                      <div>
-                                        = {item.y2*item.y2} + {item.y2*item.z2} + {item.z2*item.z2}
-                                        = {Math.pow(item.y2, 2) + item.y2*item.z2 + Math.pow(item.z2, 2)}
-                                      </div>
-                                    )}
-                                  </div>
-                                }
-                              </div>
-                            ) : '-'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {data.slice().reverse().map((item, index, arr) => {
+                        // Always use wall thickness from data without fallback calculation
+                        let wallThickness = "-";
+                        
+                        if (item.wallThickness !== undefined) {
+                          wallThickness = item.wallThickness.toFixed(2) + " mm";
+                        } 
+                        // If wallThickness is not available but we have internalDiameter and can calculate from atHead
+                        else if (item.internalDiameter && parseFloat(atHead)) {
+                          // Calculate: Wall thickness = (OD - ID) / 2
+                          const calculated = (parseFloat(atHead) - item.internalDiameter) / 2;
+                          if (!isNaN(calculated) && calculated > 0) {
+                            wallThickness = calculated.toFixed(2) + " mm";
+                          }
+                        }
+                        
+                        return (
+                          <TableRow key={index}>
+                            <TableCell>{arr.length - index}</TableCell>
+                            <TableCell>{item.had.toFixed(2)}</TableCell>
+                            <TableCell>{item.externalPressure.toFixed(2)}</TableCell>
+                            <TableCell>{item.internalDiameter !== undefined ? item.internalDiameter.toFixed(2) : '-'}</TableCell>
+                            <TableCell>{item.metalType}</TableCell>
+                            <TableCell>{item.tensileStrength.toFixed(2)}</TableCell>
+                            <TableCell>{item.unitWeight.toFixed(2)}</TableCell>
+                            <TableCell>
+                              {wallThickness}
+                              {showDebug && item.wallThickness !== undefined &&
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Wall thickness from Excel: {item.wallThickness.toFixed(2)} mm
+                                </div>
+                              }
+                            </TableCell>
+                            <TableCell>
+                              {item.L1 !== undefined ? item.L1.toFixed(2) :
+                              item.L2 !== undefined ? item.L2.toFixed(2) :
+                              item.L3 !== undefined ? item.L3.toFixed(2) :
+                              item.L4 !== undefined ? item.L4.toFixed(2) : '-'}
+                              {showDebug && 
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {item.L1 !== undefined ? 'L1' : 
+                                  item.L2 !== undefined ? 'L2' : 
+                                  item.L3 !== undefined ? 'L3' : 
+                                  item.L4 !== undefined ? 'L4' : '-'}
+                                </div>
+                              }
+                            </TableCell>
+                            <TableCell>
+                              {item.L1 !== undefined ? 
+                                (item.y1 !== undefined ? item.y1.toFixed(2) : '-') : 
+                              item.L2 !== undefined ? 
+                                (item.y2 !== undefined ? item.y2.toFixed(2) : '-') : 
+                              item.L3 !== undefined ? 
+                                (item.y3 !== undefined ? item.y3.toFixed(2) : '-') : 
+                              item.L4 !== undefined ? 
+                                (item.y4 !== undefined ? item.y4.toFixed(2) : '-') : 
+                              '-'}
+                              {showDebug && 
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {item.L1 !== undefined && item.y1 !== undefined ? 
+                                    `y₁ = (H-L₁)/HAD₂` : 
+                                  item.L2 !== undefined && item.y2 !== undefined ? 
+                                    `y₂ = (H-L₁-L₂)/HAD₃` : 
+                                  item.L3 !== undefined && item.y3 !== undefined ? 
+                                    `y₃ = (H-L₁-L₂-L₃)/HAD₄` : 
+                                  ''}
+                                </div>
+                              }
+                            </TableCell>
+                            <TableCell>
+                              {item.L1 !== undefined ? 
+                                (item.z1 !== undefined ? item.z1.toFixed(2) : '-') : 
+                              item.L2 !== undefined ? 
+                                (item.z2 !== undefined ? item.z2.toFixed(2) : '-') : 
+                              item.L3 !== undefined ? 
+                                (item.z3 !== undefined ? item.z3.toFixed(2) : '-') : 
+                              item.L4 !== undefined ? 
+                                (item.z4 !== undefined ? item.z4.toFixed(2) : '-') : 
+                              '-'}
+                              {showDebug && 
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {item.L1 !== undefined && item.z1 !== undefined ? 
+                                    `z₁ = (L₁×UW₁×1.488)/(TS₂×1000)` : 
+                                  item.L2 !== undefined && item.z2 !== undefined ? 
+                                    `z₂ = (L₁×UW₁×1.488 + L₂×UW₂×1.488)/(TS₃×1000)` : 
+                                  item.L3 !== undefined && item.z3 !== undefined ? 
+                                    `z₃ = (L₁×UW₁×1.488 + L₂×UW₂×1.488 + L₃×UW₃×1.488)/(TS₄×1000)` : 
+                                  ''}
+                                </div>
+                              }
+                            </TableCell>
+                            <TableCell>
+                              {(item.L1 !== undefined || item.L2 !== undefined) && item.conditionCheck !== undefined ? (
+                                <div className="flex items-center gap-2">
+                                  {/* Calculate the objective value from displayed y and z values */}
+                                  {item.L1 !== undefined && item.y1 !== undefined && item.z1 !== undefined ? (
+                                    <>
+                                      <span>{Math.pow(item.y1, 2) + item.y1 * item.z1 + Math.pow(item.z1, 2)}</span>
+                                      {Math.abs(Math.pow(item.y1, 2) + item.y1 * item.z1 + Math.pow(item.z1, 2) - 1) < 0.001 ? (
+                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                          Valid
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                          Invalid
+                                        </Badge>
+                                      )}
+                                    </>
+                                  ) : item.L2 !== undefined && item.y2 !== undefined && item.z2 !== undefined ? (
+                                    <>
+                                      <span>{Math.pow(item.y2, 2) + item.y2 * item.z2 + Math.pow(item.z2, 2)}</span>
+                                      {Math.abs(Math.pow(item.y2, 2) + item.y2 * item.z2 + Math.pow(item.z2, 2) - 1) < 0.001 ? (
+                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                          Valid
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                          Invalid
+                                        </Badge>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>{item.conditionCheck}</span>
+                                      {item.conditionMet ? (
+                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                          Valid
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                          Invalid
+                                        </Badge>
+                                      )}
+                                    </>
+                                  )}
+                                  {showDebug && item.L1 !== undefined && 
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      y₁² + y₁×z₁ + z₁² = 1
+                                      {item.y1 !== undefined && item.z1 !== undefined && (
+                                        <div>
+                                          = {item.y1*item.y1} + {item.y1*item.z1} + {item.z1*item.z1}
+                                          = {Math.pow(item.y1, 2) + item.y1*item.z1 + Math.pow(item.z1, 2)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  }
+                                  {showDebug && item.L2 !== undefined && 
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      y₂² + y₂×z₂ + z₂² = 1
+                                      {item.y2 !== undefined && item.z2 !== undefined && (
+                                        <div>
+                                          = {item.y2*item.y2} + {item.y2*item.z2} + {item.z2*item.z2}
+                                          = {Math.pow(item.y2, 2) + item.y2*item.z2 + Math.pow(item.z2, 2)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  }
+                                </div>
+                              ) : '-'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
