@@ -1347,6 +1347,9 @@ export default function SemanticsPage() {
         // Use direct Gc calculation instead of gc_value
         const gcDirectCalculation = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
         
+        // Store this calculated value specifically for Gc to use consistently in all formulas
+        const calculatedGc = gcDirectCalculation;
+        
         // Add debugging for G'c calculation
         console.log(`[Instance ${instanceNumber}] G'c calculation debug:`, {
           instanceGc: `γc=${instanceGc}`,
@@ -1358,7 +1361,8 @@ export default function SemanticsPage() {
           gcPrimeFormula: `G'c = ${instanceK2} * ${gcDirectCalculation} * ${vcfValue}`,
         });
         
-        const gc_prime = Number(instanceK2) * gcDirectCalculation * Number(vcfValue);
+        // Use the calculated Gc value consistently
+const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
         
         // Calculate nc in sacks - always use the formula: nc = (G'c * 1000) / 50
         const nc = (Number(gc_prime) * 1000) / 50;
@@ -1388,7 +1392,7 @@ export default function SemanticsPage() {
         // Calculate Vw (water volume) using the new formula with calculated m
         // Only calculate if we have a valid calculated m value
         const vw = (calculatedM !== null && instanceGw > 0) ? 
-                  (instanceK3 * calculatedM * gcDirectCalculation * vcfValue) / instanceGw : null;
+                  (instanceK3 * calculatedM * calculatedGc * vcfValue) / instanceGw : null;
         
         // Calculate Vfd (volume of fluid displacement)
         // Using the formula: Vfd = (π/4) × di² × (H - h)
