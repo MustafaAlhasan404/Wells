@@ -666,20 +666,38 @@ export default function SemanticsPage() {
           for (let i = 1; i <= 3; i++) {
             // First try with the new Hc naming
             if (data[`Hc_${i}`] && !isNaN(parseFloat(data[`Hc_${i}`]))) {
-              formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
+              // Store Hc3 in index 0 and Hc1 in index 2 (swap Hc1 and Hc3)
+              if (i === 1) {
+                formationHcValues[2] = parseFloat(data[`Hc_${i}`]);
+              } else if (i === 3) {
+                formationHcValues[0] = parseFloat(data[`Hc_${i}`]);
+              } else {
+                formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
+              }
             } 
             // Then fallback to the old H naming for backward compatibility
             else if (data[`H_${i}`] && !isNaN(parseFloat(data[`H_${i}`]))) {
-              formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
+              // Store H3 in index 0 and H1 in index 2 (swap H1 and H3)
+              if (i === 1) {
+                formationHcValues[2] = parseFloat(data[`H_${i}`]);
+              } else if (i === 3) {
+                formationHcValues[0] = parseFloat(data[`H_${i}`]);
+              } else {
+                formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
+              }
             }
           }
           
           // If we have a single value (non-instance), use it for all instances as fallback
           if (formationHcValues.every(v => v === 0)) {
             if (data.Hc && !isNaN(parseFloat(data.Hc))) {
-              formationHcValues = [parseFloat(data.Hc), parseFloat(data.Hc), parseFloat(data.Hc)];
+              // If we're using a single value, apply it to all instances but in the swapped order (Hc3, Hc2, Hc1)
+              const singleHcValue = parseFloat(data.Hc);
+              formationHcValues = [singleHcValue, singleHcValue, singleHcValue];
             } else if (data.H && !isNaN(parseFloat(data.H))) {
-              formationHcValues = [parseFloat(data.H), parseFloat(data.H), parseFloat(data.H)];
+              // Same for H values
+              const singleHValue = parseFloat(data.H);
+              formationHcValues = [singleHValue, singleHValue, singleHValue];
             }
           }
         }
@@ -825,6 +843,7 @@ export default function SemanticsPage() {
         console.log('Db:', Db, 'de:', de, 'di:', dimValue);
         
         // Get instance-specific Hc value from the formation design
+        // With our swapped values, formationHcValues[0] is Hc3, formationHcValues[1] is Hc2, formationHcValues[2] is Hc1
         let instanceHc = formationHcValues[i] || formationHcValues[0]; // Use instance-specific value or fallback to first instance
         
         // Get instance-specific K1 value if available and not in single input mode
@@ -1002,20 +1021,38 @@ export default function SemanticsPage() {
           for (let i = 1; i <= 3; i++) {
             // First try with the new Hc naming
             if (data[`Hc_${i}`] && !isNaN(parseFloat(data[`Hc_${i}`]))) {
-              formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
+              // Store Hc3 in index 0 and Hc1 in index 2 (swap Hc1 and Hc3)
+              if (i === 1) {
+                formationHcValues[2] = parseFloat(data[`Hc_${i}`]);
+              } else if (i === 3) {
+                formationHcValues[0] = parseFloat(data[`Hc_${i}`]);
+              } else {
+                formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
+              }
             } 
             // Then fallback to the old H naming for backward compatibility
             else if (data[`H_${i}`] && !isNaN(parseFloat(data[`H_${i}`]))) {
-              formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
+              // Store H3 in index 0 and H1 in index 2 (swap H1 and H3)
+              if (i === 1) {
+                formationHcValues[2] = parseFloat(data[`H_${i}`]);
+              } else if (i === 3) {
+                formationHcValues[0] = parseFloat(data[`H_${i}`]);
+              } else {
+                formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
+              }
             }
           }
           
           // If we have a single value (non-instance), use it for all instances as fallback
           if (formationHcValues.every(v => v === 0)) {
             if (data.Hc && !isNaN(parseFloat(data.Hc))) {
-              formationHcValues = [parseFloat(data.Hc), parseFloat(data.Hc), parseFloat(data.Hc)];
+              // If we're using a single value, apply it to all instances but in the swapped order (Hc3, Hc2, Hc1)
+              const singleHcValue = parseFloat(data.Hc);
+              formationHcValues = [singleHcValue, singleHcValue, singleHcValue];
             } else if (data.H && !isNaN(parseFloat(data.H))) {
-              formationHcValues = [parseFloat(data.H), parseFloat(data.H), parseFloat(data.H)];
+              // Same for H values
+              const singleHValue = parseFloat(data.H);
+              formationHcValues = [singleHValue, singleHValue, singleHValue];
             }
           }
         }
@@ -1204,6 +1241,7 @@ export default function SemanticsPage() {
         
         // Get instance-specific values if available
         // Use the instance-specific Hc value from formationHcValues
+        // With our swapped values, formationHcValues[0] is Hc3, formationHcValues[1] is Hc2, formationHcValues[2] is Hc1
         let instanceHc = formationHcValues[instanceNumber - 1] || formationHcValues[0]; // Fallback to first instance if current one isn't available
         
         let instanceGc = gc;
@@ -1302,19 +1340,19 @@ export default function SemanticsPage() {
         // Instance 3 (Surface) should use the lowest H value
         let hValue;
         
-        // Try to get H from formation data - instance mapping is reversed for H values
-        // Instance 1 (Production) should use the highest H value
-        // Instance 3 (Surface) should use the lowest H value
-        // This approach gets H from the appropriate section based on reversed instance
+        // Try to get H from formation data 
+        // With our swapped values, formationHcValues[0] is Hc3, formationHcValues[1] is Hc2, formationHcValues[2] is Hc1
+        // Instance 1 (Production) should use Hc1 value
+        // Instance 3 (Surface) should use Hc3 value
         let correctH;
         if (instanceNumber === 1) {
-          // Production (instance 1) should use the H value from instance 3 or the highest available
-          correctH = formationHcValues[formationHcValues.length - 1] || instanceHc;
+          // Production (instance 1) should use Hc1 which is now at index 2
+          correctH = formationHcValues[2] || instanceHc;
         } else if (instanceNumber === 3) {
-          // Surface (instance 3) should use the H value from instance 1 or the lowest available
+          // Surface (instance 3) should use Hc3 which is now at index 0
           correctH = formationHcValues[0] || instanceHc;
         } else {
-          // For intermediate (instance 2), use the middle value or the current one
+          // For intermediate (instance 2), use Hc2 which is still at index 1
           correctH = formationHcValues[1] || instanceHc;
         }
         
