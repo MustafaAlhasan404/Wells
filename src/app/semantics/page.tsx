@@ -1291,8 +1291,35 @@ export default function SemanticsPage() {
           instanceM = parseFloat(instanceValues['m'][instanceNumber]);
         }
         
-        // Calculate Gc using instance-specific values - gc = (γc.γw)/(m.γc + γw)
+        // CRITICAL: Calculate Gc using correct formula - gc = (γc.γw)/(m.γc + γw)
+        // NOTE: Do not simplify this calculation to just use instanceGc directly,
+        // as this will cause incorrect results in the Vercel deployment.
+        // This is the correct calculation based on the formula.
         const gc_value = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
+        
+        // Debug warning to help catch potential issues in the future
+        console.warn(
+          `Gc calculation validation (instance ${instanceNumber}):`,
+          `γc=${instanceGc.toFixed(4)}`,
+          `γw=${instanceGw.toFixed(4)}`,
+          `m=${instanceM.toFixed(4)}`,
+          `correct Gc=${gc_value.toFixed(4)}`,
+          `DO NOT use γc directly as Gc!`
+        );
+        
+        // Add a safety check - if gc_value is approximately equal to instanceGc, something is wrong
+        // This should never happen with proper calculation
+        if (Math.abs(gc_value - instanceGc) < 0.001) {
+          console.error('CALCULATION ERROR: Gc value equals γc! This indicates the formula is not being applied correctly.');
+          // Add an error message to the UI
+          setResultsHTML(prev => prev + `
+            <div class="mt-4 p-4 bg-red-100 border border-red-500 rounded-md text-red-700">
+              <h3 class="font-bold">⚠️ Critical Calculation Error Detected</h3>
+              <p>The Gc calculation appears to be incorrect - it equals γc directly (${gc_value.toFixed(4)} ≈ ${instanceGc.toFixed(4)}).</p>
+              <p>This suggests a deployment issue with the calculation formula. Please contact the developer.</p>
+            </div>
+          `);
+        }
         
         // Get K2 value for this instance
         let instanceK2 = 0;
@@ -1466,6 +1493,7 @@ export default function SemanticsPage() {
                   <p class="font-medium">Gc Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
                     <p class="font-mono text-sm">Gc = (γc.γw)/(m.γc + γw)</p>
+                    <p class="text-xs text-red-500 mt-1">IMPORTANT: This formula must be used exactly as shown to ensure correct results.</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
                       <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
