@@ -1346,6 +1346,19 @@ export default function SemanticsPage() {
         // Calculate G'c using instance-specific values - G'c = K2.gc.Vfc
         // Use direct Gc calculation instead of gc_value
         const gcDirectCalculation = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
+        
+        // Add debugging for G'c calculation
+        console.log(`[Instance ${instanceNumber}] G'c calculation debug:`, {
+          instanceGc,
+          instanceGw,
+          instanceM,
+          instanceK2,
+          gcDirectCalculation,
+          gcFormula: `(${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw})`,
+          gcResult: gcDirectCalculation,
+          gcPrimeFormula: `${instanceK2} * ${gcDirectCalculation} * ${vcfValue}`,
+        });
+        
         const gc_prime = Number(instanceK2) * gcDirectCalculation * Number(vcfValue);
         
         // Calculate nc in sacks - always use the formula: nc = (G'c * 1000) / 50
@@ -1521,6 +1534,7 @@ export default function SemanticsPage() {
                   <p class="font-medium">G'c Calculation:</p>
                   <div class="mt-2 bg-background/60 p-3 rounded">
                     <p class="font-mono text-sm">G'c = K2.gc.Vfc</p>
+                    <!-- Debug: gcDirectCalculation = ${gcDirectCalculation}, instanceGc = ${instanceGc} -->
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>K2 = ${instanceK2.toFixed(4)}</li>
                       <li>K2.gc = ${instanceK2.toFixed(4)} × ${gcDirectCalculation.toFixed(4)} = ${(instanceK2 * gcDirectCalculation).toFixed(4)}</li>
@@ -1658,9 +1672,9 @@ export default function SemanticsPage() {
                       <li>K3 = ${instanceK3.toFixed(4)}</li>
                       <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
                       <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gc_value.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value * vcfValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gcDirectCalculation.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
                   </div>
