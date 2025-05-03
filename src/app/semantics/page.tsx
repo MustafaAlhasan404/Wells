@@ -1344,7 +1344,9 @@ export default function SemanticsPage() {
         }
         
         // Calculate G'c using instance-specific values - G'c = K2.gc.Vfc
-        const gc_prime = Number(instanceK2) * Number(gc_value) * Number(vcfValue);
+        // Use direct Gc calculation instead of gc_value
+        const gcDirectCalculation = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
+        const gc_prime = Number(instanceK2) * gcDirectCalculation * Number(vcfValue);
         
         // Calculate nc in sacks - always use the formula: nc = (G'c * 1000) / 50
         const nc = (Number(gc_prime) * 1000) / 50;
@@ -1374,7 +1376,7 @@ export default function SemanticsPage() {
         // Calculate Vw (water volume) using the new formula with calculated m
         // Only calculate if we have a valid calculated m value
         const vw = (calculatedM !== null && instanceGw > 0) ? 
-                  (instanceK3 * calculatedM * gc_value * vcfValue) / instanceGw : null;
+                  (instanceK3 * calculatedM * gcDirectCalculation * vcfValue) / instanceGw : null;
         
         // Calculate Vfd (volume of fluid displacement)
         // Using the formula: Vfd = (π/4) × di² × (H - h)
@@ -1521,8 +1523,8 @@ export default function SemanticsPage() {
                     <p class="font-mono text-sm">G'c = K2.gc.Vfc</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>K2 = ${instanceK2.toFixed(4)}</li>
-                      <li>K2.gc = ${instanceK2.toFixed(4)} × ${Number(gc_value).toFixed(4)} = ${Number(instanceK2 * gc_value).toFixed(4)}</li>
-                      <li>K2.gc.Vfc = ${Number(instanceK2 * gc_value).toFixed(4)} × ${vcfValue.toFixed(4)} = ${Number(gc_prime).toFixed(4)}</li>
+                      <li>K2.gc = ${instanceK2.toFixed(4)} × ${gcDirectCalculation.toFixed(4)} = ${(instanceK2 * gcDirectCalculation).toFixed(4)}</li>
+                      <li>K2.gc.Vfc = ${(instanceK2 * gcDirectCalculation).toFixed(4)} × ${vcfValue.toFixed(4)} = ${Number(gc_prime).toFixed(4)}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">G'c = ${Number(gc_prime).toFixed(4)}</p>
                   </div>
@@ -1548,9 +1550,9 @@ export default function SemanticsPage() {
                       <li>K3 = ${instanceK3.toFixed(4)}</li>
                       <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
                       <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gc_value.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value * vcfValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gc_value * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gcDirectCalculation.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
                   </div>
