@@ -1309,7 +1309,7 @@ export default function SemanticsPage() {
           denominator: (instanceM * instanceGc + instanceGw)
         });
         
-        // Calculate Gc with safeguards
+        // SIMPLIFIED AND FIXED Gc calculation
         let gc_value = 0;
         const numerator = Number(instanceGc) * Number(instanceGw);
         const denominator = (Number(instanceM) * Number(instanceGc)) + Number(instanceGw);
@@ -1321,52 +1321,17 @@ export default function SemanticsPage() {
           directCalculation: (Number(instanceGc) * Number(instanceGw)) / ((Number(instanceM) * Number(instanceGc)) + Number(instanceGw))
         });
         
+        // Simplified calculation with just basic validation
         if (denominator !== 0 && !isNaN(denominator) && instanceGc > 0 && instanceGw > 0 && instanceM > 0) {
-          // Apply the correct formula with validation
+          // Direct calculation without any additional checks
           gc_value = numerator / denominator;
-          
-          // Additional check - explicitly verify the calculation matches our expectation
-          const expectedGc = (Number(instanceGc) * Number(instanceGw)) / ((Number(instanceM) * Number(instanceGc)) + Number(instanceGw));
-          if (Math.abs(gc_value - expectedGc) > 0.0001) {
-            console.error(`[Instance ${instanceNumber}] Calculation mismatch - gc_value: ${gc_value}, expected: ${expectedGc}`);
-            gc_value = expectedGc; // Force to the expected value
-          }
-          
-          // Sanity check - if gc_value equals instanceGc, something is likely wrong
-          if (Math.abs(gc_value - instanceGc) < 0.0001) {
-            console.warn(`[Instance ${instanceNumber}] Warning: gc_value (${gc_value}) is suspiciously close to instanceGc (${instanceGc}). Rechecking calculation.`);
-            // Force recalculation with explicit values
-            gc_value = Number((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw));
-          }
+          console.log(`[Instance ${instanceNumber}] Basic Gc calculation: ${numerator} / ${denominator} = ${gc_value}`);
         } else {
           console.error(`[Instance ${instanceNumber}] Error: Invalid values for Gc calculation:`, {instanceGc, instanceGw, instanceM, denominator});
-          // Set a default that's clearly not just instanceGc to avoid confusion
           gc_value = 0;
         }
         
-        console.log(`[Instance ${instanceNumber}] Debug - After Gc calculation:`, {
-          gc_value,
-          formula: '(instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)',
-          expectedValue: instanceM > 0 ? (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw) : 'Invalid (m=0)'
-        });
-        
-        // Final check to ensure gc_value is never equal to instanceGc
-        if (Math.abs(gc_value - instanceGc) < 0.0001) {
-          console.error(`[Instance ${instanceNumber}] Critical Error: gc_value (${gc_value}) still equals instanceGc (${instanceGc}) after safeguards. Forcing recalculation.`);
-          
-          // Force different calculation approach with explicit operations
-          const num = Number(instanceGc) * Number(instanceGw);
-          const den = (Number(instanceM) * Number(instanceGc)) + Number(instanceGw);
-          
-          if (den !== 0) {
-            gc_value = num / den;
-            console.log(`[Instance ${instanceNumber}] Forced recalculation result:`, gc_value);
-          } else {
-            // If still problematic, set to zero for visibility of the issue
-            gc_value = 0;
-            console.error(`[Instance ${instanceNumber}] Division by zero in forced recalculation:`, {num, den});
-          }
-        }
+        console.log(`[Instance ${instanceNumber}] Debug - Final Gc value:`, gc_value);
         
         // Get K2 value for this instance
         let instanceK2 = 0;
