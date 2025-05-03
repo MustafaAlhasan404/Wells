@@ -1470,7 +1470,7 @@ export default function SemanticsPage() {
                       <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
                       <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
                       <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
-                      <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${gc_value.toFixed(4)}</li>
+                      <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)).toFixed(4)}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Gc = ${gc_value.toFixed(4)} tonf/m3</p>
                   </div>
