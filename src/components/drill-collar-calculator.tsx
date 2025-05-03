@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Minimize, Maximize, Download, Layers, FileDown, Check } from "lucide-react"
+import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Minimize, Maximize, Download, Layers, FileDown, Check, Bug } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
@@ -32,6 +32,64 @@ interface DrillCollarCalculation {
   drillPipeMetalGrade: string;
   Lmax: number;
   instance?: number;
+}
+
+// Define types for debugging data
+interface DebugCalculationData {
+  instance: number;
+  T: number;
+  Tc: number;
+  Tec: number;
+  tau: number;
+  eq: number;
+  C_new: number;
+  SegmaC: number;
+  Lmax: number;
+  // Additional variables
+  Lp?: number;
+  qp?: number;
+  Lhw?: number;
+  qhw?: number;
+  L0c?: number;
+  qc?: number;
+  b?: number;
+  Ap?: number;
+  Aip?: number;
+  P?: number;
+  K1?: number;
+  K2?: number;
+  K3?: number;
+  Np?: number;
+  NB?: number;
+  Mp?: number;
+  dα?: number;
+  γ?: number;
+  Dep?: number;
+  dec?: number;
+  Dhw?: number;
+  n?: number;
+  WOB?: number;
+  DB?: number;
+  availableGrades: string[];
+  availableStrengths: number[];
+  nearestMpi?: number;
+  numerator?: number;
+  denominator?: number;
+  sqrt_result?: number;
+  numerator_formula?: string;
+  denominator_formula?: string;
+  sqrt_result_formula?: string;
+  subtraction_formula?: string;
+  formulas: {
+    T: string;
+    Tc: string;
+    Tec: string;
+    Np: string;
+    NB: string;
+    tau: string;
+    eq: string;
+    C_new: string;
+  };
 }
 
 interface DrillCollarCalculatorProps {}
@@ -64,6 +122,8 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCalculated, setIsCalculated] = useState(false);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [debugData, setDebugData] = useState<DebugCalculationData[]>([]);
   
   // Get casingResults from the context
   const isCasingReady = casingResults && casingResults.length > 0;
@@ -374,6 +434,111 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       console.log("API Response:", data);
       console.log("Calculations:", data.calculations);
       
+      // Create debug calculation data from console logs included in API response
+      const debugCalcs: DebugCalculationData[] = [];
+      
+      // Store available metal grades and strengths
+      let availableGrades: string[] = [];
+      let availableStrengths: number[] = [];
+      
+      // Find metal grades info from debugLogs
+      const metalGradesInfo = data.debugLogs?.find((log: any) => log.type === 'metal_grades');
+      if (metalGradesInfo) {
+        availableGrades = metalGradesInfo.metalGrades || [];
+        availableStrengths = metalGradesInfo.tensileStrengths || [];
+        console.log("Found metal grades:", availableGrades);
+        console.log("Found tensile strengths:", availableStrengths);
+      }
+      
+      // Parse calculation data if available
+      if (data.calculations && data.calculations.length > 0) {
+        data.calculations.forEach((calc: any, index: number) => {
+          // Create a debug calculation object based on the instance
+          const instance = calc.instance || index + 1;
+          
+          // Extract formulas and values from console logs if they exist
+          const tData = data.debugLogs?.find((log: any) => 
+            log.type === 'T' && log.instance === instance);
+          
+          const tauData = data.debugLogs?.find((log: any) => 
+            log.type === 'tau' && log.instance === instance);
+            
+          const cNewData = data.debugLogs?.find((log: any) => 
+            log.type === 'C_new' && log.instance === instance);
+          
+          // Find metal grade selection info
+          const mpiSelection = data.debugLogs?.find((log: any) =>
+            log.type === 'mpi_selection' && log.instance === instance);
+          
+          const nearestResult = data.debugLogs?.find((log: any) =>
+            log.type === 'nearest_result');
+            
+          // Find the lmax calculation debug log
+          const lmaxCalc = data.debugLogs?.find((log: any) =>
+            log.type === 'lmax_calculation' && log.instance === instance);
+          
+          if (tData || tauData || cNewData) {
+            debugCalcs.push({
+              instance,
+              T: tData?.T || 0,
+              Tc: tData?.Tc || 0,
+              Tec: tData?.Tec || 0,
+              tau: tauData?.tau || 0,
+              eq: cNewData?.eq || 0,
+              C_new: cNewData?.C_new || 0,
+              SegmaC: parseFloat(calc.drillPipeMetalGrade.split(' ')[1]) || 0,
+              Lmax: parseFloat(calc.Lmax) || 0,
+              Lp: tData?.Lp,
+              qp: tData?.qp,
+              Lhw: tData?.Lhw,
+              qhw: tData?.qhw,
+              L0c: tData?.L0c,
+              qc: tData?.qc,
+              b: tData?.b,
+              Ap: tData?.Ap,
+              Aip: tData?.Aip,
+              P: tData?.P,
+              K1: tData?.K1,
+              K2: tData?.K2,
+              K3: tData?.K3,
+              Np: tauData?.Np,
+              NB: tauData?.NB,
+              Mp: tauData?.Mp,
+              dα: tauData?.dα,
+              γ: tauData?.γ,
+              Dep: tauData?.Dep,
+              dec: tauData?.dec,
+              Dhw: tauData?.Dhw,
+              n: tauData?.n,
+              WOB: tauData?.WOB,
+              DB: tauData?.DB,
+              availableGrades,
+              availableStrengths,
+              nearestMpi: mpiSelection?.nearestMpi,
+              numerator: lmaxCalc?.numerator,
+              denominator: lmaxCalc?.denominator,
+              sqrt_result: lmaxCalc?.sqrt_result,
+              numerator_formula: lmaxCalc?.numerator_formula,
+              denominator_formula: lmaxCalc?.denominator_formula,
+              sqrt_result_formula: lmaxCalc?.sqrt_result_formula,
+              subtraction_formula: lmaxCalc?.subtraction_formula,
+              formulas: {
+                T: tData?.T_formula || '',
+                Tc: tData?.Tc_formula || '',
+                Tec: tData?.Tec_formula || '',
+                Np: tauData?.Np_formula || '',
+                NB: tauData?.NB_formula || '',
+                tau: tauData?.tau_formula || '',
+                eq: cNewData?.eq_formula || '',
+                C_new: cNewData?.C_new_formula || ''
+              }
+            });
+          }
+        });
+      }
+      
+      setDebugData(debugCalcs);
+      
       // Ensure all results have valid section names
       const validatedResults = data.drillCollarResults.map((result: any, index: number) => {
         if (!result.section || result.section === "Unknown") {
@@ -423,6 +588,338 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     }
   };
   
+  // Function to render debug calculation data
+  const renderDebugInfo = () => {
+    if (!showDebugInfo || debugData.length === 0) {
+      return null;
+    }
+
+    // Extract findNearest debug logs (if any)
+    const findNearestLogs = debugData.map(calc => {
+      return `C_new: ${calc.C_new.toFixed(2)}, nearest to ${calc.availableStrengths?.join(', ')} => ${calc.nearestMpi}`;
+    }).join('\n');
+
+    return (
+      <div className="mt-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-5 w-1 bg-red-500 rounded-full"></div>
+            <h3 className="text-lg font-medium">Debug Information</h3>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Metal Grade Calculation Details</CardTitle>
+            <CardDescription>Showing the detailed equation steps for each section</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[500px]">
+              {debugData.map((calc, index) => (
+                <div key={index} className="p-4 border-b border-border/50 last:border-b-0">
+                  <h4 className="font-medium mb-2">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs
+                      ${calc.instance === 1 ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' : 
+                        calc.instance === 3 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' : 
+                        'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
+                      {calc.instance === 1 ? 'Production' : calc.instance === 3 ? 'Surface' : 'Intermediate'}
+                    </span>
+                  </h4>
+                  
+                  <div className="space-y-6 text-sm">
+                    {/* Metal Grades Section */}
+                    <div className="space-y-2 pb-4 border-b">
+                      <h5 className="font-medium">Available Metal Grades</h5>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="p-2 bg-muted/30 rounded text-xs">
+                          <p className="font-medium">Grades:</p>
+                          <p>{calc.availableGrades?.join(', ') || 'N/A'}</p>
+                        </div>
+                        <div className="p-2 bg-muted/30 rounded text-xs">
+                          <p className="font-medium">Strengths (MPa):</p>
+                          <p>{calc.availableStrengths?.join(', ') || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Variable Definitions Section */}
+                    <div className="space-y-2">
+                      <h5 className="font-medium border-b pb-1">Variable Values</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {calc.Lp !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">Lp:</p>
+                            <p className="font-mono">{calc.Lp?.toFixed(2)} m</p>
+                            <p className="text-xs text-muted-foreground">Length of drill pipe</p>
+                          </div>
+                        )}
+                        {calc.qp !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">qp:</p>
+                            <p className="font-mono">{calc.qp?.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Weight of drill pipe</p>
+                          </div>
+                        )}
+                        {calc.Lhw !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">Lhw:</p>
+                            <p className="font-mono">{calc.Lhw?.toFixed(2)} m</p>
+                            <p className="text-xs text-muted-foreground">Length of heavy-wall pipe</p>
+                          </div>
+                        )}
+                        {calc.qhw !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">qhw:</p>
+                            <p className="font-mono">{calc.qhw?.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Weight of heavy-wall pipe</p>
+                          </div>
+                        )}
+                        {calc.L0c !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">L0c:</p>
+                            <p className="font-mono">{calc.L0c?.toFixed(2)} m</p>
+                            <p className="text-xs text-muted-foreground">Length of drill collar</p>
+                          </div>
+                        )}
+                        {calc.qc !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">qc:</p>
+                            <p className="font-mono">{calc.qc?.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Weight of drill collar</p>
+                          </div>
+                        )}
+                        {calc.b !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">b:</p>
+                            <p className="font-mono">{calc.b?.toFixed(3)}</p>
+                            <p className="text-xs text-muted-foreground">Buoyancy parameter</p>
+                          </div>
+                        )}
+                        {calc.Ap !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">Ap:</p>
+                            <p className="font-mono">{calc.Ap?.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Cross-sectional area</p>
+                          </div>
+                        )}
+                        {calc.Aip !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">Aip:</p>
+                            <p className="font-mono">{calc.Aip?.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Internal area</p>
+                          </div>
+                        )}
+                        {calc.P !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">P:</p>
+                            <p className="font-mono">{calc.P?.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Pressure</p>
+                          </div>
+                        )}
+                        {calc.K1 !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">K1:</p>
+                            <p className="font-mono">{calc.K1?.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Correction factor</p>
+                          </div>
+                        )}
+                        {calc.K2 !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">K2:</p>
+                            <p className="font-mono">{calc.K2?.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Correction factor</p>
+                          </div>
+                        )}
+                        {calc.K3 !== undefined && (
+                          <div className="p-2 bg-muted/20 rounded">
+                            <p className="font-medium">K3:</p>
+                            <p className="font-mono">{calc.K3?.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">Correction factor</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* T Calculation */}
+                    <div className="space-y-2 border-t pt-3">
+                      <h5 className="font-medium">1. T Calculation (Tensile Force)</h5>
+                      <div className="p-3 bg-muted/30 rounded text-xs font-mono">
+                        <p className="mb-2">Equation: T = ((1.08 * Lp * qp + Lhw * qhw + L0c * qc) * b) / Ap</p>
+                        <p className="mb-2">Variables:</p>
+                        <ul className="list-disc pl-5 space-y-1 mb-2">
+                          <li>Lp (pipe length) = {calc.Lp?.toFixed(2) || 'N/A'} m</li>
+                          <li>qp (pipe weight) = {calc.qp?.toFixed(2) || 'N/A'}</li>
+                          <li>Lhw (heavy-wall length) = {calc.Lhw?.toFixed(2) || 'N/A'} m</li>
+                          <li>qhw (heavy-wall weight) = {calc.qhw?.toFixed(2) || 'N/A'}</li>
+                          <li>L0c (collar length) = {calc.L0c?.toFixed(5) || 'N/A'} m</li>
+                          <li>qc (collar weight) = {calc.qc?.toFixed(2) || 'N/A'}</li>
+                          <li>b (buoyancy coefficient) = {calc.b?.toFixed(3) || 'N/A'}</li>
+                          <li>Ap (cross-sectional area) = {calc.Ap?.toFixed(2) || 'N/A'}</li>
+                        </ul>
+                        <p className="mb-2">Applied Formula: {calc.formulas.T}</p>
+                        <p className="font-bold">Result (T): {calc.T.toFixed(4)}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Tc Calculation */}
+                    <div className="space-y-2">
+                      <h5 className="font-medium">2. Tc Calculation (Corrected Tensile Force)</h5>
+                      <div className="p-3 bg-muted/30 rounded text-xs font-mono">
+                        <p className="mb-2">Equation: Tc = T + P * (Aip / Ap)</p>
+                        <p className="mb-2">Variables:</p>
+                        <ul className="list-disc pl-5 space-y-1 mb-2">
+                          <li>T (tensile force) = {calc.T?.toFixed(4) || 'N/A'}</li>
+                          <li>P (pressure) = {calc.P?.toFixed(2) || 'N/A'}</li>
+                          <li>Aip (internal area) = {calc.Aip?.toFixed(2) || 'N/A'}</li>
+                          <li>Ap (cross-sectional area) = {calc.Ap?.toFixed(2) || 'N/A'}</li>
+                        </ul>
+                        <p className="mb-2">Applied Formula: {calc.formulas.Tc}</p>
+                        <p className="font-bold">Result (Tc): {calc.Tc.toFixed(4)}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Tec Calculation */}
+                    <div className="space-y-2">
+                      <h5 className="font-medium">3. Tec Calculation (Equivalent Tensile Force)</h5>
+                      <div className="p-3 bg-muted/30 rounded text-xs font-mono">
+                        <p className="mb-2">Equation: Tec = Tc * K1 * K2 * K3</p>
+                        <p className="mb-2">Variables:</p>
+                        <ul className="list-disc pl-5 space-y-1 mb-2">
+                          <li>Tc (corrected tensile) = {calc.Tc?.toFixed(4) || 'N/A'}</li>
+                          <li>K1 (correction factor) = {calc.K1?.toFixed(2) || 'N/A'}</li>
+                          <li>K2 (correction factor) = {calc.K2?.toFixed(2) || 'N/A'}</li>
+                          <li>K3 (correction factor) = {calc.K3?.toFixed(2) || 'N/A'}</li>
+                        </ul>
+                        <p className="mb-2">Applied Formula: {calc.formulas.Tec}</p>
+                        <p className="font-bold">Result (Tec): {calc.Tec.toFixed(4)}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Np & NB Calculation */}
+                    <div className="space-y-2">
+                      <h5 className="font-medium">4. Np & NB Calculation (Power Components)</h5>
+                      <div className="p-3 bg-muted/30 rounded text-xs font-mono">
+                        <p className="mb-2">Np Equation: Np = dα * γ * (Lp * Dep² + L0c * dec² + Lhw * Dhw²) * n^1.7</p>
+                        <p className="mb-2">NB Equation: NB = 3.2 * 10⁻² * (WOB^0.5) * (DB^1.75) * n</p>
+                        <p className="mb-2">Variables:</p>
+                        <ul className="list-disc pl-5 space-y-1 mb-2">
+                          <li>dα = {calc.dα?.toFixed(6) || 'N/A'}</li>
+                          <li>γ (gamma) = {calc.γ?.toFixed(2) || 'N/A'}</li>
+                          <li>Dep (pipe diameter) = {calc.Dep?.toFixed(3) || 'N/A'} m</li>
+                          <li>dec (collar diameter) = {calc.dec?.toFixed(3) || 'N/A'} m</li>
+                          <li>Dhw (heavy-wall diameter) = {calc.Dhw?.toFixed(3) || 'N/A'} m</li>
+                          <li>n (rotation speed) = {calc.n || 'N/A'} rpm</li>
+                          <li>WOB (weight on bit) = {calc.WOB?.toFixed(2) || 'N/A'}</li>
+                          <li>DB (bit diameter) = {calc.DB?.toFixed(4) || 'N/A'} m</li>
+                        </ul>
+                        <p>Applied Np Formula: {calc.formulas.Np}</p>
+                        <p>Np Result: {calc.Np?.toFixed(4) || 'N/A'}</p>
+                        <p className="mt-2">Applied NB Formula: {calc.formulas.NB}</p>
+                        <p>NB Result: {calc.NB?.toFixed(4) || 'N/A'}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Tau Calculation */}
+                    <div className="space-y-2">
+                      <h5 className="font-medium">5. Tau Calculation (Torque Factor)</h5>
+                      <div className="p-3 bg-muted/30 rounded text-xs font-mono">
+                        <p className="mb-2">Equation: tau = (30 * ((Np + NB) * 10³ / (π * n * Mp))) * 10⁻⁶</p>
+                        <p className="mb-2">Variables:</p>
+                        <ul className="list-disc pl-5 space-y-1 mb-2">
+                          <li>Np = {calc.Np?.toFixed(4) || 'N/A'}</li>
+                          <li>NB = {calc.NB?.toFixed(4) || 'N/A'}</li>
+                          <li>n (rotation speed) = {calc.n || 'N/A'} rpm</li>
+                          <li>Mp (torque parameter) = {calc.Mp?.toFixed(6) || 'N/A'}</li>
+                        </ul>
+                        <p className="mb-2">Applied Formula: {calc.formulas.tau}</p>
+                        <p className="font-bold">Result (tau): {calc.tau.toFixed(4)}</p>
+                      </div>
+                    </div>
+                    
+                    {/* C_new Calculation */}
+                    <div className="space-y-2">
+                      <h5 className="font-medium">6. C_new Calculation (Safety Factor)</h5>
+                      <div className="p-3 bg-muted/30 rounded text-xs font-mono">
+                        <p className="mb-2">Equivalent Stress Equation: eq = √((Tec*10⁻¹)² + 4*tau²)</p>
+                        <p className="mb-2">C_new Equation: C_new = eq * 1.5</p>
+                        <p className="mb-2">Variables:</p>
+                        <ul className="list-disc pl-5 space-y-1 mb-2">
+                          <li>Tec = {calc.Tec?.toFixed(4) || 'N/A'}</li>
+                          <li>tau = {calc.tau?.toFixed(4) || 'N/A'}</li>
+                        </ul>
+                        <p>Equivalent Stress Formula: {calc.formulas.eq}</p>
+                        <p>Equivalent Stress Result: {calc.eq.toFixed(4)}</p>
+                        <p className="mt-2">C_new Formula: {calc.formulas.C_new}</p>
+                        <p className="font-bold">C_new Result: {calc.C_new.toFixed(4)}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Metal Grade Selection */}
+                    <div className="space-y-2">
+                      <h5 className="font-medium">7. Metal Grade Selection</h5>
+                      <div className="p-3 bg-muted/30 rounded text-xs font-mono">
+                        <p className="mb-2">Process: Find nearest minimum tensile strength to C_new</p>
+                        <p className="mb-2">Variables:</p>
+                        <ul className="list-disc pl-5 space-y-1 mb-2">
+                          <li>C_new = {calc.C_new.toFixed(4)}</li>
+                          <li>Available strengths (MPa) = {calc.availableStrengths?.join(', ') || 'N/A'}</li>
+                          <li>Available grades = {calc.availableGrades?.join(', ') || 'N/A'}</li>
+                        </ul>
+                        <p className="mb-2 text-blue-600 dark:text-blue-400 font-medium">Selected MPa value (SegmaC): {calc.nearestMpi || 'N/A'}</p>
+                        <p className="font-bold">Selected Metal Grade: {calculations[index]?.drillPipeMetalGrade}</p>
+                        
+                        <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-sm">
+                          <p className="text-blue-700 dark:text-blue-300 font-medium">Important: The actual tensile strength ({calc.nearestMpi} MPa) is used in calculations, not the number from the grade name.</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Lmax Calculation */}
+                    <div className="space-y-2">
+                      <h5 className="font-medium">8. Lmax Calculation (Maximum Length)</h5>
+                      <div className="p-3 bg-muted/30 rounded text-xs font-mono">
+                        <p className="mb-2">Equation: Lmax = √(((SegmaC/1.5)² - 4*tau²)*10¹² / ((7.85-1.5)²*10⁸)) - ((L0c*qc + Lhw*qhw) / qp)</p>
+                        <p className="mb-2">Variables:</p>
+                        <ul className="list-disc pl-5 space-y-1 mb-2">
+                          <li>SegmaC = {calc.nearestMpi || 'N/A'} MPa</li>
+                          <li>tau = {calc.tau?.toFixed(4) || 'N/A'}</li>
+                          <li>L0c = {calc.L0c?.toFixed(5) || 'N/A'}</li>
+                          <li>qc = {calc.qc?.toFixed(2) || 'N/A'}</li>
+                          <li>Lhw = {calc.Lhw?.toFixed(2) || 'N/A'}</li>
+                          <li>qhw = {calc.qhw?.toFixed(2) || 'N/A'}</li>
+                          <li>qp = {calc.qp?.toFixed(2) || 'N/A'}</li>
+                        </ul>
+                        
+                        <div className="mt-3 border-t pt-3 space-y-2">
+                          <p className="font-medium">Step 1: Calculate numerator</p>
+                          <p className="text-xs">{calc.numerator_formula}</p>
+                          <p className="text-xs">= {calc.numerator?.toExponential(4) || 'N/A'}</p>
+                          
+                          <p className="font-medium mt-2">Step 2: Calculate denominator</p>
+                          <p className="text-xs">{calc.denominator_formula}</p>
+                          <p className="text-xs">= {calc.denominator?.toExponential(4) || 'N/A'}</p>
+                          
+                          <p className="font-medium mt-2">Step 3: Calculate square root</p>
+                          <p className="text-xs">{calc.sqrt_result_formula}</p>
+                          <p className="text-xs">= {calc.sqrt_result?.toFixed(2) || 'N/A'}</p>
+                          
+                          <p className="font-medium mt-2">Step 4: Subtract the ratio</p>
+                          <p className="text-xs">{calc.subtraction_formula}</p>
+                        </div>
+                        
+                        <p className="font-bold mt-3 pt-3 border-t">Result (Lmax): {calc.Lmax.toFixed(2)} m</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {!localDrillCollarResults.length ? (
@@ -533,9 +1030,21 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           
           {calculations.length > 0 && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-1 bg-primary rounded-full"></div>
-                <h3 className="text-lg font-medium">Metal Grade Results</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-5 w-1 bg-primary rounded-full"></div>
+                  <h3 className="text-lg font-medium">Metal Grade Results</h3>
+                </div>
+                
+                <Button 
+                  onClick={() => setShowDebugInfo(!showDebugInfo)} 
+                  variant="outline" 
+                  size="sm"
+                  className={`flex items-center gap-1.5 ${showDebugInfo ? 'bg-red-100 text-red-600' : ''}`}
+                >
+                  <Bug className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{showDebugInfo ? 'Hide Debug' : 'Show Debug'}</span>
+                </Button>
               </div>
               
               <div className="overflow-auto rounded-md border border-border/50 bg-background/80">
@@ -623,6 +1132,8 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
               </div>
             </div>
           )}
+          
+          {renderDebugInfo()}
         </motion.div>
       )}
     </div>

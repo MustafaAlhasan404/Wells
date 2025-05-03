@@ -130,9 +130,26 @@ export function findNearest(array: number[], value: number): number {
     return NaN;
   }
   
-  return validArray.reduce((prev, curr) => 
-    Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
-  );
+  // Log the input parameters for debugging
+  console.log(`findNearest called with value: ${value}, array: [${validArray.join(', ')}]`);
+  
+  // Sort the array in ascending order
+  const sortedArray = [...validArray].sort((a, b) => a - b);
+  
+  // Find values greater than or equal to the target
+  const valuesGreaterOrEqual = sortedArray.filter(item => item >= value);
+  
+  // If there are values greater than or equal to the target, return the smallest one
+  if (valuesGreaterOrEqual.length > 0) {
+    const result = valuesGreaterOrEqual[0];
+    console.log(`Found value >= ${value}: ${result}`);
+    return result;
+  }
+  
+  // If no value is greater than or equal, return the largest value in the array
+  const result = sortedArray[sortedArray.length - 1];
+  console.log(`No value >= ${value}, returning largest: ${result}`);
+  return result;
 }
 
 /**
@@ -275,15 +292,15 @@ export function calculateDrillCollarData(
           qc,
           b,
           Ap,
-          T_formula: `((1.08 * ${Lp} * ${qp} + ${Lhw} * ${qhw} + ${L0c} * ${qc}) * ${b}) / ${Ap}`,
-          T,
-          P,
           Aip,
-          Tc_formula: `${T} + ${P} * (${Aip} / ${Ap})`,
-          Tc,
+          P,
           K1,
           K2,
           K3,
+          T_formula: `((1.08 * ${Lp} * ${qp} + ${Lhw} * ${qhw} + ${L0c} * ${qc}) * ${b}) / ${Ap}`,
+          T,
+          Tc_formula: `${T} + ${P} * (${Aip} / ${Ap})`,
+          Tc,
           Tec_formula: `${Tc} * ${K1} * ${K2} * ${K3}`,
           Tec
         });
@@ -312,14 +329,17 @@ export function calculateDrillCollarData(
         console.log(`Instance ${i} - Tau calculation details:`, {
           dα,
           γ,
+          Lp,
           Dep,
+          L0c,
           dec,
+          Lhw,
           Dhw,
           n,
           Np_formula: `${dα} * ${γ} * (${Lp} * ${Dep}^2 + ${L0c} * ${dec}^2 + ${Lhw} * ${Dhw}^2) * ${n}^1.7`,
           Np,
-          DB,
           WOB,
+          DB,
           NB_formula: `3.2 * 10^-2 * (${WOB}^0.5) * (${DB}^1.75) * ${n}`,
           NB,
           Mp,
@@ -343,11 +363,16 @@ export function calculateDrillCollarData(
         
         console.log(`Instance ${i} - C_new: ${C_new}, Available strengths:`, drillPipeData.minTensileStrengthMpi);
         
+        // Log the actual tensile strength values to debug
+        console.log(`Available Metal Grades:`, {
+          metalGrades: drillPipeData.metalGrades,
+          tensileStrengths: drillPipeData.minTensileStrengthMpi
+        });
+        
         // Find nearest minimum tensile strength
         const nearestMpi = findNearest(drillPipeData.minTensileStrengthMpi, C_new);
-        console.log(`Instance ${i} - Nearest MPI: ${nearestMpi}`);
+        console.log(`Instance ${i} - Nearest MPI: ${nearestMpi}, C_new: ${C_new}`);
         
-        // Restore calculation-based approach instead of explicit assignment
         // Get the index of the nearest MPI value in the array
         const metalGradeIndex = drillPipeData.minTensileStrengthMpi.indexOf(nearestMpi);
         console.log(`Instance ${i} - Metal Grade Index: ${metalGradeIndex}`);
@@ -368,6 +393,25 @@ export function calculateDrillCollarData(
         const denominator = ((7.85 - 1.5)**2) * 10**8;
         const sqrt_result = Math.sqrt(numerator / denominator);
         const Lmax = sqrt_result - ((L0c*qc + Lhw*qhw) / qp);
+        
+        // Add debugging for Lmax calculation showing the actual MPa value used
+        console.log(`Instance ${i} - Lmax calculation details:`, {
+          SegmaC,
+          tau,
+          L0c,
+          qc,
+          Lhw,
+          qhw,
+          qp,
+          numerator_formula: `((${SegmaC}/1.5)^2 - 4 * ${tau}^2) * 10^12`,
+          numerator,
+          denominator_formula: `((7.85 - 1.5)^2) * 10^8`,
+          denominator,
+          sqrt_result_formula: `sqrt(${numerator} / ${denominator})`,
+          sqrt_result,
+          subtraction_formula: `${sqrt_result} - ((${L0c}*${qc} + ${Lhw}*${qhw}) / ${qp})`,
+          Lmax
+        });
         
         // Add to results
         results.push({

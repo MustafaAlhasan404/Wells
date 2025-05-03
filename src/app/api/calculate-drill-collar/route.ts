@@ -44,6 +44,13 @@ function findColumnName(data: any[], possibleNames: string[]): string | null {
   return null;
 }
 
+// Interface to capture debug logs
+interface DebugLog {
+  type: string;
+  instance?: number; // Make instance optional
+  [key: string]: any;
+}
+
 export const config = {
   api: {
     bodyParser: false,
@@ -51,6 +58,181 @@ export const config = {
 };
 
 export async function POST(req: NextRequest) {
+  // Array to store debug logs
+  const debugLogs: DebugLog[] = [];
+  
+  // Override console.log to capture calculation debug information
+  const originalConsoleLog = console.log;
+  console.log = function(...args: any[]) {
+    // Call the original console.log
+    originalConsoleLog(...args);
+    
+    // Capture all debug logs to help with diagnostics
+    if (typeof args[0] === 'string' && args[0].includes('Available Metal Grades')) {
+      try {
+        debugLogs.push({
+          type: 'metal_grades',
+          ...args[1]
+        });
+      } catch (error) {
+        originalConsoleLog('Error capturing metal grades:', error);
+      }
+    }
+    
+    // Capture findNearest debugging
+    if (typeof args[0] === 'string' && args[0].includes('findNearest called with value')) {
+      try {
+        debugLogs.push({
+          type: 'find_nearest',
+          message: args[0]
+        });
+      } catch (error) {
+        originalConsoleLog('Error capturing findNearest debug:', error);
+      }
+    }
+    
+    if (typeof args[0] === 'string' && args[0].includes('Final nearest value')) {
+      try {
+        debugLogs.push({
+          type: 'nearest_result',
+          message: args[0]
+        });
+      } catch (error) {
+        originalConsoleLog('Error capturing nearest result:', error);
+      }
+    }
+    
+    // Check if this is a debug log we want to capture
+    if (typeof args[0] === 'string') {
+      // Capture T calculation details
+      if (args[0].includes('T calculation details')) {
+        try {
+          const match = args[0].match(/Instance (\d+)/);
+          if (match && args[1]) {
+            const instance = parseInt(match[1]);
+            
+            // Direct extraction of all available properties
+            const enhancedData = { ...args[1] };
+            
+            debugLogs.push({
+              type: 'T',
+              instance,
+              ...enhancedData
+            });
+          }
+        } catch (error) {
+          originalConsoleLog('Error capturing T calculation:', error);
+        }
+      }
+      
+      // Capture Tau calculation details
+      if (args[0].includes('Tau calculation details')) {
+        try {
+          const match = args[0].match(/Instance (\d+)/);
+          if (match && args[1]) {
+            const instance = parseInt(match[1]);
+            
+            // Direct extraction of all available properties
+            const enhancedData = { ...args[1] };
+            
+            debugLogs.push({
+              type: 'tau',
+              instance,
+              ...enhancedData
+            });
+          }
+        } catch (error) {
+          originalConsoleLog('Error capturing Tau calculation:', error);
+        }
+      }
+      
+      // Capture C_new calculation details
+      if (args[0].includes('C_new calculation details')) {
+        try {
+          const match = args[0].match(/Instance (\d+)/);
+          if (match && args[1]) {
+            const instance = parseInt(match[1]);
+            debugLogs.push({
+              type: 'C_new',
+              instance,
+              ...args[1]
+            });
+          }
+        } catch (error) {
+          originalConsoleLog('Error capturing C_new calculation:', error);
+        }
+      }
+      
+      // Capture Nearest MPI and metal grade index
+      if (args[0].includes('Nearest MPI:')) {
+        try {
+          const match = args[0].match(/Instance (\d+)/);
+          if (match) {
+            const instance = parseInt(match[1]);
+            // Extract values using regex
+            const mpiMatch = args[0].match(/Nearest MPI: ([\d.]+)/);
+            const cNewMatch = args[0].match(/C_new: ([\d.]+)/);
+            
+            const nearestMpi = mpiMatch ? parseFloat(mpiMatch[1]) : null;
+            const cNew = cNewMatch ? parseFloat(cNewMatch[1]) : null;
+            
+            debugLogs.push({
+              type: 'mpi_selection',
+              instance,
+              nearestMpi,
+              cNew
+            });
+          }
+        } catch (error) {
+          originalConsoleLog('Error capturing Nearest MPI:', error);
+        }
+      }
+      
+      // Capture Metal Grade selection
+      if (args[0].includes('Metal Grade from calculation:')) {
+        try {
+          const match = args[0].match(/Instance (\d+)/);
+          if (match) {
+            const instance = parseInt(match[1]);
+            // Extract metal grade using regex
+            const gradeMatch = args[0].match(/Metal Grade from calculation: (.+)$/);
+            const metalGrade = gradeMatch ? gradeMatch[1] : null;
+            
+            debugLogs.push({
+              type: 'metal_grade_result',
+              instance,
+              metalGrade
+            });
+          }
+        } catch (error) {
+          originalConsoleLog('Error capturing Metal Grade:', error);
+        }
+      }
+      
+      // Capture Lmax calculation details
+      if (args[0].includes('Lmax calculation details')) {
+        try {
+          const match = args[0].match(/Instance (\d+)/);
+          if (match && args[1]) {
+            const instance = parseInt(match[1]);
+            debugLogs.push({
+              type: 'lmax_calculation',
+              instance,
+              ...args[1]
+            });
+          }
+        } catch (error) {
+          originalConsoleLog('Error capturing Lmax calculation:', error);
+        }
+      }
+    }
+  };
+
+  // Function to reset console.log to original
+  const resetConsoleLog = () => {
+    console.log = originalConsoleLog;
+  };
+
   try {
     console.log("API request received: Processing drill collar calculation");
     
@@ -127,6 +309,7 @@ export async function POST(req: NextRequest) {
       const { initialDcsg, atHeadValues, nearestBitSizes } = casingValues;
       
       if (!initialDcsg || !atHeadValues || !nearestBitSizes) {
+        resetConsoleLog();
         return NextResponse.json({ error: 'Invalid casing data provided' }, { status: 400 });
       }
       
@@ -139,6 +322,7 @@ export async function POST(req: NextRequest) {
       );
       
       if (drillCollarResults.length === 0) {
+        resetConsoleLog();
         return NextResponse.json({ error: 'Failed to calculate drill collar values' }, { status: 400 });
       }
       
@@ -423,7 +607,8 @@ export async function POST(req: NextRequest) {
         }
       }
       
-      // Return the results
+      // Return the results with debug logs
+      resetConsoleLog();
       return NextResponse.json({
         drillCollarResults,
         calculations,
@@ -547,20 +732,21 @@ export async function POST(req: NextRequest) {
             
             return allBValues;
           })()
-        }
+        },
+        // Include the captured debug logs
+        debugLogs
       });
       
     } catch (error: any) {
-      console.error("Error processing file:", error);
-      return NextResponse.json({ 
-        error: `Error processing file: ${error.message}` 
-      }, { status: 500 });
+      console.error('Error calculating drill collar data:', error);
+      resetConsoleLog();
+      return NextResponse.json({ error: error.message || 'Failed to calculate drill collar values' }, { status: 500 });
     }
     
   } catch (error: any) {
-    console.error("Server error:", error);
-    return NextResponse.json({ 
-      error: `Server error: ${error.message}` 
-    }, { status: 500 });
+    console.error('API Error:', error);
+    // Reset console.log in case of error
+    console.log = originalConsoleLog;
+    return NextResponse.json({ error: error.message || 'An unexpected error occurred' }, { status: 500 });
   }
 } 
