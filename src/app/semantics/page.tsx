@@ -1725,7 +1725,7 @@ const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
         return {
           instance: vcfResult.instance,
           vcf: vcfValue,
-          gc: (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw), // Direct calculation to ensure consistency
+          gc: calculatedGc, // Use calculatedGc instead of recalculating
           nc: nc,
           vw: vw,
           vfd: vfd,
