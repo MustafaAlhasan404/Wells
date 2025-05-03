@@ -1511,7 +1511,7 @@ export default function SemanticsPage() {
                       <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
                       <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${Number((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)).toFixed(4)}</li>
                     </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Gc = ${Number(gc_value).toFixed(4)} tonf/m3</p>
+                    <p class="font-mono text-sm mt-2 font-bold">Gc = ${((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)).toFixed(4)} tonf/m3</p>
                   </div>
                 </div>
                 
@@ -1669,7 +1669,7 @@ export default function SemanticsPage() {
                 <p class="text-center font-medium">Final Results:</p>
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2">
                   <div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">Gc = ${Number(gc_value).toFixed(4)}</span>
+                    <span class="font-mono text-sm">Gc = ${((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)).toFixed(4)}</span>
                   </div>
                   <div class="bg-primary/10 p-2 rounded border border-primary/30">
                     <span class="font-mono text-sm">G'c = ${gc_prime.toFixed(4)}</span>
@@ -1704,7 +1704,7 @@ export default function SemanticsPage() {
         return {
           instance: vcfResult.instance,
           vcf: vcfValue,
-          gc: gc_value,
+          gc: (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw), // Direct calculation to ensure consistency
           nc: nc,
           vw: vw,
           vfd: vfd,
