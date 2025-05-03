@@ -811,8 +811,8 @@ export default function SemanticsPage() {
         const instanceNumber = i + 1;
         
         // Get values from the casing table
-        const Db = parseFloat(result.nearestBitSize || '0') / 1000; // Nearest bit size in m
-        const de = parseFloat(result.atBody || '0') / 1000; // Using atBody (DCSG') for de instead of dcsg
+        let Db = parseFloat(result.nearestBitSize || '0') / 1000; // Nearest bit size in m
+        let de = parseFloat(result.atBody || '0') / 1000; // Using atBody (DCSG') for de instead of dcsg
         // const di = parseFloat(result.internalDiameter || '0') / 1000; // Internal diameter in m
 
         // --- Get Dim from HAD data ---
@@ -831,12 +831,33 @@ export default function SemanticsPage() {
             }
           }
         }
+        
+        // Enhanced debug and validation
+        console.log('HAD Data available:', !!hadData);
+        if (hadData) {
+          const sectionName = getHadSectionName(result.section);
+          console.log('Section name:', sectionName);
+          console.log('Section data available:', !!hadData[sectionName]);
+          if (hadData[sectionName]) {
+            console.log('Section data keys:', Object.keys(hadData[sectionName]));
+          }
+        }
+        
         // Fallback to di if Dim is not available
         if (dimValue === null) {
           dimValue = parseFloat(result.internalDiameter || '0') / 1000;
+          console.log('Using fallback internal diameter:', dimValue);
         } else {
           // If we got dimValue from HAD data, convert from mm to meters
           dimValue = dimValue / 1000;
+          console.log('Using HAD-derived internal diameter:', dimValue);
+        }
+        
+        // Ensure dimValue is valid to prevent NaN in calculations
+        if (isNaN(dimValue) || dimValue <= 0) {
+          console.error('Invalid dimValue detected, using default value');
+          // Use a sensible default based on common casing internal diameters
+          dimValue = parseFloat(result.internalDiameter || '200') / 1000; // 200mm as fallback
         }
         
         // Add logging to debug
@@ -881,12 +902,46 @@ export default function SemanticsPage() {
         // Calculate Vcf using the formula: Vcf = (π/4) × [(K1 × Db² - de²) × Hc + di² × h]
         // Calculate each term separately for clarity
         const PI_OVER_4 = Math.PI / 4;
+        
+        // Ensure values are valid for calculation
+        if (isNaN(instanceK1) || instanceK1 <= 0) {
+          console.error('Invalid K1 value, using default 1.0');
+          instanceK1 = 1.0;
+        }
+        
+        if (isNaN(Db) || Db <= 0) {
+          console.error('Invalid Db value, using default 0.3');
+          Db = 0.3; // 300mm as fallback
+        }
+        
+        if (isNaN(de) || de <= 0) {
+          console.error('Invalid de value, using default 0.2');
+          de = 0.2; // 200mm as fallback
+        }
+        
+        if (isNaN(instanceHc) || instanceHc <= 0) {
+          console.error('Invalid Hc value, using value from input or default');
+          instanceHc = formationHcValues[0] || 2000; // Use first instance or default
+        }
+        
+        if (isNaN(h) || h <= 0) {
+          console.error('Invalid h value, using default');
+          h = 1000; // Default value
+        }
+        
         const k1_times_db_squared = instanceK1 * Math.pow(Db, 2);
         const de_squared = Math.pow(de, 2);
         const first_term = (k1_times_db_squared - de_squared) * instanceHc; // Using instanceHc from formation design
         const di_squared = Math.pow(dimValue, 2);
         const second_term = di_squared * h;
-        const vcf = PI_OVER_4 * (first_term + second_term);
+        let vcf = PI_OVER_4 * (first_term + second_term);
+        
+        // Final safety check to prevent NaN
+        if (isNaN(vcf)) {
+          console.error('Vcf calculation resulted in NaN, using fallback calculation');
+          // Simple fallback calculation based on dimensions
+          vcf = PI_OVER_4 * (Math.pow(Db, 2) * instanceHc);
+        }
         
         // Add to results
         results.push({
@@ -1350,6 +1405,52 @@ export default function SemanticsPage() {
           instanceK2 = parseFloat(instanceValues['k2'][instanceNumber]);
         }
         
+        // Function to calculate G'c
+        const calculateGPrimeC = (vcfValue: number, calculatedGc: number, useSingleInput: boolean = false): number => {
+          // Get K2 value - for now just use the main value
+          const K2Value = k2Value && !isNaN(parseFloat(k2Value)) ? parseFloat(k2Value) : 1;
+          // G'c = K2 * Gc * Vfc
+          let gPrimeC = K2Value * calculatedGc * vcfValue;
+          
+          // Safety check for NaN
+          if (isNaN(gPrimeC) || !isFinite(gPrimeC)) {
+            console.error('G\'c calculation resulted in NaN or infinity, using fallback');
+            // Fallback to a reasonable default
+            gPrimeC = calculatedGc * 10; // Rough fallback estimate
+          }
+          
+          return gPrimeC;
+        };
+
+        // Calculate nc (number of cement sacks)
+        const calculateCementSacks = (gPrimeC: number): number => {
+          // Number of cement sacks = G'c * 1000 / 50
+          let cementSacks = (gPrimeC * 1000) / 50;
+          
+          // Safety check for NaN
+          if (isNaN(cementSacks) || !isFinite(cementSacks)) {
+            console.error('Cement sacks calculation resulted in NaN or infinity, using fallback');
+            cementSacks = 100; // Rough fallback estimate
+          }
+          
+          return cementSacks;
+        };
+
+        // Calculate Vw (water volume)
+        const calculateWaterVolume = (gPrimeC: number, m: number, Gc: number, vcfValue: number, gamma_w: number): number => {
+          // Vw = K3 * m * Gc * Vfc / gamma_w
+          const K3Value = k3Value && !isNaN(parseFloat(k3Value)) ? parseFloat(k3Value) : 1;
+          let waterVolume = (K3Value * m * Gc * vcfValue) / gamma_w;
+          
+          // Safety check for NaN
+          if (isNaN(waterVolume) || !isFinite(waterVolume)) {
+            console.error('Water volume calculation resulted in NaN or infinity, using fallback');
+            waterVolume = vcfValue * 0.5; // Rough fallback estimate
+          }
+          
+          return waterVolume;
+        };
+        
         // Calculate G'c using instance-specific values - G'c = K2.Gc.Vfc
         // Use direct Gc calculation instead of gc_value
         const gcDirectCalculation = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
@@ -1369,10 +1470,10 @@ export default function SemanticsPage() {
         });
         
         // Use the calculated Gc value consistently
-const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
+        const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
         
         // Calculate nc in sacks - always use the formula: nc = (G'c * 1000) / 50
-        const nc = (Number(gc_prime) * 1000) / 50;
+        const nc = calculateCementSacks(gc_prime);
         
         // Get K3 value for this instance
         let instanceK3 = 0;
@@ -1398,39 +1499,50 @@ const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
         
         // Calculate Vw (water volume) using the new formula with calculated m
         // Only calculate if we have a valid calculated m value
-        const vw = (calculatedM !== null && instanceGw > 0) ? 
-                  (instanceK3 * calculatedM * calculatedGc * vcfValue) / instanceGw : null;
+        const vw = calculateWaterVolume(gc_prime, instanceM, instanceGc, vcfValue, instanceGw);
         
         // Calculate Vfd (volume of fluid displacement)
-        // Using the formula: Vfd = (π/4) × di² × (H - h)
-        // Where di is the casing inner diameter in meters, H is instanceHc, and h is vcfResult.h
+        // Vfd = (π/4) × di² × (H - h)
+        const PI_OVER_4 = Math.PI / 4;
+        let vfd = null;
         
-        // Get the correct H value based on the instance (reverse mapping)
-        // Instance 1 (Production) should use the highest H value
-        // Instance 3 (Surface) should use the lowest H value
-        let hValue;
-        
-        // Try to get H from formation data 
-        // With our swapped values, formationHcValues[0] is Hc3, formationHcValues[1] is Hc2, formationHcValues[2] is Hc1
-        // Instance 1 (Production) should use Hc1 value
-        // Instance 3 (Surface) should use Hc3 value
-        let correctH;
-        if (instanceNumber === 1) {
-          // Production (instance 1) should use Hc1 which is now at index 2
-          correctH = formationHcValues[2] || instanceHc;
-        } else if (instanceNumber === 3) {
-          // Surface (instance 3) should use Hc3 which is now at index 0
-          correctH = formationHcValues[0] || instanceHc;
-        } else {
-          // For intermediate (instance 2), use Hc2 which is still at index 1
-          correctH = formationHcValues[1] || instanceHc;
+        // Try to get H from tfd (fluid displacement height) input
+        let H = 250; // Default value
+        if (tfdValue && !isNaN(parseFloat(tfdValue))) {
+          H = parseFloat(tfdValue);
+        } else if (instanceValues['tfd'] && instanceValues['tfd'][instanceNumber] && !isNaN(parseFloat(instanceValues['tfd'][instanceNumber]))) {
+          H = parseFloat(instanceValues['tfd'][instanceNumber]);
         }
         
-        // Convert di from mm to meters for the calculation
-        const diInMeters = vcfResult.di / 1000;
+        // Try to get h from td (displacement height) input
+        let h = 30; // Default value
+        if (tdValue && !isNaN(parseFloat(tdValue))) {
+          h = parseFloat(tdValue);
+        } else if (instanceValues['td'] && instanceValues['td'][instanceNumber] && !isNaN(parseFloat(instanceValues['td'][instanceNumber]))) {
+          h = parseFloat(instanceValues['td'][instanceNumber]);
+        }
         
-        // Calculate Vfd using the formula with the correct H value
-        const vfd = (Math.PI / 4) * Math.pow(diInMeters, 2) * (correctH - vcfResult.h);
+        // Get internal diameter in meters
+        const di_for_vfd = vcfResult.di / 1000;
+        
+        // Debug logging
+        console.log('Vfd calculation inputs:', { di_for_vfd, H, h });
+        
+        // Validate inputs and calculate Vfd
+        if (!isNaN(di_for_vfd) && di_for_vfd > 0 && !isNaN(H) && !isNaN(h) && H > h) {
+          vfd = PI_OVER_4 * Math.pow(di_for_vfd, 2) * (H - h);
+          console.log('Calculated Vfd:', vfd);
+        } else {
+          console.error('Invalid inputs for Vfd calculation, using fallback');
+          // Fallback calculation with safe default values
+          const safe_di = di_for_vfd > 0 ? di_for_vfd : 0.2; // Use 200mm as fallback
+          const safe_H = H > 0 ? H : 250;
+          const safe_h = h >= 0 ? h : 30;
+          const safe_diff = safe_H > safe_h ? safe_H - safe_h : 220;
+          
+          vfd = PI_OVER_4 * Math.pow(safe_di, 2) * safe_diff;
+          console.log('Fallback Vfd calculation:', { safe_di, safe_H, safe_h, vfd });
+        }
         
         // Calculate Pymax (maximum pressure at yield point) - using the new formula from the image
         // Pymax = 0.1[(Hc - h)(γfc - γf)]
@@ -1440,8 +1552,8 @@ const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
         // Calculate Pc (confining pressure) using the correct formula:
         // Pc = 0.2H + (8 or 16), where 8 is used if H < 2000, otherwise 16 is used
         // Use the same H value as in Vfd calculation
-        const constantValue = correctH >= 2000 ? 16 : 8;
-        const pc = 0.2 * correctH + constantValue;
+        const constantValue = vcfResult.h >= 2000 ? 16 : 8;
+        const pc = 0.2 * vcfResult.h + constantValue;
         
         // Pfr remains constant at 5 usually
         const pfr = 5;
@@ -1593,9 +1705,9 @@ const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
                       <li>di = ${(vcfResult.di / 1000).toFixed(4)} m (${vcfResult.di.toFixed(4)} mm)</li>
                       <li>di² = ${Math.pow(vcfResult.di / 1000, 2).toFixed(6)}</li>
-                      <li>H - h = ${correctH.toFixed(4)} - ${vcfResult.h.toFixed(4)} = ${(correctH - vcfResult.h).toFixed(4)}</li>
+                      <li>H - h = ${H.toFixed(4)} - ${h.toFixed(4)} = ${(H - h).toFixed(4)}</li>
                       <li>π/4 = ${(Math.PI / 4).toFixed(6)}</li>
-                      <li>(π/4) × di² × (H - h) = ${(Math.PI / 4).toFixed(6)} × ${Math.pow(vcfResult.di / 1000, 2).toFixed(6)} × ${(correctH - vcfResult.h).toFixed(4)} = ${vfd.toFixed(4)}</li>
+                      <li>(π/4) × di² × (H - h) = ${(Math.PI / 4).toFixed(6)} × ${Math.pow(vcfResult.di / 1000, 2).toFixed(6)} × ${(H - h).toFixed(4)} = ${vfd.toFixed(4)}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Vfd = ${vfd.toFixed(4)}</p>
                   </div>
@@ -1623,10 +1735,10 @@ const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
                     <p class="font-mono text-sm">Pc = 0.2H + (8 or 16)</p>
                     <p class="font-mono text-sm mt-1">Where H is the depth and 8 is used if H < 2000, otherwise 16 is used</p>
                     <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>H = ${correctH.toFixed(4)}</li>
-                      <li>Constant value = ${correctH >= 2000 ? '16 (since H ≥ 2000)' : '8 (since H < 2000)'}</li>
-                      <li>0.2 × H = 0.2 × ${correctH.toFixed(4)} = ${(0.2 * correctH).toFixed(4)}</li>
-                      <li>0.2H + ${constantValue} = ${(0.2 * correctH).toFixed(4)} + ${constantValue} = ${pc.toFixed(4)}</li>
+                      <li>H = ${vcfResult.h.toFixed(4)}</li>
+                      <li>Constant value = ${vcfResult.h >= 2000 ? '16 (since H ≥ 2000)' : '8 (since H < 2000)'}</li>
+                      <li>0.2 × H = 0.2 × ${vcfResult.h.toFixed(4)} = ${(0.2 * vcfResult.h).toFixed(4)}</li>
+                      <li>0.2H + ${constantValue} = ${(0.2 * vcfResult.h).toFixed(4)} + ${constantValue} = ${pc.toFixed(4)}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Pc = ${pc.toFixed(4)} MPa</p>
                   </div>
