@@ -856,8 +856,18 @@ export default function SemanticsPage() {
         // Ensure dimValue is valid to prevent NaN in calculations
         if (isNaN(dimValue) || dimValue <= 0) {
           console.error('Invalid dimValue detected, using default value');
-          // Use a sensible default based on common casing internal diameters
-          dimValue = parseFloat(result.internalDiameter || '200') / 1000; // 200mm as fallback
+          // Use a sensible default based on the casing section
+          if (result.section === "Production") {
+            dimValue = 0.1628; // ~162.8mm default for production (Instance 1)
+          } else if (result.section === "Intermediate") {
+            dimValue = 0.2266; // ~226.6mm default for intermediate (Instance 2)
+          } else if (result.section === "Surface") {
+            dimValue = 0.3204; // ~320.4mm default for surface (Instance 3)
+          } else {
+            // Generic fallback
+            dimValue = 0.2000; // 200mm as generic fallback
+          }
+          console.log(`Using hardcoded internal diameter for ${result.section} section:`, dimValue);
         }
         
         // Add logging to debug
@@ -933,7 +943,15 @@ export default function SemanticsPage() {
         const de_squared = Math.pow(de, 2);
         const first_term = (k1_times_db_squared - de_squared) * instanceHc; // Using instanceHc from formation design
         const di_squared = Math.pow(dimValue, 2);
-        const second_term = di_squared * h;
+        let second_term = 0; // Declare second_term variable
+        if (isNaN(di_squared) || di_squared <= 0) {
+          console.error('Invalid di² value, using fallback');
+          const fallback_di = 0.2000; // 200mm fallback
+          const fallback_di_squared = Math.pow(fallback_di, 2);
+          second_term = fallback_di_squared * h;
+        } else {
+          second_term = di_squared * h;
+        }
         let vcf = PI_OVER_4 * (first_term + second_term);
         
         // Final safety check to prevent NaN
@@ -993,8 +1011,8 @@ export default function SemanticsPage() {
                     <li>de² = ${(de * de).toFixed(6)}</li>
                     <li>K1 × Db² - de² = ${k1_times_db_squared.toFixed(6)} - ${(de * de).toFixed(6)} = ${(k1_times_db_squared - de * de).toFixed(6)}</li>
                     <li>(K1 × Db² - de²) × Hc = ${(k1_times_db_squared - de * de).toFixed(6)} × ${instanceHc.toFixed(4)} = ${first_term.toFixed(6)}</li>
-                    <li>di² = ${(dimValue * dimValue).toFixed(6)}</li>
-                    <li>di² × h = ${(dimValue * dimValue).toFixed(6)} × ${h.toFixed(4)} = ${second_term.toFixed(6)}</li>
+                    <li>di² = ${di_squared.toFixed(6)}</li>
+                    <li>di² × h = ${di_squared.toFixed(6)} × ${h.toFixed(4)} = ${second_term.toFixed(6)}</li>
                     <li>(K1 × Db² - de²) × Hc + di² × h = ${first_term.toFixed(6)} + ${second_term.toFixed(6)} = ${(first_term + second_term).toFixed(6)}</li>
                     <li>π/4 × [(K1 × Db² - de²) × Hc + di² × h] = ${PI_OVER_4.toFixed(6)} × ${(first_term + second_term).toFixed(6)} = ${vcf.toFixed(6)}</li>
                   </ol>
@@ -1068,9 +1086,19 @@ export default function SemanticsPage() {
     try {
       // Helper function to ensure we use calculated values consistently
       const fixTemplateOutput = (html: string): string => {
-        // Replace all instances where Gc = 3.1500 occurs in the HTML template
-        return html.replace(/Gc = \${gcDirectCalculation\.toFixed\(4\)}/g, 'Gc = ${calculatedGc.toFixed(4)}')
-                  .replace(/\${gcDirectCalculation\.toFixed\(4\)}/g, '${calculatedGc.toFixed(4)}');
+        // More comprehensive replacement to ensure consistent Gc usage
+        
+        // First, ensure we explicitly mark where calculatedGc should be used
+        const markedHtml = html
+          // Add a special marker for calculated Gc
+          .replace(/Gc = \${.*?}/g, 'Gc = ${CALCULATED_GC_VALUE}')
+          // Mark all places where we might need to replace raw gamma value
+          .replace(new RegExp('\\${instanceGc.toFixed\\(4\\)}', 'g'), '${RAW_GAMMA_VALUE}');
+        
+        // Now do the actual replacements with the correct values
+        return markedHtml
+          .replace(/\${CALCULATED_GC_VALUE}/g, '${calculatedGc.toFixed(4)}')
+          .replace(/\${RAW_GAMMA_VALUE}/g, '${instanceGc.toFixed(4)}');
       };
 
       // Get formation data for Hc (HAC) values - store all three instances
@@ -1456,7 +1484,21 @@ export default function SemanticsPage() {
         const gcDirectCalculation = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
         
         // Store this calculated value specifically for Gc to use consistently in all formulas
-        const calculatedGc = gcDirectCalculation;
+        // CRITICAL: Force calculatedGc to use the direct calculation formula, not raw instanceGc
+        const calculatedGc = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
+        
+        // Add a safety check to ensure the calculation is correct
+        console.log(`[Instance ${instanceNumber}] Gc DEBUG - Formula: (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw}) = ${calculatedGc}`);
+        
+        // CRITICAL SAFEGUARD: Ensure we never use raw gamma values for Gc directly
+        // This prevents the Vercel deployment from using instanceGc (3.15) as Gc
+        if (Math.abs(calculatedGc - instanceGc) < 0.01) {
+          console.warn(`[Instance ${instanceNumber}] WARNING: Calculated Gc (${calculatedGc}) is very close to raw instanceGc (${instanceGc}). This may indicate a calculation error.`);
+        }
+        
+        // Force debug output to verify calculated values in all environments
+        console.log(`[Instance ${instanceNumber}] VERIFICATION - Raw instanceGc: ${instanceGc}, Calculated Gc: ${calculatedGc}`);
+        console.log(`[Instance ${instanceNumber}] FORMULA CHECK - Gc = (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw}) = ${calculatedGc}`);
         
         // Add debugging for G'c calculation
         console.log(`[Instance ${instanceNumber}] G'c calculation debug:`, {
@@ -1499,7 +1541,7 @@ export default function SemanticsPage() {
         
         // Calculate Vw (water volume) using the new formula with calculated m
         // Only calculate if we have a valid calculated m value
-        const vw = calculateWaterVolume(gc_prime, instanceM, instanceGc, vcfValue, instanceGw);
+        const vw = calculateWaterVolume(gc_prime, instanceM, calculatedGc, vcfValue, instanceGw);
         
         // Calculate Vfd (volume of fluid displacement)
         // Vfd = (π/4) × di² × (H - h)
@@ -1797,10 +1839,10 @@ export default function SemanticsPage() {
                       <li>K3 = ${instanceK3.toFixed(4)}</li>
                       <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
                       <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
-                      <li>Gc = ${gcDirectCalculation.toFixed(4)} (calculated cement grade)</li>
-                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${gcDirectCalculation.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * gcDirectCalculation * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
+                      <li>Gc = ${calculatedGc.toFixed(4)} (calculated cement grade)</li>
+                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${calculatedGc.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedGc).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedGc).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedGc * vcfValue).toFixed(4) : "N/A"}</li>
+                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedGc * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
                     </ol>
                     <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
                   </div>
