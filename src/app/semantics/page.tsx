@@ -1326,6 +1326,11 @@ export default function SemanticsPage() {
           calculatedM = (instanceGw * (instanceGc - instanceGfc)) / (instanceGc * (instanceGfc - instanceGw));
         }
         
+        // If we have a valid calculated m value, use it instead of the input m value
+        if (calculatedM !== null) {
+          instanceM = calculatedM;
+        }
+        
         // Calculate Vw (water volume) using the new formula with calculated m
         // Only calculate if we have a valid calculated m value
         const vw = (calculatedM !== null && instanceGw > 0) ? 
@@ -1444,7 +1449,7 @@ export default function SemanticsPage() {
                     <span class="font-mono">Vcf = ${vcfValue.toFixed(4)}</span>
                   </div>
                   <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">m = ${instanceM.toFixed(4)}</span>
+                    <span class="font-mono">m = ${calculatedM !== null ? calculatedM.toFixed(4) : instanceM.toFixed(4)}</span>
                   </div>
                   ${instanceGfc ? `<div class="bg-background/50 p-2 rounded border border-border/30">
                     <span class="font-mono">γfc = ${instanceGfc.toFixed(4)}</span>
