@@ -1084,26 +1084,45 @@ export default function SemanticsPage() {
   // Function to calculate NewGcc/Gc' values
   const calculateGcGcInternal = () => {
     try {
+      // Add a global function to enforce precision consistently across environments
+      const toFixedPrecision = (value: number, decimals: number = 4): number => {
+        const factor = Math.pow(10, decimals);
+        return Math.round(value * factor) / factor;
+      };
+
       // CRITICAL FIX: Define a hard enforced calculation function
       const calculateCorrectNewGcc = (gc: number, gw: number, m: number): number => {
         if (gc <= 0 || gw <= 0 || m <= 0) {
           console.error("Invalid values for NewGcc calculation", {gc, gw, m});
           return 0;
         }
-        const numerator = gc * gw;
-        const denominator = (m * gc) + gw;
+        
+        // CRITICAL FIX: Force consistent precision by truncating to 4 decimal places
+        // This ensures both environments produce identical results
+        const precision = 10000; // 4 decimal places
+        
+        // Parse with fixed precision to ensure consistent results across environments
+        const parsedGc = Math.round(gc * precision) / precision;
+        const parsedGw = Math.round(gw * precision) / precision;
+        const parsedM = Math.round(m * precision) / precision;
+        
+        const numerator = parsedGc * parsedGw;
+        const denominator = (parsedM * parsedGc) + parsedGw;
+        
         if (denominator <= 0) {
           console.error("Denominator is zero or negative in NewGcc calculation", {numerator, denominator});
           return 0;
         }
-        const result = numerator / denominator;
+        
+        // Calculate with fixed precision
+        const result = Math.round((numerator / denominator) * precision) / precision;
         
         // Force log the result to help with debugging
-        console.log(`CRITICAL CALCULATION: NewGcc = (${gc} * ${gw}) / (${m} * ${gc} + ${gw}) = ${result}`);
+        console.log(`PRECISION-ENFORCED CALCULATION: NewGcc = (${parsedGc} * ${parsedGw}) / (${parsedM} * ${parsedGc} + ${parsedGw}) = ${result}`);
         
         // Safety check - if result is very close to raw gc, that's a warning sign
-        if (Math.abs(result - gc) < 0.01) {
-          console.warn(`WARNING: Calculated NewGcc (${result}) is very close to raw gc (${gc}). This is suspicious.`);
+        if (Math.abs(result - parsedGc) < 0.01) {
+          console.warn(`WARNING: Calculated NewGcc (${result}) is very close to raw gc (${parsedGc}). This is suspicious.`);
         }
         
         return result;
@@ -1113,7 +1132,10 @@ export default function SemanticsPage() {
       const getStrictNumericValue = (value: string | undefined, fallback: number): number => {
         if (!value) return fallback;
         const parsed = parseFloat(value);
-        return isNaN(parsed) ? fallback : parsed;
+        const precision = 10000; // 4 decimal places
+        
+        // Force consistent precision
+        return isNaN(parsed) ? fallback : Math.round(parsed * precision) / precision;
       };
 
       // Get formation data for Hc (HAC) values - store all three instances
@@ -1342,7 +1364,7 @@ export default function SemanticsPage() {
 
       // Calculate for each Vcf result
       const results: GcResult[] = vcfResults.map(vcfResult => {
-        const vcfValue = vcfResult.vcf;
+        const vcfValue = toFixedPrecision(vcfResult.vcf); // Apply fixed precision to vcf value
         const instanceNumber = vcfResult.instance;
         
         // Get instance-specific values if available
@@ -1356,6 +1378,16 @@ export default function SemanticsPage() {
         let instanceGf = getStrictNumericValue(instanceValues['gammaF']?.[instanceNumber], parseFloat(gammaF) || 1.08);
         let instanceK2 = getStrictNumericValue(instanceValues['k2']?.[instanceNumber], parseFloat(k2Value) || 1.0);
         let instanceK3 = getStrictNumericValue(instanceValues['k3']?.[instanceNumber], parseFloat(k3Value) || 1.0);
+        
+        // CONSISTENCY FIX: Apply fixed precision to all values
+        instanceHc = toFixedPrecision(instanceHc);
+        instanceGc = toFixedPrecision(instanceGc);
+        instanceGw = toFixedPrecision(instanceGw);
+        instanceM = toFixedPrecision(instanceM);
+        instanceGfc = toFixedPrecision(instanceGfc);
+        instanceGf = toFixedPrecision(instanceGf);
+        instanceK2 = toFixedPrecision(instanceK2);
+        instanceK3 = toFixedPrecision(instanceK3);
         
         // CRITICAL FIX: Calculate m first to ensure we have correct value
         // Calculate m using the formula: m = (γw × (γc - γfc)) / (γc × (γfc - γw))
