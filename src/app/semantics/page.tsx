@@ -21,7 +21,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { NavBar } from "@/components/nav-bar"
-import { Calculator, Eye, EyeOff, ArrowRight, RefreshCcw, AlertCircle, X, CheckCircle, Save, Info, AlertTriangle, Loader2, Maximize, Minimize, Settings, Layers, LoaderCircle } from "lucide-react"
+import { Calculator, Eye, EyeOff, ArrowRight, RefreshCcw, AlertCircle, X, CheckCircle, Save, Info, AlertTriangle, Loader2, Maximize, Minimize, Settings, Layers, LoaderCircle, FileText } from "lucide-react"
 import { toast } from "sonner"
 import { useFileUpload } from "@/context/FileUploadContext"
 import { cn } from "@/lib/utils"
@@ -33,7 +33,7 @@ import { showToast } from "@/utils/toast-utils"
 import { Switch } from "@/components/ui/switch"
 import { Copy } from "lucide-react"
 import { Select, SelectTrigger, SelectValue, SelectItem, SelectContent } from "@/components/ui/select"
-import { GanttChart, Trash2, Check, FileText, LayoutGrid, Table as TableIcon } from "lucide-react"
+import { GanttChart, Trash2, Check, LayoutGrid, Table as TableIcon } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Slider } from "@/components/ui/slider"
 // import { useToast } from "@/components/ui/use-toast"
@@ -2199,18 +2199,6 @@ export default function SemanticsPage() {
                   <span>Parameters</span>
                 </TabsTrigger>
                 <TabsTrigger 
-                  value="results" 
-                  className="flex items-center justify-center gap-2 h-full rounded-full
-                    data-[state=inactive]:bg-transparent
-                    data-[state=inactive]:text-zinc-400
-                    data-[state=inactive]:hover:text-zinc-300
-                    data-[state=active]:bg-zinc-800
-                    data-[state=active]:text-white"
-                >
-                  <Calculator className="h-4 w-4" />
-                  <span>Results</span>
-                </TabsTrigger>
-                <TabsTrigger 
                   value="equations" 
                   className="flex items-center justify-center gap-2 h-full rounded-full
                     data-[state=inactive]:bg-transparent
@@ -2221,6 +2209,18 @@ export default function SemanticsPage() {
                 >
                   <FileText className="h-4 w-4" />
                   <span>Equations</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="results" 
+                  className="flex items-center justify-center gap-2 h-full rounded-full
+                    data-[state=inactive]:bg-transparent
+                    data-[state=inactive]:text-zinc-400
+                    data-[state=inactive]:hover:text-zinc-300
+                    data-[state=active]:bg-zinc-800
+                    data-[state=active]:text-white"
+                >
+                  <Calculator className="h-4 w-4" />
+                  <span>Results</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="pump-selection" 
@@ -2348,6 +2348,335 @@ export default function SemanticsPage() {
                 </Card>
             </TabsContent>
 
+            <TabsContent value="equations" className="mt-0 space-y-4">
+              <Card className="border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm">
+                <CardHeader className="bg-muted/40 border-b border-border/40 flex items-center">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-lg sm:text-xl text-primary/90">Calculation Equations</CardTitle>
+                    </div>
+                    <CardDescription className="mt-1.5">
+                      Detailed equations used for semantic calculations
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[600px] w-full">
+                    <div className="p-6">
+                      <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="vcf">
+                          <AccordionTrigger className="text-lg font-medium text-primary hover:no-underline">
+                            Vcf (Volume of Cement Fluid)
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Formula:</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">Vcf = (π/4) × [(K1 × Db² - de²) × Hc + di² × h]</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">K1 = coefficient</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Hc = Height Above Cementation (m)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Db = Bit diameter (m)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">de = Casing outer diameter (m)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">di = Casing inner diameter (m)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">h = Height parameter (m)</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Application:</h4>
+                              <p className="text-sm">The equation is used to calculate the volume of cement fluid (Vcf) needed for well cementation. It considers the annular space between the borehole and casing, as well as the height above cementation.</p>
+                              <div className="mt-3 p-3 bg-background/60 rounded border border-border/30">
+                                <h5 className="font-medium text-sm mb-2">Calculation Example:</h5>
+                                <ol className="list-decimal list-inside space-y-2 text-sm">
+                                  <li>Calculate K1 × Db²</li>
+                                  <li>Calculate de²</li>
+                                  <li>Subtract de² from K1 × Db²</li>
+                                  <li>Multiply the result by Hc</li>
+                                  <li>Calculate di² × h</li>
+                                  <li>Add the results from steps 4 and 5</li>
+                                  <li>Multiply by π/4 to get the final volume</li>
+                                </ol>
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        <AccordionItem value="newgcc">
+                          <AccordionTrigger className="text-lg font-medium text-primary hover:no-underline">
+                            NewGcc (Cement Grade)
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Formula:</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">NewGcc = (γc·γw)/(m·γc + γw)</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">γc = Cement specific gravity</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">γw = Water specific gravity (1.0)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">m = Water-to-cement ratio</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Application:</h4>
+                              <p className="text-sm">This equation determines the cement grade (NewGcc), which represents the density of the cement slurry. It's a critical parameter for well cementing operations.</p>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        <AccordionItem value="gcprime">
+                          <AccordionTrigger className="text-lg font-medium text-primary hover:no-underline">
+                            Gc' (Modified Cement Grade)
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Formula:</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">Gc' = K2·NewGcc·Vcf</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">K2 = Coefficient</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">NewGcc = Cement grade</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Vcf = Volume of cement fluid</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Application:</h4>
+                              <p className="text-sm">The modified cement grade (Gc') accounts for the additional factors that affect the amount of cement required.</p>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        <AccordionItem value="nc">
+                          <AccordionTrigger className="text-lg font-medium text-primary hover:no-underline">
+                            nc (Number of Cement Sacks)
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Formula:</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">nc = (Gc' × 1000) / 50</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Gc' = Modified cement grade</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">50 = Weight of each cement sack (kg)</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Application:</h4>
+                              <p className="text-sm">This equation calculates the practical number of cement sacks required for the cementing operation.</p>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        <AccordionItem value="vw">
+                          <AccordionTrigger className="text-lg font-medium text-primary hover:no-underline">
+                            Vw (Water Volume)
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Formula:</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">Vw = (K3 × m × NewGcc × Vcf) / γw</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">K3 = Coefficient</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">m = Water-to-cement ratio</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">NewGcc = Cement grade</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Vcf = Volume of cement fluid</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">γw = Water specific gravity (1.0)</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Application:</h4>
+                              <p className="text-sm">This formula determines the volume of water needed to mix with the cement to achieve the desired slurry consistency.</p>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        <AccordionItem value="vfd">
+                          <AccordionTrigger className="text-lg font-medium text-primary hover:no-underline">
+                            Vfd (Volume of Fluid Displacement)
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Formula:</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">Vfd = (π/4) × di² × (H - h)</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">di = Casing inner diameter (m)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">H = Total height (m)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">h = Height parameter (m)</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Application:</h4>
+                              <p className="text-sm">This equation calculates the volume of displacement fluid needed to push the cement slurry to the desired position.</p>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        <AccordionItem value="pressure">
+                          <AccordionTrigger className="text-lg font-medium text-primary hover:no-underline">
+                            Pressure Calculations
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Pymax (Maximum Pressure at Yield Point):</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(Hc - h)(γfc - γf)]</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Hc = Height Above Cementation (m)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">h = Height parameter (m)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">γfc = Fluid column specific gravity</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">γf = Fluid specific gravity</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Pc (Confining Pressure):</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">Pc = 0.2H + (8 or 16)</p>
+                              <p className="text-xs mt-1">Where 8 is used if H &lt; 2000, otherwise 16 is used</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">H = Depth (m)</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Ppmax (Maximum Pump Pressure):</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">Ppmax = (Pymax + Pc + Pfr) / 10</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Pymax = Maximum pressure at yield point (MPa)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Pc = Confining pressure (MPa)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Pfr = Friction pressure (5 MPa)</span>
+                                </div>
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        <AccordionItem value="time">
+                          <AccordionTrigger className="text-lg font-medium text-primary hover:no-underline">
+                            Time Calculations
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Cement Fill and Displacement Time:</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">tfc+tfd = ((Vcf+Vfd)*10^3)/Q</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">tfc = Cement filling time (min)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">tfd = Displacement time (min)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Vcf = Volume of cement fluid (m³)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Vfd = Volume of displacement fluid (m³)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">Q = Pump flow rate (L/min)</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Total Pumping Time:</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">tc = tfc+tfd + td</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">tc = Total pumping time (min)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">td = Additional time (min)</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="bg-muted/30 p-4 rounded-md border border-border/40">
+                              <h4 className="font-medium mb-2">Additional Time:</h4>
+                              <p className="font-mono text-sm bg-background/80 p-2 rounded">tad = 0.75 * tp</p>
+                              <p className="text-sm mt-2">Where:</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">tad = Additional time (min)</span>
+                                </div>
+                                <div className="bg-background/50 p-2 rounded border border-border/30">
+                                  <span className="font-mono">tp = Constant time (60 min)</span>
+                                </div>
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             <TabsContent value="results" className="mt-0 space-y-4">
               <Card className="border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm">
                 <CardHeader className="bg-muted/40 border-b border-border/40 flex items-center">
@@ -2440,47 +2769,6 @@ export default function SemanticsPage() {
                       </CardContent>
                     </Card>
               )}
-                  </TabsContent>
-                  
-            <TabsContent value="equations" className="mt-0 space-y-4">
-              <Card className="border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm">
-                <CardHeader className="bg-muted/40 border-b border-border/40 flex items-center">
-                            <div>
-                    <div className="flex items-center space-x-2">
-                      <FileText className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg sm:text-xl text-primary/90">Calculation Equations</CardTitle>
-                            </div>
-                    <CardDescription className="mt-1.5">
-                      Detailed explanation of the formulas used in calculations
-                    </CardDescription>
-                          </div>
-                          <Button
-                    variant="ghost" 
-                    size="icon" 
-                            onClick={toggleEquationsMinimized}
-                    className="ml-auto"
-                          >
-                    {equationsMinimized ? <Maximize className="h-4 w-4" /> : <Minimize className="h-4 w-4" />}
-                          </Button>
-                      </CardHeader>
-                <CardContent className={cn("transition-all duration-300", equationsMinimized ? "max-h-96" : "max-h-[800px]")}>
-                  <ScrollArea className={cn("w-full", equationsMinimized ? "h-96" : "h-[800px]")}>
-                    <div className="p-6">
-                      {equationHTML ? (
-                        <div 
-                          dangerouslySetInnerHTML={{ __html: equationHTML }}
-                          className="prose prose-sm max-w-none dark:prose-invert"
-                        />
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>Calculate parameters to view equations and steps</p>
-                          </div>
-                        )}
-                    </div>
-                  </ScrollArea>
-                      </CardContent>
-                    </Card>
                   </TabsContent>
                   
             <TabsContent value="pump-selection" className="mt-0 space-y-4">
