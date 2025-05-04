@@ -1086,19 +1086,35 @@ export default function SemanticsPage() {
     try {
       // Helper function to ensure we use calculated values consistently
       const fixTemplateOutput = (html: string): string => {
-        // More comprehensive replacement to ensure consistent Gc usage
+        // More comprehensive replacement approach for Gc values
         
-        // First, ensure we explicitly mark where calculatedGc should be used
-        const markedHtml = html
-          // Add a special marker for calculated Gc
-          .replace(/Gc = \${.*?}/g, 'Gc = ${CALCULATED_GC_VALUE}')
-          // Mark all places where we might need to replace raw gamma value
-          .replace(new RegExp('\\${instanceGc.toFixed\\(4\\)}', 'g'), '${RAW_GAMMA_VALUE}');
+        if (!html) return ''; // Safety check for null/undefined
         
-        // Now do the actual replacements with the correct values
-        return markedHtml
-          .replace(/\${CALCULATED_GC_VALUE}/g, '${calculatedGc.toFixed(4)}')
-          .replace(/\${RAW_GAMMA_VALUE}/g, '${instanceGc.toFixed(4)}');
+        // Replace raw instanceGc in G'c Calculation
+        let fixedHtml = html.replace(
+          new RegExp('Gc = 3\\.1500 \\(calculated cement grade from above\\)', 'g'),
+          'Gc = ${calculatedGc.toFixed(4)} (calculated cement grade from above)'
+        );
+        
+        // Replace any direct reference to instanceGc being used as Gc in calculations
+        fixedHtml = fixedHtml.replace(
+          /Gc = 3\.1500/g,
+          'Gc = ${calculatedGc.toFixed(4)}'
+        );
+        
+        // Replace numeric values that look like instanceGc in final results
+        fixedHtml = fixedHtml.replace(
+          /<span class="font-mono text-sm">Gc = 3\.1500<\/span>/g,
+          '<span class="font-mono text-sm">Gc = ${calculatedGc.toFixed(4)}</span>'
+        );
+        
+        // Handle water volume calculation that might use the wrong Gc value
+        fixedHtml = fixedHtml.replace(
+          /Gc = 3\.1500 \(calculated cement grade\)/g,
+          'Gc = ${calculatedGc.toFixed(4)} (calculated cement grade)'
+        );
+        
+        return fixedHtml;
       };
 
       // Get formation data for Hc (HAC) values - store all three instances
@@ -1480,39 +1496,22 @@ export default function SemanticsPage() {
         };
         
         // Calculate G'c using instance-specific values - G'c = K2.Gc.Vfc
-        // Use direct Gc calculation instead of gc_value
+        // First calculate the actual cement grade (Gc) using the correct formula
         const gcDirectCalculation = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
         
-        // Store this calculated value specifically for Gc to use consistently in all formulas
-        // CRITICAL: Force calculatedGc to use the direct calculation formula, not raw instanceGc
-        const calculatedGc = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
+        // Store this in a clearly named variable to avoid confusion with the raw γc value
+        const calculatedGc = gcDirectCalculation; 
         
-        // Add a safety check to ensure the calculation is correct
-        console.log(`[Instance ${instanceNumber}] Gc DEBUG - Formula: (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw}) = ${calculatedGc}`);
+        console.log(`[Instance ${instanceNumber}] DEBUG - Raw γc vs Calculated Gc: 
+          Raw γc (density): ${instanceGc}
+          Calculated Gc (grade): ${calculatedGc}
+          Formula used: (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw})
+        `);
         
-        // CRITICAL SAFEGUARD: Ensure we never use raw gamma values for Gc directly
-        // This prevents the Vercel deployment from using instanceGc (3.15) as Gc
-        if (Math.abs(calculatedGc - instanceGc) < 0.01) {
-          console.warn(`[Instance ${instanceNumber}] WARNING: Calculated Gc (${calculatedGc}) is very close to raw instanceGc (${instanceGc}). This may indicate a calculation error.`);
-        }
-        
-        // Force debug output to verify calculated values in all environments
-        console.log(`[Instance ${instanceNumber}] VERIFICATION - Raw instanceGc: ${instanceGc}, Calculated Gc: ${calculatedGc}`);
-        console.log(`[Instance ${instanceNumber}] FORMULA CHECK - Gc = (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw}) = ${calculatedGc}`);
-        
-        // Add debugging for G'c calculation
-        console.log(`[Instance ${instanceNumber}] G'c calculation debug:`, {
-          instanceGc: `γc=${instanceGc}`,
-          instanceGw: `γw=${instanceGw}`,
-          instanceM: `m=${instanceM}`,
-          instanceK2: `K2=${instanceK2}`,
-          Gc: gcDirectCalculation,
-          gcFormula: `Gc = (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw}) = ${gcDirectCalculation}`,
-          gcPrimeFormula: `G'c = ${instanceK2} * ${gcDirectCalculation} * ${vcfValue}`,
-        });
-        
-        // Use the calculated Gc value consistently
+        // Now calculate G'c using the calculated Gc value, NOT the raw γc
         const gc_prime = Number(instanceK2) * calculatedGc * Number(vcfValue);
+        
+        console.log(`[Instance ${instanceNumber}] G'c calculation: ${instanceK2} × ${calculatedGc} × ${vcfValue} = ${gc_prime}`);
         
         // Calculate nc in sacks - always use the formula: nc = (G'c * 1000) / 50
         const nc = calculateCementSacks(gc_prime);
@@ -1539,6 +1538,8 @@ export default function SemanticsPage() {
           instanceM = calculatedM;
         }
         
+        // Calculate Vw (water volume) using the new formula with calculated m
+        // Only calculate if we have a valid calculated m value
         // Calculate Vw (water volume) using the new formula with calculated m
         // Only calculate if we have a valid calculated m value
         const vw = calculateWaterVolume(gc_prime, instanceM, calculatedGc, vcfValue, instanceGw);
