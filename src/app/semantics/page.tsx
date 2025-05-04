@@ -661,18 +661,19 @@ export default function SemanticsPage() {
   // Calculate Vcf values
   const calculateVcf = () => {
     try {
-      // Get formation data for Hc (HAC) values - store all three instances
-      let formationHcValues = [0, 0, 0]; // Initialize with 0 for each instance (index 0, 1, 2)
+      // Get formation data for Hc (HAC) values - store all instances
+      let formationHcValues: number[] = [];
       try {
         const formationData = localStorage.getItem('wellsAnalyzerData');
         if (formationData) {
           const data = JSON.parse(formationData);
           
           // Check for Hc values from Formation Design (for each instance)
-          for (let i = 1; i <= 3; i++) {
+          // First try to get any instance-specific values
+          for (let i = 1; i <= 5; i++) {
             // First try with the new Hc naming
             if (data[`Hc_${i}`] && !isNaN(parseFloat(data[`Hc_${i}`]))) {
-              // Store Hc3 in index 0 and Hc1 in index 2 (swap Hc1 and Hc3)
+              // Store values while handling the swapping of instances 1 and 3
               if (i === 1) {
                 formationHcValues[2] = parseFloat(data[`Hc_${i}`]);
               } else if (i === 3) {
@@ -683,7 +684,7 @@ export default function SemanticsPage() {
             } 
             // Then fallback to the old H naming for backward compatibility
             else if (data[`H_${i}`] && !isNaN(parseFloat(data[`H_${i}`]))) {
-              // Store H3 in index 0 and H1 in index 2 (swap H1 and H3)
+              // Store values while handling the swapping of instances 1 and 3
               if (i === 1) {
                 formationHcValues[2] = parseFloat(data[`H_${i}`]);
               } else if (i === 3) {
@@ -695,15 +696,15 @@ export default function SemanticsPage() {
           }
           
           // If we have a single value (non-instance), use it for all instances as fallback
-          if (formationHcValues.every(v => v === 0)) {
+          if (formationHcValues.length === 0 || formationHcValues.every(v => v === 0 || isNaN(v))) {
             if (data.Hc && !isNaN(parseFloat(data.Hc))) {
-              // If we're using a single value, apply it to all instances but in the swapped order (Hc3, Hc2, Hc1)
+              // If we're using a single value, apply it to all instances
               const singleHcValue = parseFloat(data.Hc);
-              formationHcValues = [singleHcValue, singleHcValue, singleHcValue];
+              formationHcValues = [singleHcValue, singleHcValue, singleHcValue, singleHcValue, singleHcValue];
             } else if (data.H && !isNaN(parseFloat(data.H))) {
               // Same for H values
               const singleHValue = parseFloat(data.H);
-              formationHcValues = [singleHValue, singleHValue, singleHValue];
+              formationHcValues = [singleHValue, singleHValue, singleHValue, singleHValue, singleHValue];
             }
           }
         }
@@ -716,7 +717,9 @@ export default function SemanticsPage() {
         (instanceValues['h'] && (
           instanceValues['h'][1] || 
           instanceValues['h'][2] || 
-          instanceValues['h'][3]
+          instanceValues['h'][3] ||
+          instanceValues['h'][4] ||
+          instanceValues['h'][5]
         ));
       
       if (!hasHeightValue) {
@@ -735,7 +738,9 @@ export default function SemanticsPage() {
         (instanceValues['k1'] && (
           instanceValues['k1'][1] || 
           instanceValues['k1'][2] || 
-          instanceValues['k1'][3]
+          instanceValues['k1'][3] ||
+          instanceValues['k1'][4] ||
+          instanceValues['k1'][5]
         ));
       
       if (!hasK1Value) {
@@ -743,7 +748,7 @@ export default function SemanticsPage() {
       }
       
       // Check if at least one Hc value is available
-      if (formationHcValues.every(v => v === 0)) {
+      if (formationHcValues.every(v => v === 0 || isNaN(v))) {
         console.warn('No Hc values found in Formation Design data');
         showToast('error', "Height Above Cementation (HAC) values not found", {
           description: "Please enter HAC values in Formation Design - Drill Pipes Design tab first."
@@ -758,7 +763,7 @@ export default function SemanticsPage() {
         K1 = parseFloat(k1Value);
       } else if (instanceValues['k1']) {
         // Find the first available instance value
-        for (let i = 1; i <= 3; i++) {
+        for (let i = 1; i <= 5; i++) {
           if (instanceValues['k1'][i] && !isNaN(parseFloat(instanceValues['k1'][i]))) {
             K1 = parseFloat(instanceValues['k1'][i]);
             break;
@@ -767,7 +772,7 @@ export default function SemanticsPage() {
       }
       
       // Ensure we have valid values for Hc (at least one instance) and K1
-      if (formationHcValues.every(v => v === 0) || K1 === 0) {
+      if (formationHcValues.every(v => v === 0 || isNaN(v)) || K1 === 0) {
         return;
       }
       
@@ -785,15 +790,11 @@ export default function SemanticsPage() {
                             <div class="bg-background/50 p-2 rounded border border-border/30">
                               <span class="font-mono">K1 = ${K1.toFixed(4)} (coefficient)</span>
                             </div>
-                            <div class="bg-background/50 p-2 rounded border border-border/30">
-                              <span class="font-mono">Hc (Instance 1) = ${formationHcValues[0].toFixed(4)} m</span>
-                            </div>
-                            ${formationHcValues[1] > 0 ? `<div class="bg-background/50 p-2 rounded border border-border/30">
-                              <span class="font-mono">Hc (Instance 2) = ${formationHcValues[1].toFixed(4)} m</span>
-                            </div>` : ''}
-                            ${formationHcValues[2] > 0 ? `<div class="bg-background/50 p-2 rounded border border-border/30">
-                              <span class="font-mono">Hc (Instance 3) = ${formationHcValues[2].toFixed(4)} m</span>
-                            </div>` : ''}
+                            ${formationHcValues.map((val, idx) => val > 0 ? 
+                              `<div class="bg-background/50 p-2 rounded border border-border/30">
+                                <span class="font-mono">Hc (Instance ${idx+1}) = ${val.toFixed(4)} m</span>
+                              </div>` : ''
+                            ).join('')}
                             <div class="bg-background/50 p-2 rounded border border-border/30">
                               <span class="font-mono">Db = Bit diameter (m)</span>
                             </div>
@@ -810,7 +811,7 @@ export default function SemanticsPage() {
                         </div>
                       </div>`;
       
-      // Calculate Vcf for each instance
+      // Calculate Vcf for each instance based on available casing data
       for (let i = 0; i < casingResults.length; i++) {
         const result = casingResults[i];
         const instanceNumber = i + 1;
@@ -818,7 +819,6 @@ export default function SemanticsPage() {
         // Get values from the casing table
         let Db = parseFloat(result.nearestBitSize || '0') / 1000; // Nearest bit size in m
         let de = parseFloat(result.atBody || '0') / 1000; // Using atBody (DCSG') for de instead of dcsg
-        // const di = parseFloat(result.internalDiameter || '0') / 1000; // Internal diameter in m
 
         // --- Get Dim from HAD data ---
         let dimValue: number | null = null;
@@ -864,10 +864,10 @@ export default function SemanticsPage() {
           // Use a sensible default based on the casing section
           if (result.section === "Production") {
             dimValue = 0.1628; // ~162.8mm default for production (Instance 1)
-          } else if (result.section === "Intermediate") {
-            dimValue = 0.2266; // ~226.6mm default for intermediate (Instance 2)
+          } else if (result.section.includes("Intermediate")) {
+            dimValue = 0.2266; // ~226.6mm default for intermediate
           } else if (result.section === "Surface") {
-            dimValue = 0.3204; // ~320.4mm default for surface (Instance 3)
+            dimValue = 0.3204; // ~320.4mm default for surface
           } else {
             // Generic fallback
             dimValue = 0.2000; // 200mm as generic fallback
@@ -879,9 +879,34 @@ export default function SemanticsPage() {
         console.log('Casing result:', result);
         console.log('Db:', Db, 'de:', de, 'di:', dimValue);
         
-        // Get instance-specific Hc value from the formation design
-        // With our swapped values, formationHcValues[0] is Hc3, formationHcValues[1] is Hc2, formationHcValues[2] is Hc1
-        let instanceHc = formationHcValues[i] || formationHcValues[0]; // Use instance-specific value or fallback to first instance
+        // Get the appropriate Hc value based on instance or section
+        let instanceHc = 0;
+        
+        // Map casing section to Hc value - ensure we handle multiple intermediate sections
+        if (result.section === "Production") {
+          // Production section mapped to 1st Hc value
+          instanceHc = formationHcValues[0] || formationHcValues[0] || 2000;
+        } else if (result.section === "Surface") {
+          // Surface section mapped to 3rd Hc value (or last available)
+          instanceHc = formationHcValues[2] || formationHcValues[0] || 2000;
+        } else if (result.section.includes("Intermediate")) {
+          // Extract intermediate number if present
+          const match = result.section.match(/intermediate\s+(\d+)/i);
+          const intermediateNumber = match && match[1] ? parseInt(match[1]) : 1;
+          
+          // Map to appropriate Hc value based on intermediate number
+          // For multiple intermediates, use values 1, 3, 4, etc.
+          if (intermediateNumber > 1) {
+            // For Intermediate 2+, use formationHcValues[intermediateNumber+1] if available
+            instanceHc = formationHcValues[intermediateNumber+1] || formationHcValues[1] || formationHcValues[0] || 2000;
+          } else {
+            // For Intermediate 1, use formationHcValues[1]
+            instanceHc = formationHcValues[1] || formationHcValues[0] || 2000;
+          }
+        } else {
+          // Fallback to using instance number directly
+          instanceHc = formationHcValues[i] || formationHcValues[0] || 2000;
+        }
         
         // Get instance-specific K1 value if available and not in single input mode
         let instanceK1 = K1;
@@ -1147,18 +1172,19 @@ export default function SemanticsPage() {
         return isNaN(parsed) ? fallback : Math.round(parsed * precision) / precision;
       };
 
-      // Get formation data for Hc (HAC) values - store all three instances
-      let formationHcValues = [0, 0, 0]; // Initialize with 0 for each instance (index 0, 1, 2)
+      // Get formation data for Hc (HAC) values - store all instances
+      let formationHcValues: number[] = [];
       try {
         const formationData = localStorage.getItem('wellsAnalyzerData');
         if (formationData) {
           const data = JSON.parse(formationData);
           
           // Check for Hc values from Formation Design (for each instance)
-          for (let i = 1; i <= 3; i++) {
+          // First try to get any instance-specific values
+          for (let i = 1; i <= 5; i++) {
             // First try with the new Hc naming
             if (data[`Hc_${i}`] && !isNaN(parseFloat(data[`Hc_${i}`]))) {
-              // Store Hc3 in index 0 and Hc1 in index 2 (swap Hc1 and Hc3)
+              // Store values while handling the swapping of instances 1 and 3
               if (i === 1) {
                 formationHcValues[2] = parseFloat(data[`Hc_${i}`]);
               } else if (i === 3) {
@@ -1169,7 +1195,7 @@ export default function SemanticsPage() {
             } 
             // Then fallback to the old H naming for backward compatibility
             else if (data[`H_${i}`] && !isNaN(parseFloat(data[`H_${i}`]))) {
-              // Store H3 in index 0 and H1 in index 2 (swap H1 and H3)
+              // Store values while handling the swapping of instances 1 and 3
               if (i === 1) {
                 formationHcValues[2] = parseFloat(data[`H_${i}`]);
               } else if (i === 3) {
@@ -1181,15 +1207,15 @@ export default function SemanticsPage() {
           }
           
           // If we have a single value (non-instance), use it for all instances as fallback
-          if (formationHcValues.every(v => v === 0)) {
+          if (formationHcValues.length === 0 || formationHcValues.every(v => v === 0 || isNaN(v))) {
             if (data.Hc && !isNaN(parseFloat(data.Hc))) {
-              // If we're using a single value, apply it to all instances but in the swapped order (Hc3, Hc2, Hc1)
+              // If we're using a single value, apply it to all instances
               const singleHcValue = parseFloat(data.Hc);
-              formationHcValues = [singleHcValue, singleHcValue, singleHcValue];
+              formationHcValues = [singleHcValue, singleHcValue, singleHcValue, singleHcValue, singleHcValue];
             } else if (data.H && !isNaN(parseFloat(data.H))) {
               // Same for H values
               const singleHValue = parseFloat(data.H);
-              formationHcValues = [singleHValue, singleHValue, singleHValue];
+              formationHcValues = [singleHValue, singleHValue, singleHValue, singleHValue, singleHValue];
             }
           }
         }
@@ -1205,13 +1231,17 @@ export default function SemanticsPage() {
         (instanceValues['gammaC'] && (
           instanceValues['gammaC'][1] || 
           instanceValues['gammaC'][2] || 
-          instanceValues['gammaC'][3]
+          instanceValues['gammaC'][3] ||
+          instanceValues['gammaC'][4] ||
+          instanceValues['gammaC'][5]
         ));
       const hasGammaW = gammaW || 
         (instanceValues['gammaW'] && (
           instanceValues['gammaW'][1] || 
           instanceValues['gammaW'][2] || 
-          instanceValues['gammaW'][3]
+          instanceValues['gammaW'][3] ||
+          instanceValues['gammaW'][4] ||
+          instanceValues['gammaW'][5]
         ));
       
       // Validate required inputs
@@ -1220,7 +1250,7 @@ export default function SemanticsPage() {
       }
       
       // Check if all Hc values are 0
-      if (formationHcValues.every(v => v === 0)) {
+      if (formationHcValues.every(v => v === 0 || isNaN(v))) {
         console.warn('No Hc values found in Formation Design data');
         showToast('error', "Height Above Cementation (HAC) values not found", {
           description: "Please enter HAC values in Formation Design - Drill Pipes Design tab first."
@@ -1239,86 +1269,16 @@ export default function SemanticsPage() {
         setIsLoading(false);
         return;
       }
+
+      // Get base values for calculations with appropriate defaults
+      const baseGc = getStrictNumericValue(gammaC, 3.15);
+      const baseGw = getStrictNumericValue(gammaW, 1.0);
+      const baseM = getStrictNumericValue(mValue, 0.5);
+      const baseGfc = getStrictNumericValue(gammaFC, 1.8);
+      const baseGf = getStrictNumericValue(gammaF, 1.08);
+      const baseK2 = getStrictNumericValue(k2Value, 1.0);
+      const baseK3 = getStrictNumericValue(k3Value, 1.0);
       
-      // Get gammaC value - use main value or first available instance value
-      let newGcc = 0;
-      if (gammaC && !isNaN(parseFloat(gammaC))) {
-        newGcc = parseFloat(gammaC);
-      } else if (instanceValues['gammaC']) {
-        // Find the first available instance value
-        for (let i = 1; i <= 3; i++) {
-          if (instanceValues['gammaC'][i] && !isNaN(parseFloat(instanceValues['gammaC'][i]))) {
-            newGcc = parseFloat(instanceValues['gammaC'][i]);
-            break;
-          }
-        }
-      }
-      
-      // Get gammaW value - use main value or first available instance value
-      let gw = 1; // Default to 1
-      if (gammaW && !isNaN(parseFloat(gammaW))) {
-        gw = parseFloat(gammaW);
-      } else if (instanceValues['gammaW']) {
-        // Find the first available instance value
-        for (let i = 1; i <= 3; i++) {
-          if (instanceValues['gammaW'][i] && !isNaN(parseFloat(instanceValues['gammaW'][i]))) {
-            gw = parseFloat(instanceValues['gammaW'][i]);
-            break;
-          }
-        }
-      }
-      
-      // Get gammaFC value - use main value or first available instance value
-      let gfc = 0;
-      if (gammaFC && !isNaN(parseFloat(gammaFC))) {
-        gfc = parseFloat(gammaFC);
-      } else if (instanceValues['gammaFC']) {
-        // Find the first available instance value
-        for (let i = 1; i <= 3; i++) {
-          if (instanceValues['gammaFC'][i] && !isNaN(parseFloat(instanceValues['gammaFC'][i]))) {
-            gfc = parseFloat(instanceValues['gammaFC'][i]);
-            break;
-          }
-        }
-      }
-      
-      // Get gammaF value - use main value or first available instance value
-      let gf = 0;
-      if (gammaF && !isNaN(parseFloat(gammaF))) {
-        gf = parseFloat(gammaF);
-      } else if (instanceValues['gammaF']) {
-        // Find the first available instance value
-        for (let i = 1; i <= 3; i++) {
-          if (instanceValues['gammaF'][i] && !isNaN(parseFloat(instanceValues['gammaF'][i]))) {
-            gf = parseFloat(instanceValues['gammaF'][i]);
-            break;
-          }
-        }
-      }
-      
-      // Get m value for calculations
-      let m = 0;
-      if (mValue && !isNaN(parseFloat(mValue))) {
-        m = parseFloat(mValue);
-      } else if (instanceValues['m']) {
-        // Find the first available instance value
-        for (let i = 1; i <= 3; i++) {
-          if (instanceValues['m'][i] && !isNaN(parseFloat(instanceValues['m'][i]))) {
-            m = parseFloat(instanceValues['m'][i]);
-            break;
-          }
-        }
-      }
-      
-      // Ensure we have valid values for calculations
-      if (hc === 0 || newGcc === 0) {
-        // showToast('error', "Invalid values", {
-        //   description: "Invalid or missing values for Hc or γc",
-        //   icon: <AlertCircle className="h-4 w-4 text-destructive" />
-        // });
-        return;
-      }
-    
       // Create HTML for equations
       let gcEquations = `<div class="space-y-4 mt-6">
                         <h3 class="text-xl font-bold text-primary">NewGcc/Gc' and Related Equations</h3>
@@ -1376,17 +1336,47 @@ export default function SemanticsPage() {
         const vcfValue = toFixedPrecision(vcfResult.vcf); // Apply fixed precision to vcf value
         const instanceNumber = vcfResult.instance;
         
-        // Get instance-specific values if available
-        let instanceHc = formationHcValues[instanceNumber - 1] || formationHcValues[0];
+        // Find the casing result that corresponds to this instance
+        const casingResult = casingResults && casingResults.length > instanceNumber - 1 
+          ? casingResults[instanceNumber - 1] 
+          : null;
+
+        // Get appropriate Hc value based on casing section or instance
+        let instanceHc = 0;
+        if (casingResult) {
+          // Map based on section
+          if (casingResult.section === "Production") {
+            instanceHc = formationHcValues[0] || formationHcValues[0] || 2000;
+          } else if (casingResult.section === "Surface") {
+            instanceHc = formationHcValues[2] || formationHcValues[0] || 2000;
+          } else if (casingResult.section.includes("Intermediate")) {
+            // Extract intermediate number if present
+            const match = casingResult.section.match(/intermediate\s+(\d+)/i);
+            const intermediateNumber = match && match[1] ? parseInt(match[1]) : 1;
+            
+            // Map to appropriate Hc value based on intermediate number
+            if (intermediateNumber > 1) {
+              instanceHc = formationHcValues[intermediateNumber+1] || formationHcValues[1] || formationHcValues[0] || 2000;
+            } else {
+              instanceHc = formationHcValues[1] || formationHcValues[0] || 2000;
+            }
+          } else {
+            // Fallback to using instance number directly
+            instanceHc = formationHcValues[instanceNumber-1] || formationHcValues[0] || 2000;
+          }
+        } else {
+          // No casing result, fall back to instance number mapping
+          instanceHc = formationHcValues[instanceNumber-1] || formationHcValues[0] || 2000;
+        }
         
         // AGGRESSIVE SAFETY: Ensure all values are strictly numeric
-        let instanceGc = getStrictNumericValue(instanceValues['gammaC']?.[instanceNumber], parseFloat(gammaC) || 3.15);
-        let instanceGw = getStrictNumericValue(instanceValues['gammaW']?.[instanceNumber], parseFloat(gammaW) || 1.0);
-        let instanceM = getStrictNumericValue(instanceValues['m']?.[instanceNumber], parseFloat(mValue) || 0.5);
-        let instanceGfc = getStrictNumericValue(instanceValues['gammaFC']?.[instanceNumber], parseFloat(gammaFC) || 1.8);
-        let instanceGf = getStrictNumericValue(instanceValues['gammaF']?.[instanceNumber], parseFloat(gammaF) || 1.08);
-        let instanceK2 = getStrictNumericValue(instanceValues['k2']?.[instanceNumber], parseFloat(k2Value) || 1.0);
-        let instanceK3 = getStrictNumericValue(instanceValues['k3']?.[instanceNumber], parseFloat(k3Value) || 1.0);
+        let instanceGc = getStrictNumericValue(instanceValues['gammaC']?.[instanceNumber], baseGc);
+        let instanceGw = getStrictNumericValue(instanceValues['gammaW']?.[instanceNumber], baseGw);
+        let instanceM = getStrictNumericValue(instanceValues['m']?.[instanceNumber], baseM);
+        let instanceGfc = getStrictNumericValue(instanceValues['gammaFC']?.[instanceNumber], baseGfc);
+        let instanceGf = getStrictNumericValue(instanceValues['gammaF']?.[instanceNumber], baseGf);
+        let instanceK2 = getStrictNumericValue(instanceValues['k2']?.[instanceNumber], baseK2);
+        let instanceK3 = getStrictNumericValue(instanceValues['k3']?.[instanceNumber], baseK3);
         
         // CONSISTENCY FIX: Apply fixed precision to all values
         instanceHc = toFixedPrecision(instanceHc);
@@ -1467,48 +1457,36 @@ export default function SemanticsPage() {
         // Calculate Pc (confining pressure)
         // FIXED: Get actual depth from formation/casing data instead of using height parameter
         let depth = 0;
-        try {
-          // Try to get H/depth value from wellsAnalyzerData (formation design data)
-          const formationData = localStorage.getItem('wellsAnalyzerData');
-          if (formationData) {
-            const data = JSON.parse(formationData);
-            
-            // Try to get H values based on instance (using the same swapped indexing as for Hc)
-            if (instanceNumber === 1) { // Production (was Instance 3)
-              depth = data.H_3 ? parseFloat(data.H_3) : 0;
-            } else if (instanceNumber === 2) { // Intermediate (Instance 2)
-              depth = data.H_2 ? parseFloat(data.H_2) : 0;
-            } else if (instanceNumber === 3) { // Surface (was Instance 1)
-              depth = data.H_1 ? parseFloat(data.H_1) : 0;
-            }
-            
-            // If no instance-specific value found, try to get a single H value
-            if (depth === 0 && data.H) {
-              depth = parseFloat(data.H);
-            }
+        if (casingResult) {
+          // If we have a casing result, estimate depth based on section
+          if (casingResult.section === "Production") {
+            depth = 3000; // Typical production depth
+          } else if (casingResult.section === "Surface") {
+            depth = 1000; // Typical surface depth
+          } else if (casingResult.section.includes("Intermediate")) {
+            // Extract intermediate number if present
+            const match = casingResult.section.match(/intermediate\s+(\d+)/i);
+            const intermediateNumber = match && match[1] ? parseInt(match[1]) : 1;
+            depth = 2000 + ((intermediateNumber - 1) * 500); // Scale depth based on intermediate number
+          } else {
+            depth = 2000; // Default depth
           }
-        } catch (error) {
-          console.error('Failed to load H (depth) value from formation data:', error);
-        }
-
-        // If still no valid depth, use a fallback based on casing section type
-        if (depth === 0 && casingResults && casingResults.length > 0) {
-          // Fallback to estimating depth based on casing section
-          const casingSection = casingResults.find(r => r.section.toLowerCase().includes(
-            instanceNumber === 1 ? "production" : 
-            instanceNumber === 2 ? "intermediate" : 
-            "surface"
-          ));
-          
-          if (casingSection) {
-            // Estimate depth based on section - these are typical depths
-            if (casingSection.section.toLowerCase().includes("production")) {
-              depth = 3000; // Production typically deepest
-            } else if (casingSection.section.toLowerCase().includes("intermediate")) {
-              depth = 2000; // Intermediate typically middle depth
-            } else if (casingSection.section.toLowerCase().includes("surface")) {
-              depth = 1000; // Surface typically shallowest
+        } else {
+          // No casing result, try to get from formation data
+          try {
+            const formationData = localStorage.getItem('wellsAnalyzerData');
+            if (formationData) {
+              const data = JSON.parse(formationData);
+              
+              // Try to get H values based on instance
+              if (data[`H_${instanceNumber}`]) {
+                depth = parseFloat(data[`H_${instanceNumber}`]);
+              } else if (data.H) {
+                depth = parseFloat(data.H);
+              }
             }
+          } catch (error) {
+            console.error('Failed to load H (depth) value from formation data:', error);
           }
         }
 
@@ -1551,43 +1529,6 @@ export default function SemanticsPage() {
         const tfc = tfcPlusTfd / 2;
         const tfd = tfcPlusTfd / 2;
         const n = tc > 0 && tad > 0 ? Math.ceil(tc / tad + 1) : null;
-        
-        // Helper function to ensure we use calculated values consistently (added back to fix linter errors)
-        const fixTemplateOutput = (html: string): string => {
-          return html.replace(/NewGcc = .*?(\d+\.\d+)/g, `NewGcc = ${newGccValue.toFixed(4)}`)
-                     .replace(/Gc' = .*?(\d+\.\d+)/g, `Gc' = ${gcPrimeValue.toFixed(4)}`);
-        };
-
-        // SAFETY: Generate equation HTML with explicit calculated values
-        const newGccCalculationHtml = `
-                <div class="border-t border-border/30 pt-4">
-            <p class="font-medium">NewGcc Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-              <p class="font-mono text-sm">NewGcc = (γc.γw)/(m.γc + γw)</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
-                      <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
-                      <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
-                <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${newGccValue.toFixed(4)}</li>
-                    </ol>
-              <p class="font-mono text-sm mt-2 font-bold">NewGcc = ${newGccValue.toFixed(4)} tonf/m3</p>
-                  </div>
-          </div>`;
-                
-        const gcPrimeCalculationHtml = `
-                <div class="border-t border-border/30 pt-4">
-            <p class="font-medium">Gc' Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-              <p class="font-mono text-sm">Gc' = K2.NewGcc.Vfc</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>K2 = ${instanceK2.toFixed(4)}</li>
-                <li>NewGcc = ${newGccValue.toFixed(4)} (calculated cement grade from above)</li>
-                <li>K2.NewGcc = ${instanceK2.toFixed(4)} × ${newGccValue.toFixed(4)} = ${(instanceK2 * newGccValue).toFixed(4)}</li>
-                <li>K2.NewGcc.Vfc = ${(instanceK2 * newGccValue).toFixed(4)} × ${vcfValue.toFixed(4)} = ${gcPrimeValue.toFixed(4)}</li>
-                    </ol>
-              <p class="font-mono text-sm mt-2 font-bold">Gc' = ${gcPrimeValue.toFixed(4)}</p>
-            </div>
-          </div>`;
         
         // Create a proper GcResult object with all calculated properties
         return {
@@ -1692,10 +1633,6 @@ export default function SemanticsPage() {
       
     } catch (error) {
       console.error("Error calculating NewGcc/Gc':", error);
-      // showToast('error', "Error in calculations", {
-      //   description: "There was an error calculating values. Please check your inputs.",
-      //   icon: <AlertCircle className="h-4 w-4 text-destructive" />
-      // });
     }
   };
 
@@ -1825,8 +1762,64 @@ export default function SemanticsPage() {
         
         // If no exact matches, try to find alternatives with higher pressure
         if (pumpResultsForInstance.length === 0) {
-          // Implementation for finding alternatives...
-          // Current logic omitted for brevity
+          // Find pumps with diameter that can handle higher pressures
+          const alternativePumps = PUMP_DATA.filter(pump => {
+            const otherDiameterKeys: Array<"3.5" | "4" | "4.5"> = ["3.5", "4", "4.5"];
+            return otherDiameterKeys.some(key => {
+              if (key === diameterKey) return false; // Skip the original diameter
+              return pump.pressures[key] !== null && (pump.pressures[key] as number) >= ppmax;
+            });
+          });
+          
+          if (alternativePumps.length > 0) {
+            // Find best alternative diameter for each pump
+            alternativePumps.forEach((pump, pumpIndex) => {
+              // Find the best diameter that can handle the pressure
+              const bestDiameter = ["3.5", "4", "4.5"].reduce((best, current) => {
+                const diameter = current as "3.5" | "4" | "4.5";
+                if (pump.pressures[diameter] === null) return best;
+                if (pump.pressures[diameter]! >= ppmax && 
+                    (best === "" || Math.abs(Number(diameter) - Number(diameterKey)) < Math.abs(Number(best) - Number(diameterKey)))) {
+                  return diameter;
+                }
+                return best;
+              }, "");
+              
+              if (bestDiameter) {
+                const altDiameter = parseFloat(bestDiameter);
+                const pumpPressure = pump.pressures[bestDiameter as "3.5" | "4" | "4.5"] as number;
+                const pumpFlow = pump.flows[bestDiameter as "3.5" | "4" | "4.5"] as number;
+                
+                pumpResultsForInstance.push({
+                  type: pump.type,
+                  diameter: altDiameter,
+                  pressure: pumpPressure,
+                  flow: pumpFlow,
+                  speed: pump.speed,
+                  price: pumpIndex + 100, // Higher price for alternatives
+                  isRecommended: pumpIndex === 0, // Mark first alternative as recommended
+                  instance: instanceNumber,
+                  ppmax,
+                  tfc: null,
+                  tfd: null,
+                  tc: null,
+                  tad: 45,
+                  isTimeAllowed: null,
+                  isAlternative: true,
+                });
+              }
+            });
+            
+            // Sort alternatives by pressure closest to ppmax
+            pumpResultsForInstance.sort((a, b) => 
+              Math.abs(a.pressure - ppmax) - Math.abs(b.pressure - ppmax)
+            );
+            
+            // Mark the first one as recommended
+            if (pumpResultsForInstance.length > 0) {
+              pumpResultsForInstance[0].isRecommended = true;
+            }
+          }
         }
         
         // Add all results for this instance
