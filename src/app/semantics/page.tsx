@@ -1084,38 +1084,36 @@ export default function SemanticsPage() {
   // Function to calculate NewGcc/Gc' values
   const calculateGcGcInternal = () => {
     try {
-      // Helper function to ensure we use calculated values consistently
-      const fixTemplateOutput = (html: string): string => {
-        // More comprehensive replacement to ensure consistent NewGcc usage
-        // First, ensure we explicitly mark where calculatedNewGcc should be used
-        const markedHtml = html
-          // Add a special marker for calculated NewGcc
-          .replace(/Gc = \${.*?}/g, 'NewGcc = ${CALCULATED_NEWGCC_VALUE}')
-          // Mark all places where we might need to replace raw gamma value
-          .replace(new RegExp('\\${instanceGc.toFixed\\(4\\)}', 'g'), '${RAW_GAMMA_VALUE}');
+      // CRITICAL FIX: Define a hard enforced calculation function
+      const calculateCorrectNewGcc = (gc: number, gw: number, m: number): number => {
+        if (gc <= 0 || gw <= 0 || m <= 0) {
+          console.error("Invalid values for NewGcc calculation", {gc, gw, m});
+          return 0;
+        }
+        const numerator = gc * gw;
+        const denominator = (m * gc) + gw;
+        if (denominator <= 0) {
+          console.error("Denominator is zero or negative in NewGcc calculation", {numerator, denominator});
+          return 0;
+        }
+        const result = numerator / denominator;
         
-        // Now do the actual replacements with the correct values
-        return markedHtml
-          // Fix the title
-          .replace(/Gc\/G'c and/g, "NewGcc/Gc' and")
-          // First do the G'c to Gc' replacements
-          .replace(/G'c/g, "Gc'")
-          // Then handle the regular Gc instances with boundary checking (\b)
-          .replace(/Gc\b/g, 'NewGcc')
-          // Fix any instances of K2.Gc.Vfc
-          .replace(/K2\.Gc\.Vfc/g, 'K2.NewGcc.Vfc')
-          // Fix specific formula replacements
-          .replace(/G'c = K2\.Gc\.Vfc/g, "Gc' = K2.NewGcc.Vfc")
-          .replace(/G'c = K2\.NewGcc\.Vfc/g, "Gc' = K2.NewGcc.Vfc")
-          // Handle cases where Gc might appear in variable references and formulas
-          .replace(/\(K3 × m × Gc × Vfc\)/g, "(K3 × m × NewGcc × Vfc)")
-          .replace(/\(K3 × m × Gc\)/g, "(K3 × m × NewGcc)")
-          .replace(/\(K3 × m\) × Gc/g, "(K3 × m) × NewGcc")
-          // Handle any remaining cases where G'c might not be caught
-          .replace(/Gc'/g, "Gc'")
-          // Replace our marker values
-          .replace(/\${CALCULATED_NEWGCC_VALUE}/g, '${calculatedNewGcc.toFixed(4)}')
-          .replace(/\${RAW_GAMMA_VALUE}/g, '${instanceGc.toFixed(4)}');
+        // Force log the result to help with debugging
+        console.log(`CRITICAL CALCULATION: NewGcc = (${gc} * ${gw}) / (${m} * ${gc} + ${gw}) = ${result}`);
+        
+        // Safety check - if result is very close to raw gc, that's a warning sign
+        if (Math.abs(result - gc) < 0.01) {
+          console.warn(`WARNING: Calculated NewGcc (${result}) is very close to raw gc (${gc}). This is suspicious.`);
+        }
+        
+        return result;
+      };
+
+      // STRICT HELPER: Get value from input field with strong validation
+      const getStrictNumericValue = (value: string | undefined, fallback: number): number => {
+        if (!value) return fallback;
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? fallback : parsed;
       };
 
       // Get formation data for Hc (HAC) values - store all three instances
@@ -1348,228 +1346,57 @@ export default function SemanticsPage() {
         const instanceNumber = vcfResult.instance;
         
         // Get instance-specific values if available
-        // Use the instance-specific Hc value from formationHcValues
-        // With our swapped values, formationHcValues[0] is Hc3, formationHcValues[1] is Hc2, formationHcValues[2] is Hc1
-        let instanceHc = formationHcValues[instanceNumber - 1] || formationHcValues[0]; // Fallback to first instance if current one isn't available
+        let instanceHc = formationHcValues[instanceNumber - 1] || formationHcValues[0];
         
-        let instanceGc = newGcc;
-        let instanceGw = gw;
-        let instanceGfc = gfc;
-        let instanceGf = gf;
-        let instanceM = m;
+        // AGGRESSIVE SAFETY: Ensure all values are strictly numeric
+        let instanceGc = getStrictNumericValue(instanceValues['gammaC']?.[instanceNumber], parseFloat(gammaC) || 3.15);
+        let instanceGw = getStrictNumericValue(instanceValues['gammaW']?.[instanceNumber], parseFloat(gammaW) || 1.0);
+        let instanceM = getStrictNumericValue(instanceValues['m']?.[instanceNumber], parseFloat(mValue) || 0.5);
+        let instanceGfc = getStrictNumericValue(instanceValues['gammaFC']?.[instanceNumber], parseFloat(gammaFC) || 1.8);
+        let instanceGf = getStrictNumericValue(instanceValues['gammaF']?.[instanceNumber], parseFloat(gammaF) || 1.08);
+        let instanceK2 = getStrictNumericValue(instanceValues['k2']?.[instanceNumber], parseFloat(k2Value) || 1.0);
+        let instanceK3 = getStrictNumericValue(instanceValues['k3']?.[instanceNumber], parseFloat(k3Value) || 1.0);
         
-        // Check for instance-specific gammaC
-        if (!singleInputFields['gammaC'] && 
-            instanceValues['gammaC'] && 
-            instanceValues['gammaC'][instanceNumber] && 
-            !isNaN(parseFloat(instanceValues['gammaC'][instanceNumber]))) {
-          instanceGc = parseFloat(instanceValues['gammaC'][instanceNumber]);
-        }
-        
-        // Force numeric type to avoid any string comparison issues
-        instanceGc = Number(instanceGc);
-        
-        // Check for instance-specific gammaW
-        if (!singleInputFields['gammaW'] && 
-            instanceValues['gammaW'] && 
-            instanceValues['gammaW'][instanceNumber] && 
-            !isNaN(parseFloat(instanceValues['gammaW'][instanceNumber]))) {
-          instanceGw = parseFloat(instanceValues['gammaW'][instanceNumber]);
-        }
-        
-        // Force numeric type
-        instanceGw = Number(instanceGw);
-        
-        // Check for instance-specific m value
-        if (!singleInputFields['m'] && 
-            instanceValues['m'] && 
-            instanceValues['m'][instanceNumber] && 
-            !isNaN(parseFloat(instanceValues['m'][instanceNumber]))) {
-          instanceM = parseFloat(instanceValues['m'][instanceNumber]);
-        }
-        
-        // Force numeric type
-        instanceM = Number(instanceM);
-        
-        // Check for instance-specific gammaFC
-        if (!singleInputFields['gammaFC'] && 
-            instanceValues['gammaFC'] && 
-            instanceValues['gammaFC'][instanceNumber] && 
-            !isNaN(parseFloat(instanceValues['gammaFC'][instanceNumber]))) {
-          instanceGfc = parseFloat(instanceValues['gammaFC'][instanceNumber]);
-        }
-        
-        // Check for instance-specific gammaF
-        if (!singleInputFields['gammaF'] && 
-            instanceValues['gammaF'] && 
-            instanceValues['gammaF'][instanceNumber] && 
-            !isNaN(parseFloat(instanceValues['gammaF'][instanceNumber]))) {
-          instanceGf = parseFloat(instanceValues['gammaF'][instanceNumber]);
-        }
-        
-        // Calculate NewGcc using instance-specific values - newGcc = (γc.γw)/(m.γc + γw)
-        console.log(`[Instance ${instanceNumber}] Debug - Before NewGcc calculation:`, {
-          instanceGc,
-          instanceGw,
-          instanceM,
-          numerator: (instanceGc * instanceGw),
-          denominator: (instanceM * instanceGc + instanceGw)
-        });
-        
-        // SIMPLIFIED AND FIXED NewGcc calculation
-        let newGcc_value = 0;
-        const numerator = Number(instanceGc) * Number(instanceGw);
-        const denominator = (Number(instanceM) * Number(instanceGc)) + Number(instanceGw);
-        if (denominator !== 0 && !isNaN(denominator) && instanceGc > 0 && instanceGw > 0 && instanceM > 0) {
-          newGcc_value = numerator / denominator;
-        } else {
-          newGcc_value = 0;
-        }
-        
-        console.log(`[Instance ${instanceNumber}] Raw division values:`, {
-          numerator,
-          denominator,
-          divisionResult: numerator / denominator,
-          directCalculation: (Number(instanceGc) * Number(instanceGw)) / ((Number(instanceM) * Number(instanceGc)) + Number(instanceGw))
-        });
-        
-        // Simplified calculation with just basic validation
-        if (denominator !== 0 && !isNaN(denominator) && instanceGc > 0 && instanceGw > 0 && instanceM > 0) {
-          // Direct calculation without any additional checks
-          newGcc_value = numerator / denominator;
-          console.log(`[Instance ${instanceNumber}] Basic NewGcc calculation: ${numerator} / ${denominator} = ${newGcc_value}`);
-        } else {
-          console.error(`[Instance ${instanceNumber}] Error: Invalid values for NewGcc calculation:`, {instanceGc, instanceGw, instanceM, denominator});
-          newGcc_value = 0;
-        }
-        
-        console.log(`[Instance ${instanceNumber}] Debug - Final NewGcc value:`, newGcc_value);
-        
-        // Get K2 value for this instance
-        let instanceK2 = 0;
-        if (k2Value && !isNaN(parseFloat(k2Value))) {
-          instanceK2 = parseFloat(k2Value);
-        } else if (instanceValues['k2'] && 
-                  instanceValues['k2'][instanceNumber] && 
-                  !isNaN(parseFloat(instanceValues['k2'][instanceNumber]))) {
-          instanceK2 = parseFloat(instanceValues['k2'][instanceNumber]);
-        }
-        
-        // Function to calculate G'c
-        const calculateGPrimeC = (vcfValue: number, calculatedNewGcc: number, useSingleInput: boolean = false): number => {
-          // Get K2 value - for now just use the main value
-          const K2Value = k2Value && !isNaN(parseFloat(k2Value)) ? parseFloat(k2Value) : 1;
-          // G'c = K2 * NewGcc * Vfc
-          let gPrimeC = K2Value * calculatedNewGcc * vcfValue;
-          
-          // Safety check for NaN
-          if (isNaN(gPrimeC) || !isFinite(gPrimeC)) {
-            console.error('G\'c calculation resulted in NaN or infinity, using fallback');
-            // Fallback to a reasonable default
-            gPrimeC = calculatedNewGcc * 10; // Rough fallback estimate
-          }
-          
-          return gPrimeC;
-        };
-
-        // Calculate nc (number of cement sacks)
-        const calculateCementSacks = (gPrimeC: number): number => {
-          // Number of cement sacks = G'c * 1000 / 50
-          let cementSacks = (gPrimeC * 1000) / 50;
-          
-          // Safety check for NaN
-          if (isNaN(cementSacks) || !isFinite(cementSacks)) {
-            console.error('Cement sacks calculation resulted in NaN or infinity, using fallback');
-            cementSacks = 100; // Rough fallback estimate
-          }
-          
-          return cementSacks;
-        };
-
-        // Calculate Vw (water volume)
-        const calculateWaterVolume = (gPrimeC: number, m: number, NewGcc: number, vcfValue: number, gamma_w: number): number => {
-          // Vw = K3 * m * NewGcc * Vfc / gamma_w
-          const K3Value = k3Value && !isNaN(parseFloat(k3Value)) ? parseFloat(k3Value) : 1;
-          let waterVolume = (K3Value * m * NewGcc * vcfValue) / gamma_w;
-          
-          // Safety check for NaN
-          if (isNaN(waterVolume) || !isFinite(waterVolume)) {
-            console.error('Water volume calculation resulted in NaN or infinity, using fallback');
-            waterVolume = vcfValue * 0.5; // Rough fallback estimate
-          }
-          
-          return waterVolume;
-        };
-        
-        // Calculate G'c using instance-specific values - G'c = K2.Gc.Vfc
-        // Use direct Gc calculation instead of gc_value
-        const gcDirectCalculation = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
-        
-        // Store this calculated value specifically for NewGcc to use consistently in all formulas
-        // CRITICAL: Force calculatedNewGcc to use the direct calculation formula, not raw instanceGc
-        const calculatedNewGcc = (instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw);
-        
-        // Add a safety check to ensure the calculation is correct
-        console.log(`[Instance ${instanceNumber}] NewGcc DEBUG - Formula: (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw}) = ${calculatedNewGcc}`);
-        
-        // CRITICAL SAFEGUARD: Ensure we never use raw gamma values for NewGcc directly
-        // This prevents the Vercel deployment from using instanceGc (3.15) as NewGcc
-        if (Math.abs(calculatedNewGcc - instanceGc) < 0.01) {
-          console.warn(`[Instance ${instanceNumber}] WARNING: Calculated NewGcc (${calculatedNewGcc}) is very close to raw instanceGc (${instanceGc}). This may indicate a calculation error.`);
-        }
-        
-        // Force debug output to verify calculated values in all environments
-        console.log(`[Instance ${instanceNumber}] VERIFICATION - Raw instanceGc: ${instanceGc}, Calculated NewGcc: ${calculatedNewGcc}`);
-        console.log(`[Instance ${instanceNumber}] FORMULA CHECK - NewGcc = (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw}) = ${calculatedNewGcc}`);
-        
-        // Add debugging for Gc' calculation
-        console.log(`[Instance ${instanceNumber}] Gc' calculation debug:`, {
-          instanceGc: `γc=${instanceGc}`,
-          instanceGw: `γw=${instanceGw}`,
-          instanceM: `m=${instanceM}`,
-          instanceK2: `K2=${instanceK2}`,
-          NewGcc: calculatedNewGcc,
-          NewGccFormula: `NewGcc = (${instanceGc} * ${instanceGw}) / (${instanceM} * ${instanceGc} + ${instanceGw}) = ${calculatedNewGcc}`,
-          GcPrimeFormula: `Gc' = ${instanceK2} * ${calculatedNewGcc} * ${vcfValue}`,
-        });
-        
-        // Use the calculated NewGcc value consistently
-        const gc_prime = Number(instanceK2) * calculatedNewGcc * Number(vcfValue);
-        
-        // Calculate nc in sacks - always use the formula: nc = (G'c * 1000) / 50
-        const nc = calculateCementSacks(gc_prime);
-        
-        // Get K3 value for this instance
-        let instanceK3 = 0;
-        if (k3Value && !isNaN(parseFloat(k3Value))) {
-          instanceK3 = parseFloat(k3Value);
-        } else if (instanceValues['k3'] && 
-                  instanceValues['k3'][instanceNumber] && 
-                  !isNaN(parseFloat(instanceValues['k3'][instanceNumber]))) {
-          instanceK3 = parseFloat(instanceValues['k3'][instanceNumber]);
-        }
-        
-        // Calculate m using the formula: m = (γw * (γc - γfc)) / (γc * (γfc - γw))
+        // CRITICAL FIX: Calculate m first to ensure we have correct value
+        // Calculate m using the formula: m = (γw × (γc - γfc)) / (γc × (γfc - γw))
         let calculatedM = null;
         if (instanceGw > 0 && instanceGc > 0 && instanceGfc > 0 && 
             (instanceGfc - instanceGw) !== 0) {
           calculatedM = (instanceGw * (instanceGc - instanceGfc)) / (instanceGc * (instanceGfc - instanceGw));
+          
+          // Force log the calculation to help debugging
+          console.log(`[Instance ${instanceNumber}] m calculation: (${instanceGw} * (${instanceGc} - ${instanceGfc})) / (${instanceGc} * (${instanceGfc} - ${instanceGw})) = ${calculatedM}`);
         }
         
         // If we have a valid calculated m value, use it instead of the input m value
-        if (calculatedM !== null) {
+        if (calculatedM !== null && !isNaN(calculatedM) && calculatedM > 0) {
           instanceM = calculatedM;
+          console.log(`[Instance ${instanceNumber}] Using calculated m: ${instanceM}`);
+        } else {
+          console.log(`[Instance ${instanceNumber}] Using provided m: ${instanceM}`);
         }
         
-        // Calculate Vw (water volume) using the new formula with calculated m
-        // Only calculate if we have a valid calculated m value
-        const vw = calculateWaterVolume(gc_prime, instanceM, calculatedNewGcc, vcfValue, instanceGw);
+        // CRITICAL FIX: Calculate NewGcc using our enforced function
+        const newGccValue = calculateCorrectNewGcc(instanceGc, instanceGw, instanceM);
+        
+        // ALWAYS use this same newGccValue variable throughout all calculations
+        console.log(`[Instance ${instanceNumber}] FINAL NewGcc VALUE TO USE: ${newGccValue}`);
+        
+        // CRITICAL FIX: Calculate Gc' using the correct newGccValue  
+        const gcPrimeValue = instanceK2 * newGccValue * vcfValue;
+        console.log(`[Instance ${instanceNumber}] FINAL Gc' VALUE TO USE: ${gcPrimeValue} = ${instanceK2} * ${newGccValue} * ${vcfValue}`);
+        
+        // Calculate nc (number of cement sacks) - use gcPrimeValue
+        const nc = (gcPrimeValue * 1000) / 50;
+        
+        // Calculate Vw (water volume) - use newGccValue
+        const vw = (instanceK3 * instanceM * newGccValue * vcfValue) / instanceGw;
         
         // Calculate Vfd (volume of fluid displacement)
         // Vfd = (π/4) × di² × (H - h)
         const PI_OVER_4 = Math.PI / 4;
         let vfd = null;
-        
+
         // Try to get H from tfd (fluid displacement height) input
         let H = 250; // Default value
         if (tfdValue && !isNaN(parseFloat(tfdValue))) {
@@ -1577,7 +1404,7 @@ export default function SemanticsPage() {
         } else if (instanceValues['tfd'] && instanceValues['tfd'][instanceNumber] && !isNaN(parseFloat(instanceValues['tfd'][instanceNumber]))) {
           H = parseFloat(instanceValues['tfd'][instanceNumber]);
         }
-        
+
         // Try to get h from td (displacement height) input
         let h = 30; // Default value
         if (tdValue && !isNaN(parseFloat(tdValue))) {
@@ -1585,322 +1412,85 @@ export default function SemanticsPage() {
         } else if (instanceValues['td'] && instanceValues['td'][instanceNumber] && !isNaN(parseFloat(instanceValues['td'][instanceNumber]))) {
           h = parseFloat(instanceValues['td'][instanceNumber]);
         }
-        
+
         // Get internal diameter in meters
         const di_for_vfd = vcfResult.di / 1000;
-        
-        // Debug logging
-        console.log('Vfd calculation inputs:', { di_for_vfd, H, h });
-        
-        // Validate inputs and calculate Vfd
         if (!isNaN(di_for_vfd) && di_for_vfd > 0 && !isNaN(H) && !isNaN(h) && H > h) {
           vfd = PI_OVER_4 * Math.pow(di_for_vfd, 2) * (H - h);
-          console.log('Calculated Vfd:', vfd);
-        } else {
-          console.error('Invalid inputs for Vfd calculation, using fallback');
-          // Fallback calculation with safe default values
-          const safe_di = di_for_vfd > 0 ? di_for_vfd : 0.2; // Use 200mm as fallback
-          const safe_H = H > 0 ? H : 250;
-          const safe_h = h >= 0 ? h : 30;
-          const safe_diff = safe_H > safe_h ? safe_H - safe_h : 220;
-          
-          vfd = PI_OVER_4 * Math.pow(safe_di, 2) * safe_diff;
-          console.log('Fallback Vfd calculation:', { safe_di, safe_H, safe_h, vfd });
         }
-        
-        // Calculate Pymax (maximum pressure at yield point) - using the new formula from the image
-        // Pymax = 0.1[(Hc - h)(γfc - γf)]
+
+        // Calculate Pymax (maximum pressure at yield point)
         const pymax = (instanceGfc && instanceGf && vcfResult.h) ? 
-                      0.1 * (instanceHc - vcfResult.h) * (instanceGfc - instanceGf) : null;
-        
-        // Calculate Pc (confining pressure) using the correct formula:
-        // Pc = 0.2H + (8 or 16), where 8 is used if H < 2000, otherwise 16 is used
-        // Use the same H value as in Vfd calculation
+          0.1 * (instanceHc - vcfResult.h) * (instanceGfc - instanceGf) : null;
+
+        // Calculate Pc (confining pressure)
         const constantValue = vcfResult.h >= 2000 ? 16 : 8;
         const pc = 0.2 * vcfResult.h + constantValue;
-        
+
         // Pfr remains constant at 5 usually
         const pfr = 5;
-        
-        // Calculate Ppmax (maximum pump pressure) based on the formula
-        // Ppmax = Pymax + Pc + Pfr
+
+        // Calculate Ppmax (maximum pump pressure)
         const ppmax = (pymax && pc) ? ((pymax + pc + pfr) / 10) : null;
-        
-        // Calculate n (number of pumps) using tc/tad + 1 formula
-        // Get td value - from input
-        let instanceTd = 0;
-        if (tdValue && !isNaN(parseFloat(tdValue))) {
-          instanceTd = parseFloat(tdValue);
-        } else if (instanceValues['td'] && 
-                  instanceValues['td'][instanceNumber] && 
-                  !isNaN(parseFloat(instanceValues['td'][instanceNumber]))) {
-          instanceTd = parseFloat(instanceValues['td'][instanceNumber]);
-        }
-        
-        // Calculate total time variables
+
+        // Calculate td and related time variables
+        let instanceTd = getStrictNumericValue(instanceValues['td']?.[instanceNumber], parseFloat(tdValue) || 30);
         const tp = 60; // Constant value of 60
         const tad = 0.75 * tp; // tad = 0.75 * tp
-        
+
         // Get Q value from pumpResults if available
         let Q = 0;
         if (pumpResults && pumpResults.length > 0) {
-          // Look for pump data for this instance
           const pumpForInstance = pumpResults.find(p => p.instance === instanceNumber && p.isRecommended);
           if (pumpForInstance && pumpForInstance.flow) {
             Q = pumpForInstance.flow;
           }
         }
-        
-        // Calculate tfc+tfd = ((Vcf+Vfd)*10^3)/Q
+
+        // Calculate time values
         let tfcPlusTfd = 0;
         if (Q > 0 && vfd !== null) {
           tfcPlusTfd = ((vcfValue + vfd) * 1000) / Q;
         }
-        
-        // Calculate tc = tfc+tfd + td
         const tc = tfcPlusTfd + instanceTd;
-        
-        // Split tfcPlusTfd into tfc and tfd (50/50 split as a default approach)
         const tfc = tfcPlusTfd / 2;
         const tfd = tfcPlusTfd / 2;
-        
-        // Calculate n (number of pumps) based on the formula: n = tc/tad + 1
         const n = tc > 0 && tad > 0 ? Math.ceil(tc / tad + 1) : null;
-        
-        // Add equation steps for this instance
-        gcEquations += `
-          <div class="mt-6 border border-primary/20 rounded-md overflow-hidden">
-            <div class="bg-primary/10 p-3 border-b border-primary/20">
-              <h4 class="font-semibold">Instance ${instanceNumber} Calculations</h4>
+
+        // Helper function to ensure we use calculated values consistently (added back to fix linter errors)
+        const fixTemplateOutput = (html: string): string => {
+          return html.replace(/NewGcc = .*?(\d+\.\d+)/g, `NewGcc = ${newGccValue.toFixed(4)}`)
+                     .replace(/Gc' = .*?(\d+\.\d+)/g, `Gc' = ${gcPrimeValue.toFixed(4)}`);
+        };
+
+        // SAFETY: Generate equation HTML with explicit calculated values
+        const newGccCalculationHtml = `
+          <div class="border-t border-border/30 pt-4">
+            <p class="font-medium">NewGcc Calculation:</p>
+            <div class="mt-2 bg-background/60 p-3 rounded">
+              <p class="font-mono text-sm">NewGcc = (γc.γw)/(m.γc + γw)</p>
+              <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
+                <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
+                <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
+                <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
+                <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${newGccValue.toFixed(4)}</li>
+              </ol>
+              <p class="font-mono text-sm mt-2 font-bold">NewGcc = ${newGccValue.toFixed(4)} tonf/m3</p>
             </div>
-            <div class="p-4 space-y-4 bg-muted/20">
-              <div>
-                <p class="font-medium mb-2">Input Values:</p>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">Hc = ${instanceHc.toFixed(4)} m</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">γc = ${instanceGc.toFixed(4)}</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">γw = ${instanceGw.toFixed(4)}</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">Vcf = ${vcfValue.toFixed(4)}</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">m = ${calculatedM !== null ? calculatedM.toFixed(4) : instanceM.toFixed(4)}</span>
-                  </div>
-                  ${instanceGfc ? `<div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">γfc = ${instanceGfc.toFixed(4)}</span>
-                  </div>` : ''}
-                  ${instanceGf ? `<div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">γf = ${instanceGf.toFixed(4)}</span>
-                  </div>` : ''}
-                </div>
-              </div>
-              
-              <div class="space-y-6">
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">NewGcc Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">NewGcc = (γc.γw)/(m.γc + γw)</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
-                      <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
-                      <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
-                      <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${Number((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)).toFixed(4)}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">NewGcc = ${((instanceGc * instanceGw) / (instanceM * instanceGc + instanceGw)).toFixed(4)} tonf/m3</p>
-                  </div>
-                </div>
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">Gc' Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Gc' = K2.NewGcc.Vfc</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>K2 = ${instanceK2.toFixed(4)}</li>
-                      <li>NewGcc = ${calculatedNewGcc.toFixed(4)} (calculated cement grade from above)</li>
-                      <li>K2.NewGcc = ${instanceK2.toFixed(4)} × ${calculatedNewGcc.toFixed(4)} = ${(instanceK2 * calculatedNewGcc).toFixed(4)}</li>
-                      <li>K2.NewGcc.Vfc = ${(instanceK2 * calculatedNewGcc).toFixed(4)} × ${vcfValue.toFixed(4)} = ${Number(gc_prime).toFixed(4)}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Gc' = ${Number(gc_prime).toFixed(4)}</p>
-                  </div>
-                </div>
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">nc (Cement Sacks) Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">nc = (Gc' × 1000) / 50</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>Gc' × 1000 = ${Number(gc_prime).toFixed(4)} × 1000 = ${Number(gc_prime * 1000).toFixed(4)}</li>
-                      <li>(Gc' × 1000) / 50 = ${Number(gc_prime * 1000).toFixed(4)} / 50 = ${nc !== null ? Number(nc).toFixed(4) : "N/A"}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">nc = ${nc !== null ? Number(nc).toFixed(4) : "N/A"} sacks</p>
-                  </div>
-                </div>
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">Vw (Water Volume) Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Vw = (K3 × m × NewGcc × Vfc) / γw</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>K3 = ${instanceK3.toFixed(4)}</li>
-                      <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
-                      <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
-                      <li>NewGcc = ${calculatedNewGcc.toFixed(4)} (calculated cement grade)</li>
-                      <li>(K3 × m) × NewGcc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${calculatedNewGcc.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedNewGcc).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × NewGcc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedNewGcc).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedNewGcc * vcfValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × NewGcc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedNewGcc * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
-                  </div>
-                </div>
-                
-                ${instanceGfc && instanceGf ? `
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">Vfd (Fluid Displacement) Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Vfd = (π/4) × di² × (H - h)</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>di = ${(vcfResult.di / 1000).toFixed(4)} m (${vcfResult.di.toFixed(4)} mm)</li>
-                      <li>di² = ${Math.pow(vcfResult.di / 1000, 2).toFixed(6)}</li>
-                      <li>H - h = ${H.toFixed(4)} - ${h.toFixed(4)} = ${(H - h).toFixed(4)}</li>
-                      <li>π/4 = ${(Math.PI / 4).toFixed(6)}</li>
-                      <li>(π/4) × di² × (H - h) = ${(Math.PI / 4).toFixed(6)} × ${Math.pow(vcfResult.di / 1000, 2).toFixed(6)} × ${(H - h).toFixed(4)} = ${vfd.toFixed(4)}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Vfd = ${vfd.toFixed(4)}</p>
-                  </div>
-                </div>
-                ` : ''}
-                
-                ${nc !== null && instanceGf ? `
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">Pymax (Max Pressure at Yield) Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Pymax = 0.1[(Hc - h)(γfc - γf)]</p>
-                    <p class="text-xs text-muted-foreground mt-1">Where Hc is Height Above Cementation from Formation Design and h is the height parameter from semantic screen</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>Hc - h = ${instanceHc.toFixed(4)} - ${vcfResult.h.toFixed(4)} = ${(instanceHc - vcfResult.h).toFixed(4)}</li>
-                      <li>γfc - γf = ${instanceGfc.toFixed(4)} - ${instanceGf.toFixed(4)} = ${(instanceGfc - instanceGf).toFixed(4)}</li>
-                      <li>0.1 × (Hc - h) × (γfc - γf) = 0.1 × ${(instanceHc - vcfResult.h).toFixed(4)} × ${(instanceGfc - instanceGf).toFixed(4)} = ${pymax !== null ? pymax.toFixed(4) : "N/A"}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Pymax = ${pymax !== null ? pymax.toFixed(4) : "N/A"} MPa</p>
-                  </div>
-                </div>
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">Pc (Confining Pressure) Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Pc = 0.2H + (8 or 16)</p>
-                    <p class="font-mono text-sm mt-1">Where H is the depth and 8 is used if H < 2000, otherwise 16 is used</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>H = ${vcfResult.h.toFixed(4)}</li>
-                      <li>Constant value = ${vcfResult.h >= 2000 ? '16 (since H ≥ 2000)' : '8 (since H < 2000)'}</li>
-                      <li>0.2 × H = 0.2 × ${vcfResult.h.toFixed(4)} = ${(0.2 * vcfResult.h).toFixed(4)}</li>
-                      <li>0.2H + ${constantValue} = ${(0.2 * vcfResult.h).toFixed(4)} + ${constantValue} = ${pc.toFixed(4)}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Pc = ${pc.toFixed(4)} MPa</p>
-                  </div>
-                </div>
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">Ppmax (Maximum Pump Pressure) Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Ppmax = (Pymax + Pc + Pfr) / 10</p>
-                    <p class="font-mono text-sm mt-1">Where Pfr (friction pressure) = 5 MPa (constant)</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>Pymax + Pc + Pfr = ${pymax !== null ? pymax.toFixed(4) : "N/A"} + ${pc !== null ? pc.toFixed(4) : "N/A"} + ${pfr} = ${pymax !== null && pc !== null ? (pymax + pc + pfr).toFixed(4) : "N/A"}</li>
-                      <li>(Pymax + Pc + Pfr) / 10 = ${pymax !== null && pc !== null ? (pymax + pc + pfr).toFixed(4) : "N/A"} / 10 = ${ppmax !== null ? ppmax.toFixed(4) : "N/A"}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Ppmax = ${ppmax !== null ? ppmax.toFixed(4) : "N/A"} MPa/10</p>
-                  </div>
-                </div>
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">n (Number of Pumps) Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">n = tc/tad + 1</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>tc = ${tc > 0 ? tc.toFixed(2) : "N/A"}</li>
-                      <li>tad = ${tad.toFixed(2)}</li>
-                      <li>tc/tad = ${tc > 0 && tad > 0 ? (tc/tad).toFixed(4) : "N/A"}</li>
-                      <li>tc/tad + 1 = ${tc > 0 && tad > 0 ? (tc/tad).toFixed(4) : "N/A"} + 1 = ${tc > 0 && tad > 0 ? (tc/tad + 1).toFixed(4) : "N/A"}</li>
-                      <li>Ceiling(tc/tad + 1) = ${n !== null ? n : "N/A"}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">n = ${n !== null ? n : "N/A"} pumps</p>
-                  </div>
-                </div>
-                                ` : ''}
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">m Variable Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">m = (γw × (γc - γfc)) / (γc × (γfc - γw))</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      ${instanceGfc ? `
-                      <li>γw × (γc - γfc) = ${instanceGw.toFixed(4)} × (${instanceGc.toFixed(4)} - ${instanceGfc.toFixed(4)}) = ${instanceGw.toFixed(4)} × ${(instanceGc - instanceGfc).toFixed(4)} = ${(instanceGw * (instanceGc - instanceGfc)).toFixed(4)}</li>
-                      <li>γc × (γfc - γw) = ${instanceGc.toFixed(4)} × (${instanceGfc.toFixed(4)} - ${instanceGw.toFixed(4)}) = ${instanceGc.toFixed(4)} × ${(instanceGfc - instanceGw).toFixed(4)} = ${(instanceGc * (instanceGfc - instanceGw)).toFixed(4)}</li>
-                      <li>(γw × (γc - γfc)) / (γc × (γfc - γw)) = ${(instanceGw * (instanceGc - instanceGfc)).toFixed(4)} / ${(instanceGc * (instanceGfc - instanceGw)).toFixed(4)} = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
-                      ` : `<li>Cannot calculate m: missing γfc value</li>`}
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Calculated m = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</p>
-                    <p class="text-xs text-muted-foreground mt-1">Calculated m value is used for water volume calculations</p>
-                  </div>
-                </div>
-                
-                <div class="border-t border-border/30 pt-4">
-                  <p class="font-medium">Vw (Water Volume) Calculation:</p>
-                  <div class="mt-2 bg-background/60 p-3 rounded">
-                    <p class="font-mono text-sm">Vw = (K3 × m × Gc × Vfc) / γw</p>
-                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                      <li>K3 = ${instanceK3.toFixed(4)}</li>
-                      <li>Calculated m = (γw × (γc - γfc)) / (γc × (γfc - γw)) = ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"}</li>
-                      <li>K3 × m = ${instanceK3.toFixed(4)} × ${calculatedM !== null ? calculatedM.toFixed(4) : "N/A"} = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"}</li>
-                      <li>Gc = ${calculatedNewGcc.toFixed(4)} (calculated cement grade)</li>
-                      <li>(K3 × m) × Gc = ${calculatedM !== null ? (instanceK3 * calculatedM).toFixed(4) : "N/A"} × ${calculatedNewGcc.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedNewGcc).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc) × Vfc = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedNewGcc).toFixed(4) : "N/A"} × ${vcfValue.toFixed(4)} = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedNewGcc * vcfValue).toFixed(4) : "N/A"}</li>
-                      <li>(K3 × m × Gc × Vfc) / γw = ${calculatedM !== null ? (instanceK3 * calculatedM * calculatedNewGcc * vcfValue).toFixed(4) : "N/A"} / ${instanceGw.toFixed(4)} = ${vw !== null ? vw.toFixed(4) : "N/A"}</li>
-                    </ol>
-                    <p class="font-mono text-sm mt-2 font-bold">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="mt-3 pt-3 border-t border-border/30">
-                <p class="text-center font-medium">Final Results:</p>
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2">
-                  <div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">NewGcc = ${calculatedNewGcc.toFixed(4)}</span>
-                  </div>
-                  <div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">Gc' = ${gc_prime.toFixed(4)}</span>
-                  </div>
-                  <div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">nc = ${nc !== null ? nc.toFixed(4) : "N/A"}</span>
-                  </div>
-                  <div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">Vw = ${vw !== null ? vw.toFixed(4) : "N/A"}</span>
-                  </div>
-                  ${vfd !== null ? `<div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">Vfd = ${vfd.toFixed(4)}</span>
-                  </div>` : ''}
-                  ${pymax !== null ? `<div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">Pymax = ${pymax.toFixed(4)}</span>
-                  </div>` : ''}
-                  ${pc !== null ? `<div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">Pc = ${pc.toFixed(4)}</span>
-                  </div>` : ''}
-                  ${ppmax !== null ? `<div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">Ppmax = ${ppmax.toFixed(4)}</span>
-                  </div>` : ''}
-                  ${n !== null ? `<div class="bg-primary/10 p-2 rounded border border-primary/30">
-                    <span class="font-mono text-sm">n = ${n}</span>
-                  </div>` : ''}
-                </div>
-              </div>
+          </div>`;
+        
+        const gcPrimeCalculationHtml = `
+          <div class="border-t border-border/30 pt-4">
+            <p class="font-medium">Gc' Calculation:</p>
+            <div class="mt-2 bg-background/60 p-3 rounded">
+              <p class="font-mono text-sm">Gc' = K2.NewGcc.Vfc</p>
+              <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
+                <li>K2 = ${instanceK2.toFixed(4)}</li>
+                <li>NewGcc = ${newGccValue.toFixed(4)} (calculated cement grade from above)</li>
+                <li>K2.NewGcc = ${instanceK2.toFixed(4)} × ${newGccValue.toFixed(4)} = ${(instanceK2 * newGccValue).toFixed(4)}</li>
+                <li>K2.NewGcc.Vfc = ${(instanceK2 * newGccValue).toFixed(4)} × ${vcfValue.toFixed(4)} = ${gcPrimeValue.toFixed(4)}</li>
+              </ol>
+              <p class="font-mono text-sm mt-2 font-bold">Gc' = ${gcPrimeValue.toFixed(4)}</p>
             </div>
           </div>`;
         
@@ -1908,7 +1498,7 @@ export default function SemanticsPage() {
         return {
           instance: vcfResult.instance,
           vcf: vcfValue,
-          newGcc: calculatedNewGcc, // Use calculatedNewGcc instead of recalculating
+          newGcc: newGccValue, // CRITICAL: Use our strictly calculated value
           nc: nc,
           vw: vw,
           vfd: vfd,
@@ -1926,15 +1516,19 @@ export default function SemanticsPage() {
         };
       });
       
-      // Update the equation HTML with the enhanced version
-      if (equationHTML) {
-        updateEquationHTML(fixTemplateOutput(equationHTML + gcEquations));
+      // Inside calculateGcGcInternal function, after processing results:
+      if (results.length > 0) {
+        if (equationHTML && equationHTML.length > 0) {
+          // Directly update without fixTemplateOutput since we're already using correct values
+          updateEquationHTML(equationHTML + gcEquations);
+        } else {
+          // Directly update without fixTemplateOutput
+          updateEquationHTML(gcEquations);
+        }
+        setGcResults(results);
       } else {
-        updateEquationHTML(fixTemplateOutput(gcEquations));
+        // ... existing code ...
       }
-      
-      // Update state with calculated results
-      setGcResults(results);
       
       // Save results to localStorage
       saveResultsToLocalStorage();
