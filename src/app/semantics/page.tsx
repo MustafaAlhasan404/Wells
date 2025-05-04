@@ -1326,7 +1326,7 @@ export default function SemanticsPage() {
                             </div>
                             <div>
                               <p class="font-medium">Ppmax (maximum pump pressure):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Ppmax = Pymax + Pc + Pfr</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Ppmax = (Pymax + Pc + Pfr) / 10</p>
                               <p class="text-sm mt-1">Where Pfr (friction pressure) = 5 MPa (constant)</p>
                             </div>
                             <div>
@@ -1396,7 +1396,7 @@ export default function SemanticsPage() {
         // Vfd = (π/4) × di² × (H - h)
         const PI_OVER_4 = Math.PI / 4;
         let vfd = null;
-
+        
         // Try to get H from tfd (fluid displacement height) input
         let H = 250; // Default value
         if (tfdValue && !isNaN(parseFloat(tfdValue))) {
@@ -1404,7 +1404,7 @@ export default function SemanticsPage() {
         } else if (instanceValues['tfd'] && instanceValues['tfd'][instanceNumber] && !isNaN(parseFloat(instanceValues['tfd'][instanceNumber]))) {
           H = parseFloat(instanceValues['tfd'][instanceNumber]);
         }
-
+        
         // Try to get h from td (displacement height) input
         let h = 30; // Default value
         if (tdValue && !isNaN(parseFloat(tdValue))) {
@@ -1412,7 +1412,7 @@ export default function SemanticsPage() {
         } else if (instanceValues['td'] && instanceValues['td'][instanceNumber] && !isNaN(parseFloat(instanceValues['td'][instanceNumber]))) {
           h = parseFloat(instanceValues['td'][instanceNumber]);
         }
-
+        
         // Get internal diameter in meters
         const di_for_vfd = vcfResult.di / 1000;
         if (!isNaN(di_for_vfd) && di_for_vfd > 0 && !isNaN(H) && !isNaN(h) && H > h) {
@@ -1421,23 +1421,23 @@ export default function SemanticsPage() {
 
         // Calculate Pymax (maximum pressure at yield point)
         const pymax = (instanceGfc && instanceGf && vcfResult.h) ? 
-          0.1 * (instanceHc - vcfResult.h) * (instanceGfc - instanceGf) : null;
-
+                      0.1 * (instanceHc - vcfResult.h) * (instanceGfc - instanceGf) : null;
+        
         // Calculate Pc (confining pressure)
         const constantValue = vcfResult.h >= 2000 ? 16 : 8;
         const pc = 0.2 * vcfResult.h + constantValue;
-
+        
         // Pfr remains constant at 5 usually
         const pfr = 5;
-
+        
         // Calculate Ppmax (maximum pump pressure)
         const ppmax = (pymax && pc) ? ((pymax + pc + pfr) / 10) : null;
-
+        
         // Calculate td and related time variables
         let instanceTd = getStrictNumericValue(instanceValues['td']?.[instanceNumber], parseFloat(tdValue) || 30);
         const tp = 60; // Constant value of 60
         const tad = 0.75 * tp; // tad = 0.75 * tp
-
+        
         // Get Q value from pumpResults if available
         let Q = 0;
         if (pumpResults && pumpResults.length > 0) {
@@ -1446,7 +1446,7 @@ export default function SemanticsPage() {
             Q = pumpForInstance.flow;
           }
         }
-
+        
         // Calculate time values
         let tfcPlusTfd = 0;
         if (Q > 0 && vfd !== null) {
@@ -1456,7 +1456,7 @@ export default function SemanticsPage() {
         const tfc = tfcPlusTfd / 2;
         const tfd = tfcPlusTfd / 2;
         const n = tc > 0 && tad > 0 ? Math.ceil(tc / tad + 1) : null;
-
+        
         // Helper function to ensure we use calculated values consistently (added back to fix linter errors)
         const fixTemplateOutput = (html: string): string => {
           return html.replace(/NewGcc = .*?(\d+\.\d+)/g, `NewGcc = ${newGccValue.toFixed(4)}`)
@@ -1465,31 +1465,31 @@ export default function SemanticsPage() {
 
         // SAFETY: Generate equation HTML with explicit calculated values
         const newGccCalculationHtml = `
-          <div class="border-t border-border/30 pt-4">
+                <div class="border-t border-border/30 pt-4">
             <p class="font-medium">NewGcc Calculation:</p>
-            <div class="mt-2 bg-background/60 p-3 rounded">
+                  <div class="mt-2 bg-background/60 p-3 rounded">
               <p class="font-mono text-sm">NewGcc = (γc.γw)/(m.γc + γw)</p>
-              <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
-                <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
-                <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
+                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
+                      <li>γc.γw = ${instanceGc.toFixed(4)} × ${instanceGw.toFixed(4)} = ${(instanceGc * instanceGw).toFixed(4)}</li>
+                      <li>m.γc = ${instanceM.toFixed(4)} × ${instanceGc.toFixed(4)} = ${(instanceM * instanceGc).toFixed(4)}</li>
+                      <li>m.γc + γw = ${(instanceM * instanceGc).toFixed(4)} + ${instanceGw.toFixed(4)} = ${(instanceM * instanceGc + instanceGw).toFixed(4)}</li>
                 <li>(γc.γw)/(m.γc + γw) = ${(instanceGc * instanceGw).toFixed(4)} / ${(instanceM * instanceGc + instanceGw).toFixed(4)} = ${newGccValue.toFixed(4)}</li>
-              </ol>
+                    </ol>
               <p class="font-mono text-sm mt-2 font-bold">NewGcc = ${newGccValue.toFixed(4)} tonf/m3</p>
-            </div>
+                  </div>
           </div>`;
-        
+                
         const gcPrimeCalculationHtml = `
-          <div class="border-t border-border/30 pt-4">
+                <div class="border-t border-border/30 pt-4">
             <p class="font-medium">Gc' Calculation:</p>
-            <div class="mt-2 bg-background/60 p-3 rounded">
+                  <div class="mt-2 bg-background/60 p-3 rounded">
               <p class="font-mono text-sm">Gc' = K2.NewGcc.Vfc</p>
-              <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                <li>K2 = ${instanceK2.toFixed(4)}</li>
+                    <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
+                      <li>K2 = ${instanceK2.toFixed(4)}</li>
                 <li>NewGcc = ${newGccValue.toFixed(4)} (calculated cement grade from above)</li>
                 <li>K2.NewGcc = ${instanceK2.toFixed(4)} × ${newGccValue.toFixed(4)} = ${(instanceK2 * newGccValue).toFixed(4)}</li>
                 <li>K2.NewGcc.Vfc = ${(instanceK2 * newGccValue).toFixed(4)} × ${vcfValue.toFixed(4)} = ${gcPrimeValue.toFixed(4)}</li>
-              </ol>
+                    </ol>
               <p class="font-mono text-sm mt-2 font-bold">Gc' = ${gcPrimeValue.toFixed(4)}</p>
             </div>
           </div>`;
@@ -1518,16 +1518,72 @@ export default function SemanticsPage() {
       
       // Inside calculateGcGcInternal function, after processing results:
       if (results.length > 0) {
-        if (equationHTML && equationHTML.length > 0) {
-          // Directly update without fixTemplateOutput since we're already using correct values
-          updateEquationHTML(equationHTML + gcEquations);
-        } else {
-          // Directly update without fixTemplateOutput
-          updateEquationHTML(gcEquations);
-        }
+        // CRITICAL FIX: Force regeneration of the entire equation HTML to ensure consistent rendering
+        const fullEquationHTML = `
+          <div class="space-y-4">
+            <!-- This is the introductory section that must always be visible -->
+            <div class="space-y-4 mt-6">
+              <h3 class="text-xl font-bold text-primary">NewGcc/Gc' and Related Equations</h3>
+              <div class="bg-muted/30 p-4 rounded-md border border-border/40">
+                <h4 class="font-medium mb-2">General Formulas:</h4>
+                <div class="space-y-4">
+                  <div>
+                    <p class="font-medium">NewGcc (cement grade):</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">NewGcc = (γc·γw)/(m·γc + γw)</p>
+                  </div>
+                  <div>
+                    <p class="font-medium">Gc' (modified cement grade):</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">Gc' = K2.NewGcc.Vfc</p>
+                  </div>
+                  <div>
+                    <p class="font-medium">nc (number of cement sacks):</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">nc = (Gc' × 1000) / 50</p>
+                  </div>
+                  <div>
+                    <p class="font-medium">Vw (water volume):</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">Vw = (K3 × m × NewGcc × Vfc) / γw</p>
+                  </div>
+                  <div>
+                    <p class="font-medium">Vfd (volume of fluid displacement):</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">Vfd = (π/4) × di² × (H - h)</p>
+                  </div>
+                  <div>
+                    <p class="font-medium">Pymax (maximum pressure at yield point):</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(Hc - h)(γfc - γf)]</p>
+                    <p class="text-xs mt-1">Where Hc is Height Above Cementation from Formation Design and h is the height parameter from semantic screen</p>
+                  </div>
+                  <div>
+                    <p class="font-medium">Pc (confining pressure):</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">Pc = 0.2H + (8 or 16)</p>
+                    <p class="text-xs mt-1">Where H is the depth and 8 is used if H < 2000, otherwise 16 is used</p>
+                  </div>
+                  <div>
+                    <p class="font-medium">Ppmax (maximum pump pressure):</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">Ppmax = (Pymax + Pc + Pfr) / 10</p>
+                    <p class="text-sm mt-1">Where Pfr (friction pressure) = 5 MPa (constant)</p>
+                  </div>
+                  <div>
+                    <p class="font-medium">Time Calculations:</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">tfc+tfd = ((Vcf+Vfd)*10^3)/Q</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">tc = tfc+tfd + td</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">tad = 0.75 * tp</p>
+                    <p class="text-sm mt-1">Where Q is the pump flow rate, td is input value, tp = 60</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Instance specific calculations -->
+            ${gcEquations}
+          </div>
+        `;
+        
+        // Use the full HTML that we've manually constructed to guarantee it appears
+        console.log("Updating with complete equation HTML, length:", fullEquationHTML.length);
+        updateEquationHTML(fullEquationHTML);
         setGcResults(results);
       } else {
-        // ... existing code ...
+        console.warn("No results generated for gc calculations");
       }
       
       // Save results to localStorage
