@@ -2037,91 +2037,55 @@ export default function SemanticsPage() {
 
   const updateGammaC = (value: string) => {
     setGammaC(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateGammaW = (value: string) => {
     setGammaW(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateGammaFC = (value: string) => {
     setGammaFC(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
-  // Add wellType context
-  const { wellType } = useWellType();
-  
-  // Set fixed gammaF value for exploration wells on initial load and when wellType changes
-  useEffect(() => {
-    if (wellType === 'exploration') {
-      setGammaF("1.08");
-    }
-  }, [wellType]);
-  
   const updateGammaF = (value: string) => {
-    // For exploration wells, gammaF should be fixed at 1.08
     if (wellType === 'exploration') {
       setGammaF("1.08");
     } else {
       setGammaF(value);
     }
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateK1Value = (value: string) => {
     setK1Value(value);
-    // Clear Vcf results when K1 changes
     clearVcfResults();
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateK2Value = (value: string) => {
     setK2Value(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateK3Value = (value: string) => {
     setK3Value(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateTfcValue = (value: string) => {
     setTfcValue(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateTfdValue = (value: string) => {
     setTfdValue(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateTdValue = (value: string) => {
     setTdValue(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateHValue = (value: string) => {
     setHValue(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   const updateMValue = (value: string) => {
     setMValue(value);
-    // Auto-save after changing value
-    setTimeout(() => saveInputData(), 0);
   };
 
   // Helper to get HAD section name from casing result section
@@ -2142,6 +2106,16 @@ export default function SemanticsPage() {
     
     return section + " Section";
   };
+
+  // Add wellType context
+  const { wellType } = useWellType();
+  
+  // Set fixed gammaF value for exploration wells on initial load and when wellType changes
+  useEffect(() => {
+    if (wellType === 'exploration') {
+      setGammaF("1.08");
+    }
+  }, [wellType]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
