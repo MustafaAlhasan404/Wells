@@ -1456,9 +1456,63 @@ export default function SemanticsPage() {
                       0.1 * (instanceHc - vcfResult.h) * (instanceGfc - instanceGf) : null;
         
         // Calculate Pc (confining pressure)
-        const constantValue = vcfResult.h >= 2000 ? 16 : 8;
-        const pc = 0.2 * vcfResult.h + constantValue;
-        
+        // FIXED: Get actual depth from formation/casing data instead of using height parameter
+        let depth = 0;
+        try {
+          // Try to get H/depth value from wellsAnalyzerData (formation design data)
+          const formationData = localStorage.getItem('wellsAnalyzerData');
+          if (formationData) {
+            const data = JSON.parse(formationData);
+            
+            // Try to get H values based on instance (using the same swapped indexing as for Hc)
+            if (instanceNumber === 1) { // Production (was Instance 3)
+              depth = data.H_3 ? parseFloat(data.H_3) : 0;
+            } else if (instanceNumber === 2) { // Intermediate (Instance 2)
+              depth = data.H_2 ? parseFloat(data.H_2) : 0;
+            } else if (instanceNumber === 3) { // Surface (was Instance 1)
+              depth = data.H_1 ? parseFloat(data.H_1) : 0;
+            }
+            
+            // If no instance-specific value found, try to get a single H value
+            if (depth === 0 && data.H) {
+              depth = parseFloat(data.H);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load H (depth) value from formation data:', error);
+        }
+
+        // If still no valid depth, use a fallback based on casing section type
+        if (depth === 0 && casingResults && casingResults.length > 0) {
+          // Fallback to estimating depth based on casing section
+          const casingSection = casingResults.find(r => r.section.toLowerCase().includes(
+            instanceNumber === 1 ? "production" : 
+            instanceNumber === 2 ? "intermediate" : 
+            "surface"
+          ));
+          
+          if (casingSection) {
+            // Estimate depth based on section - these are typical depths
+            if (casingSection.section.toLowerCase().includes("production")) {
+              depth = 3000; // Production typically deepest
+            } else if (casingSection.section.toLowerCase().includes("intermediate")) {
+              depth = 2000; // Intermediate typically middle depth
+            } else if (casingSection.section.toLowerCase().includes("surface")) {
+              depth = 1000; // Surface typically shallowest
+            }
+          }
+        }
+
+        // If we still don't have a depth value, use vcfResult.h as a last resort
+        if (depth === 0) {
+          depth = vcfResult.h;
+          console.warn(`Using height parameter (${depth}) as fallback for depth value in Pc calculation, instance ${instanceNumber}`);
+        }
+
+        // Now calculate Pc with the proper depth value
+        const constantValue = depth >= 2000 ? 16 : 8;
+        const pc = 0.02 * depth + constantValue;
+
         // Pfr remains constant at 5 usually
         const pfr = 5;
         
