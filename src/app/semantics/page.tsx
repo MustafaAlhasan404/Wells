@@ -2239,18 +2239,29 @@ export default function SemanticsPage() {
       setIsLoading(true);
       
       try {
-        // Run Vcf calculation
-        calculateVcf();
+        // Run Vcf calculation and check if it returned results
+        const vcfResultsFromCalc = calculateVcf();
         
-        // If successful, mark first step as done
-        setTimeout(() => {
-          setCalculationProgress(50);
-          setCalculationStep('vcf-done');
-          setIsLoading(false);
-          showToast('info', "Vcf calculated successfully", {
-            description: "Click Calculate again to proceed with the remaining calculations"
-          });
-        }, 300);
+        // Only proceed if we actually got valid results
+        if (vcfResultsFromCalc && vcfResultsFromCalc.length > 0) {
+          // If successful, mark first step as done
+          setTimeout(() => {
+            setCalculationProgress(50);
+            setCalculationStep('vcf-done');
+            setIsLoading(false);
+            showToast('info', "Vcf calculated successfully", {
+              description: "Click Calculate again to proceed with the remaining calculations"
+            });
+          }, 300);
+        } else {
+          // No results returned but no error thrown - reset state
+          setTimeout(() => {
+            setCalculationStep('idle');
+            setCalculationProgress(0);
+            setIsLoading(false);
+            // No need for another toast as calculateVcf() already showed one
+          }, 300);
+        }
       } catch (error) {
         console.error("Error in Vcf calculation:", error);
         showToast('error', "Error calculating Vcf");
@@ -2260,6 +2271,9 @@ export default function SemanticsPage() {
       }
     }
   };
+
+  // Add this to the state declarations at the top of the component
+  const [selectedPumpIndices, setSelectedPumpIndices] = useState<Record<number, number>>({});
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -2709,62 +2723,114 @@ export default function SemanticsPage() {
                     {pumpResults && pumpResults.length > 0 && (
                       <div className="pt-4 border-t border-border/30">
                         <h3 className="text-lg font-medium text-primary/90 mb-4">Selected Pumps</h3>
-                          <div className="space-y-6">
+                        <div className="space-y-6">
                           {[...new Set(pumpResults.map(pump => pump.instance))].map(instance => {
                             const pumpsForInstance = pumpResults.filter(pump => pump.instance === instance);
                             const recommendedPump = pumpsForInstance.find(pump => pump.isRecommended);
                             
+                            // Get the selected pump index from our component-level state
+                            const selectedPumpIndex = selectedPumpIndices[instance] || 0;
+                            const selectedPump = pumpsForInstance[selectedPumpIndex] || recommendedPump;
+                            
                             return (
                               <div key={`instance-${instance}`} className="border border-border/30 rounded-md overflow-hidden">
-                                <div className="bg-muted/30 px-4 py-3 border-b border-border/30">
+                                <div className="bg-zinc-900 px-3 py-2 border-b border-zinc-800 flex justify-between items-center">
                                   <h4 className="font-medium">Instance {instance}</h4>
+                                  
+                                  {/* Simplified pump selection dropdown */}
+                                  <div className="flex items-center gap-2">
+                                    <Settings className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm text-muted-foreground">Compare:</span>
+                                    <Select 
+                                      value={selectedPumpIndex.toString()} 
+                                      onValueChange={(value) => setSelectedPumpIndices(prev => ({...prev, [instance]: parseInt(value)}))}
+                                    >
+                                      <SelectTrigger id={`pump-select-${instance}`} className="w-[220px] h-9 bg-zinc-900 border-zinc-800">
+                                        {selectedPump && (
+                                          <div className="flex items-center gap-1 whitespace-nowrap overflow-hidden">
+                                            {selectedPump.isRecommended && (
+                                              <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />
+                                            )}
+                                            <span className="truncate">{selectedPump.type}</span>
+                                            <span className="text-xs flex-shrink-0 text-muted-foreground">Speed {selectedPump.speed}</span>
+                                          </div>
+                                        )}
+                                      </SelectTrigger>
+                                      <SelectContent className="max-h-[280px]">
+                                        {pumpsForInstance.map((pump, index) => (
+                                          <SelectItem 
+                                            key={index} 
+                                            value={index.toString()}
+                                          >
+                                            <div className="flex items-center gap-1 whitespace-nowrap overflow-hidden">
+                                              {pump.isRecommended && (
+                                                <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />
+                                              )}
+                                              <span className="truncate">{pump.type}</span>
+                                              <span className="text-xs flex-shrink-0 text-muted-foreground">Speed {pump.speed}</span>
+                                              {pump.isRecommended && (
+                                                <span className="ml-1 text-xs flex-shrink-0 text-green-500">Recommended</span>
+                                              )}
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
                                 </div>
                                 <div className="p-4">
-                                  {recommendedPump ? (
+                                  {selectedPump ? (
                                     <div className="space-y-4">
                                       <div className="flex items-center space-x-2">
-                                        <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
-                                          Recommended
-                                        </Badge>
-                                        <span className="font-medium">{recommendedPump.type}</span>
+                                        {selectedPump.isRecommended ? (
+                                          <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
+                                            Recommended
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+                                            Alternative
+                                          </Badge>
+                                        )}
+                                        <span className="font-medium">{selectedPump.type}</span>
+                                        <span className="text-sm text-muted-foreground">(Speed: {selectedPump.speed})</span>
                                       </div>
                                       
                                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                         <div className="bg-background/50 p-2 rounded border border-border/30">
                                           <span className="text-xs text-muted-foreground">Diameter</span>
-                                          <p className="font-medium">{recommendedPump.diameter}"</p>
+                                          <p className="font-medium">{selectedPump.diameter}"</p>
                                         </div>
                                         <div className="bg-background/50 p-2 rounded border border-border/30">
                                           <span className="text-xs text-muted-foreground">Speed</span>
-                                          <p className="font-medium">{recommendedPump.speed}</p>
+                                          <p className="font-medium">{selectedPump.speed}</p>
                                         </div>
                                         <div className="bg-background/50 p-2 rounded border border-border/30">
                                           <span className="text-xs text-muted-foreground">Pressure</span>
-                                          <p className="font-medium">{recommendedPump.pressure} MPa</p>
+                                          <p className="font-medium">{selectedPump.pressure} MPa</p>
                                         </div>
                                         <div className="bg-background/50 p-2 rounded border border-border/30">
                                           <span className="text-xs text-muted-foreground">Flow</span>
-                                          <p className="font-medium">{recommendedPump.flow} L/min</p>
+                                          <p className="font-medium">{selectedPump.flow} L/min</p>
                                         </div>
                                       </div>
                                       
-                                      {recommendedPump.tfc !== null && (
+                                      {selectedPump.tfc !== null && (
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
                                           <div className="bg-background/50 p-2 rounded border border-border/30">
                                             <span className="text-xs text-muted-foreground">Cement Fill Time</span>
-                                            <p className="font-medium">{recommendedPump.tfc?.toFixed(2) || "0.00"} min</p>
+                                            <p className="font-medium">{selectedPump.tfc?.toFixed(2) || "0.00"} min</p>
                                           </div>
                                           <div className="bg-background/50 p-2 rounded border border-border/30">
                                             <span className="text-xs text-muted-foreground">Displacement Time</span>
-                                            <p className="font-medium">{recommendedPump.tfd?.toFixed(2) || "0.00"} min</p>
+                                            <p className="font-medium">{selectedPump.tfd?.toFixed(2) || "0.00"} min</p>
                                           </div>
                                           <div className="bg-background/50 p-2 rounded border border-border/30">
                                             <span className="text-xs text-muted-foreground">Total Time</span>
-                                            <p className="font-medium">{(recommendedPump.tc || 10).toFixed(2)} min</p>
+                                            <p className="font-medium">{(selectedPump.tc || 10).toFixed(2)} min</p>
                                           </div>
                                           <div className="bg-background/50 p-2 rounded border border-border/30">
                                             <span className="text-xs text-muted-foreground">Required Pressure</span>
-                                            <p className="font-medium">{recommendedPump.ppmax.toFixed(2)} MPa/10</p>
+                                            <p className="font-medium">{selectedPump.ppmax.toFixed(2)} MPa/10</p>
                                           </div>
                                         </div>
                                       )}
@@ -2772,7 +2838,7 @@ export default function SemanticsPage() {
                                       <div className="grid grid-cols-3 md:grid-cols-3 gap-3 mt-3">
                                         <div className="bg-background/50 p-2 rounded border border-border/30">
                                           <span className="text-xs text-muted-foreground">tfc+tfd</span>
-                                          <p className="font-medium">{((recommendedPump?.tfc || 0) + (recommendedPump?.tfd || 0)).toFixed(2)} min</p>
+                                          <p className="font-medium">{((selectedPump?.tfc || 0) + (selectedPump?.tfd || 0)).toFixed(2)} min</p>
                                         </div>
                                         <div className="bg-background/50 p-2 rounded border border-border/30">
                                           <span className="text-xs text-muted-foreground">Additional Time (td)</span>
@@ -2780,7 +2846,7 @@ export default function SemanticsPage() {
                                         </div>
                                         <div className="bg-background/50 p-2 rounded border border-border/30">
                                           <span className="text-xs text-muted-foreground">tc = tfc+tfd + td</span>
-                                          <p className="font-medium">{(((recommendedPump?.tfc || 0) + (recommendedPump?.tfd || 0)) + 10).toFixed(2)} min</p>
+                                          <p className="font-medium">{(((selectedPump?.tfc || 0) + (selectedPump?.tfd || 0)) + 10).toFixed(2)} min</p>
                                         </div>
                                       </div>
                                       
@@ -2794,17 +2860,63 @@ export default function SemanticsPage() {
                                           <p className="font-medium">45.00 min</p>
                                         </div>
                                       </div>
+
+                                      {/* Simplified performance comparison indicator */}
+                                      {!selectedPump.isRecommended && recommendedPump && (
+                                        <div className="mt-3 border border-zinc-800 rounded-md overflow-hidden">
+                                          <div className="bg-zinc-900 px-3 py-1.5">
+                                            <span className="text-xs font-medium">Comparison with recommended pump</span>
+                                          </div>
+                                          <div className="p-3">
+                                            <div className="grid grid-cols-2 gap-3">
+                                              {/* Pressure comparison */}
+                                              <div>
+                                                <div className="flex justify-between items-center mb-1">
+                                                  <span className="text-xs font-medium">Pressure</span>
+                                                  <span className={`text-xs ${selectedPump.pressure >= recommendedPump.pressure ? "text-green-500" : "text-amber-500"}`}>
+                                                    {((selectedPump.pressure / recommendedPump.pressure) * 100 - 100).toFixed(1)}%
+                                                    {selectedPump.pressure > recommendedPump.pressure ? " higher" : " lower"}
+                                                  </span>
+                                                </div>
+                                                <div className="overflow-hidden h-1 text-xs flex rounded bg-zinc-800">
+                                                  <div 
+                                                    className={`shadow-none flex flex-col text-center whitespace-nowrap justify-center ${selectedPump.pressure >= recommendedPump.pressure ? "bg-green-500" : "bg-amber-500"}`} 
+                                                    style={{ width: `${Math.min(100, Math.max(20, (selectedPump.pressure / recommendedPump.pressure) * 100))}%` }}
+                                                  ></div>
+                                                </div>
+                                              </div>
+                                              
+                                              {/* Flow comparison */}
+                                              <div>
+                                                <div className="flex justify-between items-center mb-1">
+                                                  <span className="text-xs font-medium">Flow Rate</span>
+                                                  <span className={`text-xs ${selectedPump.flow >= recommendedPump.flow ? "text-green-500" : "text-amber-500"}`}>
+                                                    {((selectedPump.flow / recommendedPump.flow) * 100 - 100).toFixed(1)}%
+                                                    {selectedPump.flow > recommendedPump.flow ? " higher" : " lower"}
+                                                  </span>
+                                                </div>
+                                                <div className="overflow-hidden h-1 text-xs flex rounded bg-zinc-800">
+                                                  <div 
+                                                    className={`shadow-none flex flex-col text-center whitespace-nowrap justify-center ${selectedPump.flow >= recommendedPump.flow ? "bg-green-500" : "bg-amber-500"}`} 
+                                                    style={{ width: `${Math.min(100, Math.max(20, (selectedPump.flow / recommendedPump.flow) * 100))}%` }}
+                                                  ></div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   ) : (
-                                    <p className="text-muted-foreground">No recommended pump found for this instance.</p>
+                                    <p className="text-muted-foreground">No pump data available for this instance.</p>
                                   )}
-                            </div>
+                                </div>
                               </div>
                             );
                           })}
                         </div>
-                          </div>
-                        )}
+                      </div>
+                    )}
                   </div>
                       </CardContent>
                     </Card>
