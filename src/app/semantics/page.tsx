@@ -568,6 +568,8 @@ export default function SemanticsPage() {
       setGcResults([]);
       setEquationHTML("");
       setResultsHTML("");
+      setCalculationStep('idle');
+      setCalculationProgress(0);
       
       showToast('success', "All data cleared successfully");
     } catch (error) {
@@ -623,6 +625,8 @@ export default function SemanticsPage() {
   // Clear Vcf results
   const clearVcfResults = () => {
     setVcfResults([]);
+    setCalculationStep('idle');
+    setCalculationProgress(0); // Reset progress when clearing results
   };
 
   // Update setVcfResults
@@ -1071,14 +1075,18 @@ export default function SemanticsPage() {
 
   // Calculate Gc and Gc
   const calculateGcGc = () => {
-    // Validate that we have Vcf results first
-    if (!vcfResults || vcfResults.length === 0) {
-      alert("Please calculate Vcf values first");
-      return;
-    }
+    setIsLoading(true);
     
-    // Call the actual calculation function
-    calculateGcGcInternal();
+    // First calculate Vcf values
+    const vcfResults = calculateVcf();
+    
+    // Now if we have Vcf results, proceed with calculating the rest
+    if (vcfResults && vcfResults.length > 0) {
+      // Call the internal function to calculate Gc/Gc'
+      calculateGcGcInternal();
+    } else {
+      setIsLoading(false);
+    }
   };
 
   // Function to calculate NewGcc/Gc' values
@@ -2171,6 +2179,67 @@ export default function SemanticsPage() {
     }
   }, [wellType]);
 
+  // Add calculation progress state near the other state variables
+  const [calculationStep, setCalculationStep] = useState<'idle' | 'vcf-done' | 'calculating'>("idle");
+  const [calculationProgress, setCalculationProgress] = useState<number>(0);
+
+  // Update the calculateAll function to handle the two-step process
+  const calculateAll = () => {
+    // If we already calculated Vcf, proceed to the next step
+    if (calculationStep === 'vcf-done') {
+      setCalculationStep('calculating');
+      setCalculationProgress(75); // Start from 50% and animate to 75%
+      setIsLoading(true);
+      
+      try {
+        // Run GcGc calculations
+        calculateGcGcInternal();
+        
+        // Set to 100% when done and keep it there
+        setTimeout(() => {
+          setCalculationProgress(100);
+          setCalculationStep('idle'); // Reset step but keep progress at 100%
+          setIsLoading(false);
+        }, 300);
+      } catch (error) {
+        console.error("Error in GcGc calculations:", error);
+        showToast('error', "Error performing calculations");
+        setCalculationStep('vcf-done'); // Stay at step 1 if there's an error
+        setCalculationProgress(50);
+        setIsLoading(false);
+      }
+    } else {
+      // First step - calculate Vcf
+      setCalculationStep('calculating');
+      setCalculationProgress(0); // Start from 0
+      
+      // Immediately set to 25% for animation effect
+      setTimeout(() => setCalculationProgress(25), 10);
+      setIsLoading(true);
+      
+      try {
+        // Run Vcf calculation
+        calculateVcf();
+        
+        // If successful, mark first step as done
+        setTimeout(() => {
+          setCalculationProgress(50);
+          setCalculationStep('vcf-done');
+          setIsLoading(false);
+          showToast('info', "Vcf calculated successfully", {
+            description: "Click Calculate again to proceed with the remaining calculations"
+          });
+        }, 300);
+      } catch (error) {
+        console.error("Error in Vcf calculation:", error);
+        showToast('error', "Error calculating Vcf");
+        setCalculationStep('idle');
+        setCalculationProgress(0);
+        setIsLoading(false);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <NavBar />
@@ -2324,43 +2393,57 @@ export default function SemanticsPage() {
                       </div>
                     </div>
                   </CardContent>
-                <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col sm:flex-row gap-2">
-                      <Button 
-                        onClick={calculateVcf}
-                    className="flex-1 bg-primary/80 hover:bg-primary/90 text-primary-foreground shadow-sm gap-2"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <>
-                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                        <span>Calculating...</span>
-                          </>
-                        ) : (
-                          <>
-                        <Calculator className="h-4 w-4" />
-                        <span>Calculate Vcf</span>
-                          </>
-                        )}
-                      </Button>
-                    
+                <CardFooter className="bg-muted/20 px-6 py-4 border-t border-border/30 flex flex-col gap-3">
+                  <div className="w-full bg-muted/50 rounded-full h-2.5 overflow-hidden">
+                    <div 
+                      className="bg-primary h-2.5 rounded-full transition-all duration-500 ease-out" 
+                      style={{ width: `${calculationProgress}%` }}
+                    ></div>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button 
-                      onClick={calculateGcGc}
-                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm gap-2"
+                      onClick={calculateAll}
+                      className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm gap-2"
                       disabled={isLoading}
                     >
                       {isLoading ? (
                         <>
-                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                        <span>Calculating...</span>
+                          <LoaderCircle className="h-4 w-4 animate-spin" />
+                          <span>Calculating...</span>
+                        </>
+                      ) : calculationStep === 'vcf-done' ? (
+                        <>
+                          <Calculator className="h-4 w-4" />
+                          <span>Calculate All (Step 2/2)</span>
                         </>
                       ) : (
                         <>
-                        <Calculator className="h-4 w-4" />
-                        <span>Calculate All</span>
+                          <Calculator className="h-4 w-4" />
+                          <span>Calculate Vcf (Step 1/2)</span>
                         </>
                       )}
                     </Button>
-                  </CardFooter>
+                    
+                    <Button 
+                      onClick={saveData}
+                      className="flex-1 bg-muted hover:bg-muted/80 text-muted-foreground border border-border/50 shadow-sm gap-2"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <LoaderCircle className="h-4 w-4 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          <span>Save Data</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardFooter>
                 </Card>
             </TabsContent>
 
