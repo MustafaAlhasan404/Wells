@@ -242,12 +242,6 @@ export default function DataInputForm() {
                 )}
               </div>
               <div className="flex items-center">
-                <div className="flex items-center gap-1.5 mr-4">
-                  <Label htmlFor={`toggle-${field}`} className="text-xs text-muted-foreground whitespace-nowrap">
-                    Single value
-                  </Label>
-                  <HelpTooltip text="Click when there is the same value for all sections" />
-                </div>
                 <Switch 
                   id={`toggle-${field}`} 
                   checked={!!singleInputFields[field]} 
@@ -351,12 +345,6 @@ export default function DataInputForm() {
                 )}
               </div>
               <div className="flex items-center">
-                <div className="flex items-center gap-1.5 mr-4">
-                  <Label htmlFor={`toggle-${field}`} className="text-xs text-muted-foreground whitespace-nowrap">
-                    Single value
-                  </Label>
-                  <HelpTooltip text="Click when there is the same value for all sections" />
-                </div>
                 <Switch 
                   id={`toggle-${field}`} 
                   checked={!!singleInputFields[field]} 
@@ -432,7 +420,7 @@ export default function DataInputForm() {
   }
 
   const renderConstants = () => {
-    const fields = ["K1", "K2", "K3"]
+    const fields = ["K1", "K2", "K3", "Yc", "Yfc", "h", "td"]
     
     return (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
@@ -441,13 +429,25 @@ export default function DataInputForm() {
             <div className="flex items-center gap-2">
               <Label htmlFor={field} className="text-base font-medium text-primary">{field}</Label>
               {field === "K1" && (
-                <HelpTooltip text="Factor that consider the friction of the drill pipes with wellbore, ranges (1.1-1.2)" />
+                <HelpTooltip text="Factor that consider to the increase of the well dimeter (1.1-1.2)" />
               )}
               {field === "K2" && (
                 <HelpTooltip text="Factor that consider sticking of the drill pipes ranges (1.1-1.25)" />
               )}
               {field === "K3" && (
                 <HelpTooltip text="Factor that consider the acceleration of the drill pipes when raising ranges (1.02-1.04)" />
+              )}
+              {field === "Yc" && (
+                <HelpTooltip text="The specific weight for the cementing powder (gf/cm3)" />
+              )}
+              {field === "Yfc" && (
+                <HelpTooltip text="The specific weight for the cementing fluid (gf/cm3)" />
+              )}
+              {field === "h" && (
+                <HelpTooltip text="The height of Float Collars (m)" />
+              )}
+              {field === "td" && (
+                <HelpTooltip text="The time spent on bumping the cement (10-15 min)" />
               )}
             </div>
             <Input

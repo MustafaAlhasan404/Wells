@@ -40,6 +40,7 @@ import { Slider } from "@/components/ui/slider"
 import { calculateDim, HADResults } from "@/utils/casingCalculations";
 import { motion } from "framer-motion"
 import { useWellType } from "@/context/WellTypeContext";
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 
 interface VcfResult {
   instance: number;
@@ -2002,11 +2003,31 @@ export default function SemanticsPage() {
     return (
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <Label htmlFor={fieldId} className="text-sm font-medium">{label}</Label>
           <div className="flex items-center gap-2">
-            <Label htmlFor={`toggle-${fieldId}`} className="text-xs text-muted-foreground">
-              Single value
-            </Label>
+            <Label htmlFor={fieldId} className="text-sm font-medium">{label}</Label>
+            {fieldId === "gammaC" && (
+              <HelpTooltip text="The specific weight for the cementing powder (gf/cm3)" />
+            )}
+            {fieldId === "gammaFC" && (
+              <HelpTooltip text="The specific weight for the cementing fluid (gf/cm3)" />
+            )}
+            {fieldId === "h" && (
+              <HelpTooltip text="The height of Float Collars (m)" />
+            )}
+            {fieldId === "td" && (
+              <HelpTooltip text="The time spent on bumping the cement (10-15 min)" />
+            )}
+            {fieldId === "k1" && (
+              <HelpTooltip text="Factor that considers the increase of the well diameter (1.1-1.2)" />
+            )}
+            {fieldId === "k2" && (
+              <HelpTooltip text="Factor that considers sticking of the drill pipes (1.1-1.25)" />
+            )}
+            {fieldId === "k3" && (
+              <HelpTooltip text="Factor that considers the acceleration when raising (1.02-1.04)" />
+            )}
+          </div>
+          <div className="flex items-center gap-2">
             <Switch 
               id={`toggle-${fieldId}`} 
               checked={!!singleInputFields[fieldId]} 

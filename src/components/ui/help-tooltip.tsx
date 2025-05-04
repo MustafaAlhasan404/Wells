@@ -12,6 +12,7 @@ export function HelpTooltip({ text, className }: HelpTooltipProps) {
   const [isVisible, setIsVisible] = React.useState(false)
   const tooltipRef = React.useRef<HTMLDivElement>(null)
   const buttonRef = React.useRef<HTMLButtonElement>(null)
+  const [position, setPosition] = React.useState({ x: 0, y: 0 })
 
   // Close tooltip when clicking outside
   React.useEffect(() => {
@@ -32,6 +33,30 @@ export function HelpTooltip({ text, className }: HelpTooltipProps) {
     }
   }, [])
 
+  // Calculate tooltip position
+  React.useEffect(() => {
+    if (isVisible && buttonRef.current && tooltipRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect()
+      const tooltipRect = tooltipRef.current.getBoundingClientRect()
+      
+      // Center the tooltip above the button
+      let left = buttonRect.left + (buttonRect.width / 2) - (tooltipRect.width / 2)
+      
+      // Ensure tooltip doesn't go off the left edge of the screen
+      if (left < 10) left = 10
+      
+      // Ensure tooltip doesn't go off the right edge of the screen
+      if (left + tooltipRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipRect.width - 10
+      }
+      
+      setPosition({
+        x: left,
+        y: buttonRect.top - tooltipRect.height - 5
+      })
+    }
+  }, [isVisible])
+
   return (
     <div className="relative inline-block">
       <button
@@ -49,7 +74,13 @@ export function HelpTooltip({ text, className }: HelpTooltipProps) {
       {isVisible && (
         <div
           ref={tooltipRef}
-          className="absolute z-50 bottom-6 left-1/2 transform -translate-x-1/2 w-max max-w-xs bg-popover text-popover-foreground rounded-md border shadow-md px-3 py-1.5 text-sm animate-in fade-in-0 zoom-in-95"
+          className="fixed z-100 bg-popover text-popover-foreground rounded-md border shadow-md px-3 py-1.5 text-sm animate-in fade-in-0 zoom-in-95"
+          style={{ 
+            minWidth: "180px",
+            maxWidth: "250px",
+            top: `${position.y}px`,
+            left: `${position.x}px`,
+          }}
         >
           <p className="text-sm whitespace-normal">{text}</p>
         </div>
