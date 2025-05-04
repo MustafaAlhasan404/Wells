@@ -2185,7 +2185,7 @@ export default function SemanticsPage() {
         <div className="px-4 sm:px-6 md:px-8 lg:px-10 max-w-7xl mx-auto w-full py-6 md:py-10 space-y-6 md:space-y-8">
           <Tabs defaultValue="inputs" className="w-full">
             <div className="flex items-center justify-between mb-6">
-              <TabsList className="grid grid-cols-4 w-full max-w-xl bg-zinc-900 rounded-full overflow-hidden p-0 h-12">
+              <TabsList className="grid grid-cols-3 w-full max-w-xl bg-zinc-900 rounded-full overflow-hidden p-0 h-12">
                 <TabsTrigger 
                   value="inputs" 
                   className="flex items-center justify-center gap-2 h-full rounded-full
@@ -2209,18 +2209,6 @@ export default function SemanticsPage() {
                 >
                   <Calculator className="h-4 w-4" />
                   <span>Results</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="equations" 
-                  className="flex items-center justify-center gap-2 h-full rounded-full
-                    data-[state=inactive]:bg-transparent
-                    data-[state=inactive]:text-zinc-400
-                    data-[state=inactive]:hover:text-zinc-300
-                    data-[state=active]:bg-zinc-800
-                    data-[state=active]:text-white"
-                >
-                  <FileText className="h-4 w-4" />
-                  <span>Equations</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="pump-selection" 
@@ -2440,47 +2428,6 @@ export default function SemanticsPage() {
                       </CardContent>
                     </Card>
               )}
-                  </TabsContent>
-                  
-            <TabsContent value="equations" className="mt-0 space-y-4">
-              <Card className="border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm">
-                <CardHeader className="bg-muted/40 border-b border-border/40 flex items-center">
-                            <div>
-                    <div className="flex items-center space-x-2">
-                      <FileText className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg sm:text-xl text-primary/90">Calculation Equations</CardTitle>
-                            </div>
-                    <CardDescription className="mt-1.5">
-                      Detailed explanation of the formulas used in calculations
-                    </CardDescription>
-                          </div>
-                          <Button
-                    variant="ghost" 
-                    size="icon" 
-                            onClick={toggleEquationsMinimized}
-                    className="ml-auto"
-                          >
-                    {equationsMinimized ? <Maximize className="h-4 w-4" /> : <Minimize className="h-4 w-4" />}
-                          </Button>
-                      </CardHeader>
-                <CardContent className={cn("transition-all duration-300", equationsMinimized ? "max-h-96" : "max-h-[800px]")}>
-                  <ScrollArea className={cn("w-full", equationsMinimized ? "h-96" : "h-[800px]")}>
-                    <div className="p-6">
-                      {equationHTML ? (
-                        <div 
-                          dangerouslySetInnerHTML={{ __html: equationHTML }}
-                          className="prose prose-sm max-w-none dark:prose-invert"
-                        />
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>Calculate parameters to view equations and steps</p>
-                          </div>
-                        )}
-                    </div>
-                  </ScrollArea>
-                      </CardContent>
-                    </Card>
                   </TabsContent>
                   
             <TabsContent value="pump-selection" className="mt-0 space-y-4">
