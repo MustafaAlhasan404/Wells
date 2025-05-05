@@ -52,53 +52,26 @@ export function nearestDrillCollar(drillCollarDiameters: number[], value: number
 
 /**
  * Calculate drill collar values based on casing data
- * @param initialDcsg Initial DCSG amount
  * @param atHeadValues At head values from casing calculations
  * @param nearestBitSizes Nearest bit sizes from casing calculations
  * @param drillCollarDiameters Available drill collar diameters
  * @returns Array of drill collar results
  */
 export function calculateDrillCollar(
-  initialDcsg: string,
   atHeadValues: number[],
   nearestBitSizes: number[],
   drillCollarDiameters: number[]
 ): DrillCollarResult[] {
+  const sectionOrder = ["Production", "Intermediate", "Surface"];
   const results: DrillCollarResult[] = [];
-  
-  // Combine values for processing
-  const allValues = [parseFloat(initialDcsg), ...atHeadValues].map((atHead, index) => {
-    return {
-      atHead,
-      bitSize: index < nearestBitSizes.length ? nearestBitSizes[index] : null
-    };
-  });
-  
-  const totalIterations = allValues.length;
-  
-  for (let i = 0; i < totalIterations; i++) {
-    const { atHead, bitSize } = allValues[i];
-    
-    // Skip if bit size is null
-    if (bitSize === null) continue;
-    
+  for (let i = 0; i < sectionOrder.length; i++) {
+    const sectionName = sectionOrder[i];
+    const atHead = atHeadValues[i];
+    const bitSize = nearestBitSizes[i];
     // Calculate drill collar (2 * at_head - bit_size)
     const drillCollar = 2 * atHead - bitSize;
-    
     // Find nearest available drill collar diameter
     const nearestDrillCollarDiameter = nearestDrillCollar(drillCollarDiameters, drillCollar);
-    
-    // Determine section name
-    let sectionName: string;
-    if (i === 0) {
-      sectionName = "Production";
-    } else if (i === totalIterations - 1) {
-      sectionName = "Surface";
-    } else {
-      // All middle sections are just "Intermediate" without numbers
-      sectionName = "Intermediate";
-    }
-    
     results.push({
       section: sectionName,
       atHead: atHead,
@@ -107,12 +80,6 @@ export function calculateDrillCollar(
       numberOfColumns: 0
     });
   }
-  
-  // Ensure the last item is always marked as Surface
-  if (results.length > 0) {
-    results[results.length - 1].section = "Surface";
-  }
-  
   return results;
 }
 
@@ -580,7 +547,7 @@ export function readDrillCollarData(buffer: ArrayBuffer): DrillCollarData {
     
     // Set specific metal grades based on instances if we have enough data
     // This ensures we use the exact grades from the Excel file for each instance
-    let instanceGrades: string[] = ['E 75', 'E 75', 'X 95']; // Default to the expected values
+    const instanceGrades: string[] = ['E 75', 'E 75', 'X 95']; // Default to the expected values
     
     // If no metal grades found, provide specified defaults
     if (metalGrades.length === 0) {

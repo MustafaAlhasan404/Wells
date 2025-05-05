@@ -306,16 +306,15 @@ export async function POST(req: NextRequest) {
       const drillCollarData = readDrillCollarData(arrayBuffer);
       
       // Extract required values from casing data
-      const { initialDcsg, atHeadValues, nearestBitSizes } = casingValues;
+      const { atHeadValues, nearestBitSizes } = casingValues;
       
-      if (!initialDcsg || !atHeadValues || !nearestBitSizes) {
+      if (!atHeadValues || !nearestBitSizes) {
         resetConsoleLog();
         return NextResponse.json({ error: 'Invalid casing data provided' }, { status: 400 });
       }
       
       // Calculate drill collar values
       const drillCollarResults = calculateDrillCollar(
-        initialDcsg,
         atHeadValues,
         nearestBitSizes,
         drillCollarData.drillCollarDiameters

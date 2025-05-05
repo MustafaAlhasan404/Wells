@@ -193,6 +193,7 @@ const generateDebugSummary = (vcfResults: any[], gcResults: any[], pumpResults: 
       summary += `- de (mm): ${result.de.toFixed(4)}\n`;
       summary += `- di (mm): ${result.di.toFixed(4)}\n`;
       summary += `- Hc: ${result.hc.toFixed(4)}\n`;
+      summary += `- H (depth): ${result.h ? result.h.toFixed(4) : 'N/A'}\n`;
       summary += `- hp: ${result.hp.toFixed(4)}\n`;
       summary += `- Vcf: ${result.vcf.toFixed(6)}\n`;
     });
@@ -341,6 +342,7 @@ interface VcfResult {
   di: number;  // di (mm)
   hp: number;  // hp (was h)
   hc: number;  // Hc value used
+  h: number; // H (depth) used for Pc
   vcf: number; // Vcf
 }
 
@@ -1371,6 +1373,23 @@ export default function SemanticsPage() {
         }
         
         // Add to results
+        // To get H (depth) for each instance, always use sectionInputs[i].depth from casingCalculatorData
+        let instanceH = null;
+        try {
+          const casingData = localStorage.getItem('casingCalculatorData');
+          if (casingData) {
+            const parsedData = JSON.parse(casingData);
+            if (parsedData.sectionInputs && parsedData.sectionInputs[i] && parsedData.sectionInputs[i].depth) {
+              instanceH = parseFloat(parsedData.sectionInputs[i].depth);
+            }
+          }
+        } catch (e) {
+          instanceH = null;
+        }
+        // Fallback to hp if not found
+        if (!instanceH || isNaN(instanceH)) {
+          instanceH = h;
+        }
         results.push({
           instance: instanceNumber,
           db: Db * 1000, // Convert back to mm for display
@@ -1378,15 +1397,16 @@ export default function SemanticsPage() {
           di: dimValue * 1000, // Convert back to mm for display
           hp: h, // rename h to hp
           hc: instanceHc, // add Hc
+          h: instanceH, // add H (depth) used for Pc
           vcf: vcf
         });
-        
         debugLog('calculateVcf', `Final Vcf result for instance ${instanceNumber}:`, {
           'Db (mm)': Db * 1000,
           'de (mm)': de * 1000,
           'di (mm)': dimValue * 1000,
           'hp': h,
           'hc': instanceHc,
+          'H (depth)': instanceH,
           'Vcf': vcf
         });
       }
@@ -1405,6 +1425,7 @@ export default function SemanticsPage() {
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">de (mm)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">di (mm)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Hc</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">H (depth)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">hp</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Vcf</th>
             </tr>
@@ -1417,6 +1438,7 @@ export default function SemanticsPage() {
                 <td class="px-4 py-2 text-center">${r.de.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.di.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.hc.toFixed(2)}</td>
+                <td class="px-4 py-2 text-center">${r.h ? r.h.toFixed(2) : 'N/A'}</td>
                 <td class="px-4 py-2 text-center">${r.hp.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.vcf.toFixed(4)}</td>
               </tr>
@@ -1769,78 +1791,10 @@ export default function SemanticsPage() {
         // Vfd = (π/4) × di² × (H - h)
         const PI_OVER_4 = Math.PI / 4;
         let vfd = null;
-        
-        // Try to get H from casing calculator data
-        let H = 250; // Default fallback value
-        
-        try {
-          // Get depths from casing calculator data
-          const casingData = localStorage.getItem('casingCalculatorData');
-          if (casingData) {
-            const parsedData = JSON.parse(casingData);
-            
-            if (parsedData && parsedData.sectionInputs && parsedData.sectionInputs.length > 0) {
-              // Sections in casingCalculatorData are stored from deepest (index 0) to shallowest (last index)
-              // Map instance to appropriate section based on correct ordering
-              let sectionIndex = 0;
-              
-              if (instanceNumber === 1) {
-                // Instance 1 (Production) uses the deepest section (index 0)
-                sectionIndex = 0;
-              } else if (instanceNumber === 2) {
-                // Instance 2 uses the second deepest (index 1)
-                sectionIndex = 1;
-                if (sectionIndex >= parsedData.sectionInputs.length) sectionIndex = 0;
-              } else if (instanceNumber === 3) {
-                // Instance 3 uses the third deepest (index 2)
-                sectionIndex = 2;
-                if (sectionIndex >= parsedData.sectionInputs.length) sectionIndex = 0;
-              } else if (instanceNumber === 4) {
-                // Instance 4 uses the fourth deepest (index 3)
-                sectionIndex = 3;
-                if (sectionIndex >= parsedData.sectionInputs.length) sectionIndex = 0;
-              } else if (instanceNumber === 5) {
-                // Instance 5 (Surface) uses the shallowest section (last in the array)
-                sectionIndex = parsedData.sectionInputs.length - 1;
-              }
-              
-              // Get depth from the appropriate section
-              if (parsedData.sectionInputs[sectionIndex] && parsedData.sectionInputs[sectionIndex].depth) {
-                const sectionDepth = parseFloat(parsedData.sectionInputs[sectionIndex].depth);
-                if (!isNaN(sectionDepth) && sectionDepth > 0) {
-                  H = sectionDepth;
-                  debugLog('calculateGcGc', `Using depth from casing data for instance ${instanceNumber}: ${H}m (section index ${sectionIndex}, depth order ${sectionIndex + 1})`);
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error loading depths from casing calculator data:', error);
-          debugLog('calculateGcGc', `Error loading depths from casing calculator data: ${error}`);
-        }
-        
-        // Fallback: Try to get H from tfd (fluid displacement height) input if casing data isn't available
-        if (H === 250) {
-          debugLog('calculateGcGc', `No valid depth found in casing data, checking tfd inputs`);
-          if (tfdValue && !isNaN(parseFloat(tfdValue))) {
-            H = parseFloat(tfdValue);
-            debugLog('calculateGcGc', `Using H from tfd input field: ${H}`);
-          } else if (instanceValues['tfd'] && instanceValues['tfd'][instanceNumber] && !isNaN(parseFloat(instanceValues['tfd'][instanceNumber]))) {
-            H = parseFloat(instanceValues['tfd'][instanceNumber]);
-            debugLog('calculateGcGc', `Using H from tfd instance values: ${H}`);
-          }
-        }
-        
-        // Try to get h from td (displacement height) input
-        let h = 30; // Default value
-        if (tdValue && !isNaN(parseFloat(tdValue))) {
-          h = parseFloat(tdValue);
-        } else if (instanceValues['td'] && instanceValues['td'][instanceNumber] && !isNaN(parseFloat(instanceValues['td'][instanceNumber]))) {
-          h = parseFloat(instanceValues['td'][instanceNumber]);
-        }
-        
-        // Get internal diameter in meters
-        const di_for_vfd = vcfResult.di / 1000;
+        // Use H (depth) from vcfResult.h
+        const H = vcfResult.h;
+        const di_for_vfd = vcfResult.di / 1000; // convert mm to m
+        const h = vcfResult.hp; // use height parameter from Vcf result
         if (!isNaN(di_for_vfd) && di_for_vfd > 0 && !isNaN(H) && !isNaN(h) && H > h) {
           vfd = PI_OVER_4 * Math.pow(di_for_vfd, 2) * (H - h);
           debugLog('calculateGcGc', `Calculated Vfd for instance ${instanceNumber}:`, {
@@ -1865,48 +1819,11 @@ export default function SemanticsPage() {
                       0.1 * (instanceHc - vcfResult.hp) * (instanceGfc - instanceGf) : null;
         
         // Calculate Pc (confining pressure)
-        // FIXED: Get actual depth from formation/casing data instead of using height parameter
-        let depth = 0;
-        if (casingResult) {
-          // If we have a casing result, estimate depth based on section
-          if (casingResult.section === "Production") {
-            depth = 3000; // Typical production depth
-          } else if (casingResult.section === "Surface") {
-            depth = 1000; // Typical surface depth
-          } else if (casingResult.section.includes("Intermediate")) {
-            // Extract intermediate number if present
-            const match = casingResult.section.match(/intermediate\s+(\d+)/i);
-            const intermediateNumber = match && match[1] ? parseInt(match[1]) : 1;
-            depth = 2000 + ((intermediateNumber - 1) * 500); // Scale depth based on intermediate number
-          } else {
-            depth = 2000; // Default depth
-          }
-        } else {
-          // No casing result, try to get from formation data
-          try {
-            const formationData = localStorage.getItem('wellsAnalyzerData');
-            if (formationData) {
-              const data = JSON.parse(formationData);
-              
-              // Try to get H values based on instance
-              if (data[`H_${instanceNumber}`]) {
-                depth = parseFloat(data[`H_${instanceNumber}`]);
-              } else if (data.H) {
-                depth = parseFloat(data.H);
-              }
-            }
-          } catch (error) {
-            console.error('Failed to load H (depth) value from formation data:', error);
-          }
+        // Use H (depth) from vcfResult.h
+        let depth = H;
+        if (isNaN(depth) || depth <= 0) {
+          depth = h; // fallback to hp if needed
         }
-
-        // If we still don't have a depth value, use vcfResult.hp as a last resort
-        if (depth === 0) {
-          depth = vcfResult.hp;
-          console.warn(`Using height parameter (${depth}) as fallback for depth value in Pc calculation, instance ${instanceNumber}`);
-        }
-
-        // Now calculate Pc with the proper depth value
         const constantValue = depth >= 2000 ? 16 : 8;
         const pc = 0.02 * depth + constantValue;
 

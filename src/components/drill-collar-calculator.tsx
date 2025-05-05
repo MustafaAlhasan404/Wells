@@ -122,7 +122,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCalculated, setIsCalculated] = useState(false);
-  const showDebugInfo = false;
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [debugData, setDebugData] = useState<DebugCalculationData[]>([]);
   
   // Get casingResults from the context
@@ -278,23 +278,22 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       // Map the casing results to extract the values we need
       const initialDcsg = getInitialDcsg() || '';
       
-      // Extract atHead values from dcsg property (strip formatting)
-      const atHeadValues = casingResults.map(result => {
-        // Extract numeric value from dcsg string, e.g. "244.5 mm (9 5/8")" -> 244.5
-        if (!result.dcsg) return 0;
-        const match = result.dcsg.match(/(\d+(?:\.\d+)?)/);
+      // Ensure At Head and Bit Size values are mapped by section name, not by index
+      const sectionOrder = ["Production", "Intermediate", "Surface"];
+      const atHeadValues = sectionOrder.map(sectionName => {
+        const result = casingResults.find(r => r.section.toLowerCase().includes(sectionName.toLowerCase()));
+        if (!result || !result.atBody) return 0;
+        const match = result.atBody.match(/(\d+(?:\.\d+)?)/);
         return match ? parseFloat(match[1]) : 0;
-      }).filter(val => val > 0); // Filter out zero values
-      
-      // Extract nearest bit sizes (strip formatting)
-      const nearestBitSizes = casingResults.map(result => {
-        // Extract numeric value from nearestBitSize string
-        if (!result.nearestBitSize) return 0;
+      });
+      const nearestBitSizes = sectionOrder.map(sectionName => {
+        const result = casingResults.find(r => r.section.toLowerCase().includes(sectionName.toLowerCase()));
+        if (!result || !result.nearestBitSize) return 0;
         const match = result.nearestBitSize.match(/(\d+(?:\.\d+)?)/);
         return match ? parseFloat(match[1]) : 0;
       });
       
-      console.log("Extracted values:", { initialDcsg, atHeadValues, nearestBitSizes });
+      console.log("Extracted values (At Head = DCSG'):", { initialDcsg, atHeadValues, nearestBitSizes });
       
       return {
         initialDcsg,
@@ -590,8 +589,300 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   
   // Function to render debug calculation data
   const renderDebugInfo = () => {
-    // Always return null to never show debug info
-    return null;
+    if (!showDebugInfo || debugData.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="space-y-6 mt-8 border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/50 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bug className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <h3 className="text-lg font-medium text-amber-700 dark:text-amber-400">Debug Information</h3>
+          </div>
+          <Button 
+            onClick={() => setShowDebugInfo(false)} 
+            variant="outline" 
+            size="sm"
+            className="text-amber-600 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+          >
+            <Minimize className="h-3.5 w-3.5" />
+            <span className="ml-1.5">Hide Debug</span>
+          </Button>
+        </div>
+        
+        <ScrollArea className="h-[500px] w-full rounded-md border border-amber-200 dark:border-amber-800/50">
+          {debugData.map((data, index) => (
+            <div key={index} className="p-4 border-b border-amber-200 dark:border-amber-800/50">
+              <h4 className="text-md font-medium mb-2 text-amber-700 dark:text-amber-400">
+                Instance {data.instance} Calculations
+              </h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="bg-white/80 dark:bg-background/80">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Core Values</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="font-medium">T:</div>
+                      <div>{data.T.toFixed(4)} (N)</div>
+                      
+                      <div className="font-medium">Tc:</div>
+                      <div>{data.Tc.toFixed(4)} (N)</div>
+                      
+                      <div className="font-medium">Tec:</div>
+                      <div>{data.Tec.toFixed(4)}</div>
+                      
+                      <div className="font-medium">tau:</div>
+                      <div>{data.tau.toFixed(4)}</div>
+                      
+                      <div className="font-medium">eq:</div>
+                      <div>{data.eq.toFixed(4)}</div>
+                      
+                      <div className="font-medium">C_new:</div>
+                      <div>{data.C_new.toFixed(4)}</div>
+                      
+                      <div className="font-medium">SegmaC:</div>
+                      <div>{data.SegmaC.toFixed(2)} (MPa)</div>
+                      
+                      <div className="font-medium">Lmax:</div>
+                      <div>{data.Lmax.toFixed(2)} (m)</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white/80 dark:bg-background/80">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Section Parameters</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="font-medium">Lp:</div>
+                      <div>{data.Lp?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">qp:</div>
+                      <div>{data.qp?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">Lhw:</div>
+                      <div>{data.Lhw?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">qhw:</div>
+                      <div>{data.qhw?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">L0c:</div>
+                      <div>{data.L0c?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">qc:</div>
+                      <div>{data.qc?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">b:</div>
+                      <div>{data.b?.toFixed(4) || 'N/A'}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white/80 dark:bg-background/80">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Area & Force Parameters</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="font-medium">Ap:</div>
+                      <div>{data.Ap?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">Aip:</div>
+                      <div>{data.Aip?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">P:</div>
+                      <div>{data.P?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">K1:</div>
+                      <div>{data.K1?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">K2:</div>
+                      <div>{data.K2?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">K3:</div>
+                      <div>{data.K3?.toFixed(4) || 'N/A'}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white/80 dark:bg-background/80">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Force & Geometric Parameters</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="font-medium">Np:</div>
+                      <div>{data.Np?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">NB:</div>
+                      <div>{data.NB?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">Mp:</div>
+                      <div>{data.Mp?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">dα:</div>
+                      <div>{data.dα?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">γ:</div>
+                      <div>{data.γ?.toFixed(4) || 'N/A'}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white/80 dark:bg-background/80">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Diameters & WOB</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="font-medium">Dep:</div>
+                      <div>{data.Dep?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">dec:</div>
+                      <div>{data.dec?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">Dhw:</div>
+                      <div>{data.Dhw?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">n:</div>
+                      <div>{data.n?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">WOB:</div>
+                      <div>{data.WOB?.toFixed(4) || 'N/A'}</div>
+                      
+                      <div className="font-medium">DB:</div>
+                      <div>{data.DB?.toFixed(4) || 'N/A'}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {data.numerator !== undefined && (
+                  <Card className="bg-white/80 dark:bg-background/80 md:col-span-2">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Lmax Calculation</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="font-medium">Numerator:</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                          {data.numerator_formula || `${data.numerator?.toFixed(4)}`}
+                        </div>
+                        
+                        <div className="font-medium">Denominator:</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                          {data.denominator_formula || `${data.denominator?.toFixed(4)}`}
+                        </div>
+                        
+                        <div className="font-medium">Square Root Result:</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                          {data.sqrt_result_formula || `${data.sqrt_result?.toFixed(4)}`}
+                        </div>
+                        
+                        <div className="font-medium">Lmax Subtraction Formula:</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                          {data.subtraction_formula || `Lmax = ${data.Lmax.toFixed(4)}`}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <Card className="bg-white/80 dark:bg-background/80 md:col-span-2">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Formulas Used</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="font-medium">T Formula:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        {data.formulas.T || 'Not available'}
+                      </div>
+                      
+                      <div className="font-medium">Tc Formula:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        {data.formulas.Tc || 'Not available'}
+                      </div>
+                      
+                      <div className="font-medium">Tec Formula:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        {data.formulas.Tec || 'Not available'}
+                      </div>
+                      
+                      <div className="font-medium">Np Formula:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        {data.formulas.Np || 'Not available'}
+                      </div>
+                      
+                      <div className="font-medium">NB Formula:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        {data.formulas.NB || 'Not available'}
+                      </div>
+                      
+                      <div className="font-medium">tau Formula:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        {data.formulas.tau || 'Not available'}
+                      </div>
+                      
+                      <div className="font-medium">eq Formula:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        {data.formulas.eq || 'Not available'}
+                      </div>
+                      
+                      <div className="font-medium">C_new Formula:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        {data.formulas.C_new || 'Not available'}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {data.availableGrades && data.availableGrades.length > 0 && (
+                  <Card className="bg-white/80 dark:bg-background/80 md:col-span-2">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Metal Grade Selection</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div>
+                        <div className="font-medium">Available Grades:</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
+                          {data.availableGrades.map((grade, i) => (
+                            <span key={i} className="inline-block mr-2 mb-1 px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs">
+                              {grade}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <div className="font-medium">Available Strengths (MPa):</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
+                          {data.availableStrengths.map((strength, i) => (
+                            <span key={i} className="inline-block mr-2 mb-1 px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs">
+                              {strength}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <div className="font-medium">Selected MPI:</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
+                          {data.nearestMpi || 'Not available'}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          ))}
+        </ScrollArea>
+      </div>
+    );
   };
 
   return (
@@ -710,7 +1001,18 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                   <h3 className="text-lg font-medium">Metal Grade Results</h3>
                 </div>
                 
-                {/* Debug button removed */}
+                <Button 
+                  onClick={() => setShowDebugInfo(!showDebugInfo)} 
+                  variant="outline" 
+                  size="sm"
+                  className={cn(
+                    "flex items-center gap-1.5",
+                    showDebugInfo ? "text-amber-600 border-amber-300 dark:border-amber-700" : "text-muted-foreground"
+                  )}
+                >
+                  <Bug className="h-3.5 w-3.5" />
+                  <span>{showDebugInfo ? "Hide Debug" : "Show Debug"}</span>
+                </Button>
               </div>
               
               <div className="overflow-auto rounded-md border border-border/50 bg-background/80">
