@@ -192,7 +192,8 @@ const generateDebugSummary = (vcfResults: any[], gcResults: any[], pumpResults: 
       summary += `- Db (mm): ${result.db.toFixed(4)}\n`;
       summary += `- de (mm): ${result.de.toFixed(4)}\n`;
       summary += `- di (mm): ${result.di.toFixed(4)}\n`;
-      summary += `- h: ${result.h.toFixed(4)}\n`;
+      summary += `- Hc: ${result.hc.toFixed(4)}\n`;
+      summary += `- hp: ${result.hp.toFixed(4)}\n`;
       summary += `- Vcf: ${result.vcf.toFixed(6)}\n`;
     });
   }
@@ -338,7 +339,8 @@ interface VcfResult {
   db: number;  // Db (mm)
   de: number;  // de (mm)
   di: number;  // di (mm)
-  h: number;   // h
+  hp: number;  // hp (was h)
+  hc: number;  // Hc value used
   vcf: number; // Vcf
 }
 
@@ -1374,7 +1376,8 @@ export default function SemanticsPage() {
           db: Db * 1000, // Convert back to mm for display
           de: de * 1000, // Convert back to mm for display
           di: dimValue * 1000, // Convert back to mm for display
-          h: h,
+          hp: h, // rename h to hp
+          hc: instanceHc, // add Hc
           vcf: vcf
         });
         
@@ -1382,7 +1385,8 @@ export default function SemanticsPage() {
           'Db (mm)': Db * 1000,
           'de (mm)': de * 1000,
           'di (mm)': dimValue * 1000,
-          'h': h,
+          'hp': h,
+          'hc': instanceHc,
           'Vcf': vcf
         });
       }
@@ -1400,7 +1404,8 @@ export default function SemanticsPage() {
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Db (mm)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">de (mm)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">di (mm)</th>
-              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">h</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Hc</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">hp</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Vcf</th>
             </tr>
           </thead>
@@ -1411,7 +1416,8 @@ export default function SemanticsPage() {
                 <td class="px-4 py-2 text-center">${r.db.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.de.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.di.toFixed(2)}</td>
-                <td class="px-4 py-2 text-center">${r.h.toFixed(2)}</td>
+                <td class="px-4 py-2 text-center">${r.hc.toFixed(2)}</td>
+                <td class="px-4 py-2 text-center">${r.hp.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.vcf.toFixed(4)}</td>
               </tr>
             `).join('')}
@@ -1855,8 +1861,8 @@ export default function SemanticsPage() {
         }
 
         // Calculate Pymax (maximum pressure at yield point)
-        const pymax = (instanceGfc && instanceGf && vcfResult.h) ? 
-                      0.1 * (instanceHc - vcfResult.h) * (instanceGfc - instanceGf) : null;
+        const pymax = (instanceGfc && instanceGf && vcfResult.hp) ? 
+                      0.1 * (instanceHc - vcfResult.hp) * (instanceGfc - instanceGf) : null;
         
         // Calculate Pc (confining pressure)
         // FIXED: Get actual depth from formation/casing data instead of using height parameter
@@ -1894,9 +1900,9 @@ export default function SemanticsPage() {
           }
         }
 
-        // If we still don't have a depth value, use vcfResult.h as a last resort
+        // If we still don't have a depth value, use vcfResult.hp as a last resort
         if (depth === 0) {
-          depth = vcfResult.h;
+          depth = vcfResult.hp;
           console.warn(`Using height parameter (${depth}) as fallback for depth value in Pc calculation, instance ${instanceNumber}`);
         }
 
