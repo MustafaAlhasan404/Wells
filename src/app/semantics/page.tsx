@@ -1683,18 +1683,18 @@ export default function SemanticsPage() {
             instanceHc = formationHcValues[0] || 2000;
             debugLog('GcGc Calculation', `Production section - using Hc value: ${instanceHc}`);
           } else if (casingResult.section === "Surface") {
-            instanceHc = formationHcValues[4] || formationHcValues[0] || 2000;
+            // Surface section mapped to 3rd Hc value (index 2)
+            instanceHc = formationHcValues[2] || formationHcValues[0] || 2000;
             debugLog('GcGc Calculation', `Surface section - using Hc value: ${instanceHc}`);
           } else if (casingResult.section.includes("Intermediate")) {
             // Extract intermediate number if present
             const match = casingResult.section.match(/intermediate\s+(\d+)/i);
             const intermediateNumber = match && match[1] ? parseInt(match[1]) : 1;
             debugLog('GcGc Calculation', `Intermediate section ${intermediateNumber} detected`);
-            
             // Map to appropriate Hc value based on intermediate number
             if (intermediateNumber > 0 && intermediateNumber <= formationHcValues.length) {
               instanceHc = formationHcValues[intermediateNumber] || formationHcValues[0] || 2000;
-              debugLog('GcGc Calculation', `Intermediate ${intermediateNumber} - using Hc value: ${instanceHc}`);
+              debugLog('GcGc Calculation', `Intermediate ${intermediateNumber} - using Hc value from index ${intermediateNumber}: ${instanceHc}`);
             } else {
               // Default to first intermediate
               instanceHc = formationHcValues[1] || formationHcValues[0] || 2000;
