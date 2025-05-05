@@ -1243,8 +1243,8 @@ export default function SemanticsPage() {
           instanceHc = formationHcValues[0] || 2000;
           debugLog('calculateVcf', `Production section - using Hc value: ${instanceHc}`);
         } else if (result.section === "Surface") {
-          // Surface section mapped to last available or appropriate Hc value
-          instanceHc = formationHcValues[4] || formationHcValues[0] || 2000;
+          // Surface section mapped to 3rd Hc value (index 2)
+          instanceHc = formationHcValues[2] || formationHcValues[0] || 2000;
           debugLog('calculateVcf', `Surface section - using Hc value: ${instanceHc}`);
         } else if (result.section.includes("Intermediate")) {
           // Extract intermediate number if present
