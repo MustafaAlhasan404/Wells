@@ -42,6 +42,297 @@ import { motion } from "framer-motion"
 import { useWellType } from "@/context/WellTypeContext";
 import { HelpTooltip } from "@/components/ui/help-tooltip"
 
+// Add a debug utility for tracking calculations
+const DEBUG_ENABLED = true; // Set to false to disable debug logging in production
+const debugLog = (section: string, message: string, data?: any) => {
+  if (!DEBUG_ENABLED) return;
+  
+  console.group(`🔍 DEBUG [${section}]`);
+  console.log(message);
+  if (data !== undefined) {
+    console.log('Data:', data);
+  }
+  console.groupEnd();
+};
+
+// Add a function to check all localStorage values for Hc/HAC values
+const debugAllFormationData = () => {
+  const debug: {
+    wellsAnalyzerData: any | null;
+    drillCollarResults: any | null;
+    drillCollarCalculations: any | null;
+    wellsAnalyzerSemanticData: any | null;
+    otherKeys: Array<{key: string; value: any}>;
+    error?: string;
+  } = {
+    wellsAnalyzerData: null,
+    drillCollarResults: null,
+    drillCollarCalculations: null,
+    wellsAnalyzerSemanticData: null,
+    otherKeys: []
+  };
+  
+  try {
+    // Check main data store
+    const wellsData = localStorage.getItem('wellsAnalyzerData');
+    if (wellsData) {
+      debug.wellsAnalyzerData = JSON.parse(wellsData);
+    }
+    
+    // Check drill collar data
+    const drillCollarData = localStorage.getItem('drillCollarResults');
+    if (drillCollarData) {
+      debug.drillCollarResults = JSON.parse(drillCollarData);
+    }
+    
+    // Check drill collar calculations
+    const drillCalcs = localStorage.getItem('drillCollarCalculations');
+    if (drillCalcs) {
+      debug.drillCollarCalculations = JSON.parse(drillCalcs);
+    }
+    
+    // Check semantics data
+    const semanticData = localStorage.getItem('wellsAnalyzerSemanticData');
+    if (semanticData) {
+      debug.wellsAnalyzerSemanticData = JSON.parse(semanticData);
+    }
+    
+    // List all other localStorage keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && !['wellsAnalyzerData', 'drillCollarResults', 'drillCollarCalculations', 'wellsAnalyzerSemanticData'].includes(key)) {
+        try {
+          const rawValue = localStorage.getItem(key);
+          if (rawValue) {
+            try {
+              debug.otherKeys.push({
+                key,
+                value: JSON.parse(rawValue)
+              });
+            } catch {
+              debug.otherKeys.push({
+                key,
+                value: rawValue
+              });
+            }
+          }
+        } catch (e) {
+          console.error(`Error processing localStorage key ${key}:`, e);
+        }
+      }
+    }
+    
+    return debug;
+  } catch (error) {
+    console.error('Error retrieving localStorage data:', error);
+    return { 
+      wellsAnalyzerData: null,
+      drillCollarResults: null,
+      drillCollarCalculations: null,
+      wellsAnalyzerSemanticData: null,
+      otherKeys: [],
+      error: String(error) 
+    };
+  }
+};
+
+// Generate a debug summary for all calculations
+const generateDebugSummary = (vcfResults: any[], gcResults: any[], pumpResults: any[]) => {
+  if (!vcfResults?.length && !gcResults?.length && !pumpResults?.length) {
+    return "No calculation results available.";
+  }
+  
+  let summary = "--- WELLS ANALYZER DEBUG SUMMARY ---\n\n";
+  
+  // Add timestamp
+  summary += `Generated: ${new Date().toISOString()}\n\n`;
+
+  // First add a section showing the source data from Formation Design
+  summary += "=== FORMATION DESIGN DATA (HAC/Hc Values) ===\n";
+  try {
+    const formationData = localStorage.getItem('wellsAnalyzerData');
+    if (formationData) {
+      const data = JSON.parse(formationData);
+      summary += "Raw Formation Design data from localStorage (wellsAnalyzerData):\n";
+      
+      // Add specific logging for Hc and H values
+      for (let i = 1; i <= 5; i++) {
+        summary += `Hc_${i}: ${data[`Hc_${i}`] || 'Not found'}\n`;
+        summary += `H_${i}: ${data[`H_${i}`] || 'Not found'}\n`;
+      }
+      
+      // Also log single values if present
+      summary += `\nSingle Hc value: ${data.Hc || 'Not found'}\n`;
+      summary += `Single H value: ${data.H || 'Not found'}\n`;
+      
+      // Show the entire wellsAnalyzerData object
+      summary += "\nComplete Formation Design data object:\n";
+      Object.keys(data).forEach(key => {
+        summary += `${key}: ${data[key]}\n`;
+      });
+    } else {
+      summary += "No formation design data found in localStorage.\n";
+    }
+  } catch (error) {
+    summary += `Error reading formation design data: ${error}\n`;
+  }
+  
+  // Add section for all localStorage data
+  summary += "\n=== ALL LOCALSTORAGE DATA ===\n";
+  const allStorageData = debugAllFormationData();
+  summary += JSON.stringify(allStorageData, null, 2);
+  
+  summary += "\n\n";
+  
+  // VCF Results
+  if (vcfResults?.length) {
+    summary += "=== VCF RESULTS ===\n";
+    vcfResults.forEach(result => {
+      summary += `\nInstance ${result.instance}:\n`;
+      summary += `- Db (mm): ${result.db.toFixed(4)}\n`;
+      summary += `- de (mm): ${result.de.toFixed(4)}\n`;
+      summary += `- di (mm): ${result.di.toFixed(4)}\n`;
+      summary += `- h: ${result.h.toFixed(4)}\n`;
+      summary += `- Vcf: ${result.vcf.toFixed(6)}\n`;
+    });
+  }
+  
+  // GC Results
+  if (gcResults?.length) {
+    summary += "\n\n=== GC/GC' RESULTS ===\n";
+    gcResults.forEach(result => {
+      summary += `\nInstance ${result.instance}:\n`;
+      summary += `- Vcf: ${result.vcf?.toFixed(6) || "N/A"}\n`;
+      summary += `- NewGcc: ${result.newGcc?.toFixed(6) || "N/A"}\n`;
+      summary += `- nc (sacks): ${result.nc?.toFixed(2) || "N/A"}\n`;
+      summary += `- Vw: ${result.vw?.toFixed(4) || "N/A"}\n`;
+      summary += `- Vfd: ${result.vfd?.toFixed(4) || "N/A"}\n`;
+      summary += `- Pymax: ${result.pymax?.toFixed(4) || "N/A"}\n`;
+      summary += `- Pc: ${result.pc?.toFixed(4) || "N/A"}\n`;
+      summary += `- Pfr: ${result.pfr?.toFixed(4) || "N/A"}\n`;
+      summary += `- Ppmax: ${result.ppmax?.toFixed(4) || "N/A"} MPa/10\n`;
+      summary += `- Time factors: tfc=${result.tfc?.toFixed(2) || "N/A"}, tfd=${result.tfd?.toFixed(2) || "N/A"}, tc=${result.tc?.toFixed(2) || "N/A"}, td=${result.td?.toFixed(2) || "N/A"}\n`;
+    });
+  }
+  
+  // Pump Results
+  if (pumpResults?.length) {
+    summary += "\n\n=== PUMP SELECTION RESULTS ===\n";
+    // Group by instance
+    const pumpsByInstance: {[key: number]: PumpResult[]} = {};
+    pumpResults.forEach(pump => {
+      if (!pumpsByInstance[pump.instance]) {
+        pumpsByInstance[pump.instance] = [];
+      }
+      pumpsByInstance[pump.instance].push(pump);
+    });
+    
+    // Print each instance's pumps
+    Object.keys(pumpsByInstance).forEach(instanceKey => {
+      const instance = parseInt(instanceKey);
+      const pumps = pumpsByInstance[instance];
+      const recommendedPump = pumps.find(p => p.isRecommended);
+      
+      summary += `\nInstance ${instance}:\n`;
+      summary += `- Required Ppmax: ${pumps[0]?.ppmax?.toFixed(4) || "N/A"} MPa/10\n`;
+      
+      if (recommendedPump) {
+        summary += `- Recommended pump: ${recommendedPump.type} (Speed ${recommendedPump.speed})\n`;
+        summary += `  - Diameter: ${recommendedPump.diameter}"\n`;
+        summary += `  - Pressure: ${recommendedPump.pressure.toFixed(2)} MPa\n`;
+        summary += `  - Flow: ${recommendedPump.flow.toFixed(2)} L/min\n`;
+        if (recommendedPump.tfc !== null) {
+          summary += `  - Time factors: tfc=${recommendedPump.tfc?.toFixed(2) || "N/A"}, tfd=${recommendedPump.tfd?.toFixed(2) || "N/A"}, tc=${recommendedPump.tc?.toFixed(2) || "N/A"}\n`;
+        }
+      } else {
+        summary += "- No recommended pump found\n";
+      }
+      
+      summary += `- Total pumps found: ${pumps.length}\n`;
+    });
+  }
+  
+  return summary;
+};
+
+// Debug Summary Component
+const DebugSummary = ({ 
+  vcfResults, 
+  gcResults, 
+  pumpResults 
+}: { 
+  vcfResults: any[], 
+  gcResults: any[], 
+  pumpResults: any[] 
+}) => {
+  const [isCopied, setIsCopied] = useState(false);
+  
+  // Generate summary text
+  let summaryText = "";
+  try {
+    summaryText = generateDebugSummary(vcfResults, gcResults, pumpResults);
+  } catch (error) {
+    console.error("Error generating debug summary:", error);
+    summaryText = "Error generating debug summary. See console for details.";
+  }
+  
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(summaryText).then(
+      () => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      },
+      (err) => {
+        console.error('Could not copy text: ', err);
+        showToast('error', "Failed to copy debug summary");
+      }
+    );
+  };
+  
+  return (
+    <Card className="mt-6 border-primary/10 shadow-md overflow-hidden bg-card/50 backdrop-blur-sm">
+      <CardHeader className="bg-muted/40 border-b border-border/40 flex flex-row items-center justify-between">
+        <div>
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            <CardTitle className="text-lg sm:text-xl text-primary/90">Debug Summary</CardTitle>
+          </div>
+          <CardDescription className="mt-1.5">
+            Technical details for troubleshooting calculation issues
+          </CardDescription>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-1.5"
+          onClick={copyToClipboard}
+        >
+          {isCopied ? (
+            <>
+              <CheckCircle className="h-3.5 w-3.5" />
+              <span>Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="h-3.5 w-3.5" />
+              <span>Copy All</span>
+            </>
+          )}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-0">
+        <ScrollArea className="h-[300px] w-full">
+          <div className="p-4">
+            <pre className="text-xs font-mono whitespace-pre-wrap break-words bg-muted/20 p-3 rounded-md overflow-auto">
+              {summaryText}
+            </pre>
+          </div>
+        </ScrollArea>
+      </CardContent>
+    </Card>
+  );
+};
+
 interface VcfResult {
   instance: number;
   db: number;  // Db (mm)
@@ -661,37 +952,62 @@ export default function SemanticsPage() {
   // Calculate Vcf values
   const calculateVcf = () => {
     try {
+      debugLog('calculateVcf', 'Starting Vcf calculation');
+      
       // Get formation data for Hc (HAC) values - store all instances
       let formationHcValues: number[] = [];
       try {
         const formationData = localStorage.getItem('wellsAnalyzerData');
         if (formationData) {
           const data = JSON.parse(formationData);
+          debugLog('calculateVcf', 'Loaded formation data from localStorage: wellsAnalyzerData', data);
+          
+          // Log all possible Hc/H values to diagnose issues
+          const hcValues = {
+            'Hc_1': data.Hc_1,
+            'Hc_2': data.Hc_2,
+            'Hc_3': data.Hc_3,
+            'Hc_4': data.Hc_4,
+            'Hc_5': data.Hc_5,
+            'H_1': data.H_1,
+            'H_2': data.H_2,
+            'H_3': data.H_3,
+            'H_4': data.H_4,
+            'H_5': data.H_5,
+            'Hc': data.Hc,
+            'H': data.H
+          };
+          
+          debugLog('calculateVcf', 'All possible Hc/H values in formation data:', hcValues);
           
           // Check for Hc values from Formation Design (for each instance)
           // First try to get any instance-specific values
           for (let i = 1; i <= 5; i++) {
             // First try with the new Hc naming
             if (data[`Hc_${i}`] && !isNaN(parseFloat(data[`Hc_${i}`]))) {
-              // Store values while handling the swapping of instances 1 and 3
-              if (i === 1) {
-                formationHcValues[2] = parseFloat(data[`Hc_${i}`]);
-              } else if (i === 3) {
-                formationHcValues[0] = parseFloat(data[`Hc_${i}`]);
-              } else {
-                formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
-              }
+              // Store values directly without swapping instances 1 and 3
+              formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
+              
+              debugLog('calculateVcf', `Found Hc_${i} value: ${parseFloat(data[`Hc_${i}`])}, stored at index ${i-1}`, {
+                'Source key': `Hc_${i}`,
+                'Source value': data[`Hc_${i}`],
+                'Parsed value': parseFloat(data[`Hc_${i}`]),
+                'Stored at index': i-1,
+                'Note': 'Direct mapping without swapping'
+              });
             } 
             // Then fallback to the old H naming for backward compatibility
             else if (data[`H_${i}`] && !isNaN(parseFloat(data[`H_${i}`]))) {
-              // Store values while handling the swapping of instances 1 and 3
-              if (i === 1) {
-                formationHcValues[2] = parseFloat(data[`H_${i}`]);
-              } else if (i === 3) {
-                formationHcValues[0] = parseFloat(data[`H_${i}`]);
-              } else {
-                formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
-              }
+              // Store values directly without swapping instances 1 and 3
+              formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
+              
+              debugLog('calculateVcf', `Found H_${i} value: ${parseFloat(data[`H_${i}`])}, stored at index ${i-1}`, {
+                'Source key': `H_${i}`,
+                'Source value': data[`H_${i}`],
+                'Parsed value': parseFloat(data[`H_${i}`]),
+                'Stored at index': i-1,
+                'Note': 'Direct mapping without swapping'
+              });
             }
           }
           
@@ -701,16 +1017,44 @@ export default function SemanticsPage() {
               // If we're using a single value, apply it to all instances
               const singleHcValue = parseFloat(data.Hc);
               formationHcValues = [singleHcValue, singleHcValue, singleHcValue, singleHcValue, singleHcValue];
+              debugLog('calculateVcf', `Using single Hc value for all instances: ${singleHcValue}`, {
+                'Source key': 'Hc',
+                'Source value': data.Hc,
+                'Parsed value': singleHcValue,
+                'Applied to all instances': true
+              });
             } else if (data.H && !isNaN(parseFloat(data.H))) {
               // Same for H values
               const singleHValue = parseFloat(data.H);
               formationHcValues = [singleHValue, singleHValue, singleHValue, singleHValue, singleHValue];
+              debugLog('calculateVcf', `Using single H value for all instances: ${singleHValue}`, {
+                'Source key': 'H',
+                'Source value': data.H,
+                'Parsed value': singleHValue,
+                'Applied to all instances': true
+              });
             }
           }
+        } else {
+          debugLog('calculateVcf', 'ERROR: No formation data found in localStorage. wellsAnalyzerData is null or empty.');
         }
       } catch (error) {
         console.error('Failed to load Hc from Formation Design data:', error);
+        debugLog('calculateVcf', 'ERROR: Failed to load Hc from Formation Design data', error);
       }
+      
+      debugLog('calculateVcf', 'Final loaded formation Hc values', {
+        'Values array': formationHcValues,
+        'Array length': formationHcValues.length,
+        'Instance 1 (index 0)': formationHcValues[0],
+        'Instance 2 (index 1)': formationHcValues[1],
+        'Instance 3 (index 2)': formationHcValues[2],
+        'Instance 4 (index 3)': formationHcValues[3],
+        'Instance 5 (index 4)': formationHcValues[4],
+        'Any valid values': formationHcValues.some(v => v > 0 && !isNaN(v))
+      });
+      
+      debugLog('calculateVcf', 'Loaded formation Hc values', formationHcValues);
       
       // Check if we have height parameter value - different from Hc/HAC
       const hasHeightValue = hValue || 
@@ -816,51 +1160,64 @@ export default function SemanticsPage() {
         const result = casingResults[i];
         const instanceNumber = i + 1;
         
+        debugLog('calculateVcf', `Processing instance ${instanceNumber}`, result);
+        
         // Get values from the casing table
         let Db = parseFloat(result.nearestBitSize || '0') / 1000; // Nearest bit size in m
         let de = parseFloat(result.atBody || '0') / 1000; // Using atBody (DCSG') for de instead of dcsg
+
+        debugLog('calculateVcf', `Initial values for instance ${instanceNumber}:`, {
+          'Db (m)': Db,
+          'de (m)': de,
+          'Section': result.section
+        });
 
         // --- Get Dim from HAD data ---
         let dimValue: number | null = null;
         if (hadData) {
           const sectionName = getHadSectionName(result.section);
+          debugLog('calculateVcf', `Looking for HAD data for section: ${sectionName}`);
+          
           const sectionData = hadData[sectionName];
           if (sectionData) {
             const atHeadKeys = Object.keys(sectionData);
+            debugLog('calculateVcf', `Found HAD section data with keys: ${atHeadKeys.join(', ')}`);
+            
             if (atHeadKeys.length > 0) {
               // Use original calculateDim without external diameter parameter
               const dimStr = calculateDim(sectionData[atHeadKeys[0]]);
+              debugLog('calculateVcf', `Calculated Dim from HAD data: ${dimStr}`);
+              
               if (dimStr !== "-") {
                 dimValue = parseFloat(dimStr);
+                debugLog('calculateVcf', `Using HAD-derived internal diameter: ${dimValue} mm`);
               }
             }
           }
         }
         
         // Enhanced debug and validation
-        console.log('HAD Data available:', !!hadData);
-        if (hadData) {
-          const sectionName = getHadSectionName(result.section);
-          console.log('Section name:', sectionName);
-          console.log('Section data available:', !!hadData[sectionName]);
-          if (hadData[sectionName]) {
-            console.log('Section data keys:', Object.keys(hadData[sectionName]));
-          }
-        }
+        debugLog('calculateVcf', 'HAD Data status:', {
+          'HAD Data available': !!hadData,
+          'Section name': getHadSectionName(result.section),
+          'Section data available': hadData ? !!hadData[getHadSectionName(result.section)] : false,
+          'Section data keys': hadData && hadData[getHadSectionName(result.section)] ? 
+            Object.keys(hadData[getHadSectionName(result.section)]) : []
+        });
         
         // Fallback to di if Dim is not available
         if (dimValue === null) {
           dimValue = parseFloat(result.internalDiameter || '0') / 1000;
-          console.log('Using fallback internal diameter:', dimValue);
+          debugLog('calculateVcf', `Using fallback internal diameter: ${dimValue} m`);
         } else {
           // If we got dimValue from HAD data, convert from mm to meters
           dimValue = dimValue / 1000;
-          console.log('Using HAD-derived internal diameter:', dimValue);
+          debugLog('calculateVcf', `Converted HAD internal diameter to meters: ${dimValue} m`);
         }
         
         // Ensure dimValue is valid to prevent NaN in calculations
         if (isNaN(dimValue) || dimValue <= 0) {
-          console.error('Invalid dimValue detected, using default value');
+          debugLog('calculateVcf', `⚠️ Invalid dimValue detected, using default value for ${result.section} section`);
           // Use a sensible default based on the casing section
           if (result.section === "Production") {
             dimValue = 0.1628; // ~162.8mm default for production (Instance 1)
@@ -872,12 +1229,8 @@ export default function SemanticsPage() {
             // Generic fallback
             dimValue = 0.2000; // 200mm as generic fallback
           }
-          console.log(`Using hardcoded internal diameter for ${result.section} section:`, dimValue);
+          debugLog('calculateVcf', `Using hardcoded internal diameter for ${result.section} section: ${dimValue} m`);
         }
-        
-        // Add logging to debug
-        console.log('Casing result:', result);
-        console.log('Db:', Db, 'de:', de, 'di:', dimValue);
         
         // Get the appropriate Hc value based on instance or section
         let instanceHc = 0;
@@ -885,27 +1238,32 @@ export default function SemanticsPage() {
         // Map casing section to Hc value - ensure we handle multiple intermediate sections
         if (result.section === "Production") {
           // Production section mapped to 1st Hc value
-          instanceHc = formationHcValues[0] || formationHcValues[0] || 2000;
+          instanceHc = formationHcValues[0] || 2000;
+          debugLog('calculateVcf', `Production section - using Hc value: ${instanceHc}`);
         } else if (result.section === "Surface") {
-          // Surface section mapped to 3rd Hc value (or last available)
-          instanceHc = formationHcValues[2] || formationHcValues[0] || 2000;
+          // Surface section mapped to last available or appropriate Hc value
+          instanceHc = formationHcValues[4] || formationHcValues[0] || 2000;
+          debugLog('calculateVcf', `Surface section - using Hc value: ${instanceHc}`);
         } else if (result.section.includes("Intermediate")) {
           // Extract intermediate number if present
           const match = result.section.match(/intermediate\s+(\d+)/i);
           const intermediateNumber = match && match[1] ? parseInt(match[1]) : 1;
+          debugLog('calculateVcf', `Intermediate section ${intermediateNumber} detected`);
           
           // Map to appropriate Hc value based on intermediate number
-          // For multiple intermediates, use values 1, 3, 4, etc.
-          if (intermediateNumber > 1) {
-            // For Intermediate 2+, use formationHcValues[intermediateNumber+1] if available
-            instanceHc = formationHcValues[intermediateNumber+1] || formationHcValues[1] || formationHcValues[0] || 2000;
+          // For Intermediate 1, use index 1, for Intermediate 2, use index 2, etc.
+          if (intermediateNumber > 0 && intermediateNumber <= formationHcValues.length) {
+            instanceHc = formationHcValues[intermediateNumber] || formationHcValues[0] || 2000;
+            debugLog('calculateVcf', `Intermediate ${intermediateNumber} - using Hc value from index ${intermediateNumber}: ${instanceHc}`);
           } else {
-            // For Intermediate 1, use formationHcValues[1]
+            // Default to first intermediate
             instanceHc = formationHcValues[1] || formationHcValues[0] || 2000;
+            debugLog('calculateVcf', `Intermediate default - using Hc value from index 1: ${instanceHc}`);
           }
         } else {
           // Fallback to using instance number directly
           instanceHc = formationHcValues[i] || formationHcValues[0] || 2000;
+          debugLog('calculateVcf', `Other section - using Hc value from index ${i}: ${instanceHc}`);
         }
         
         // Get instance-specific K1 value if available and not in single input mode
@@ -915,80 +1273,99 @@ export default function SemanticsPage() {
             instanceValues['k1'][instanceNumber] && 
             !isNaN(parseFloat(instanceValues['k1'][instanceNumber]))) {
           instanceK1 = parseFloat(instanceValues['k1'][instanceNumber]);
+          debugLog('calculateVcf', `Using instance-specific K1 value: ${instanceK1}`);
         }
         
         // Get h value from instance values if available
         let h = 1000 + (i * 500); // Default if not available
+        debugLog('calculateVcf', `Initial default h value: ${h}`);
         
         const hKey = `H_${i + 1}`;
         
         // First try to get from the h input field
         if (hValue && !isNaN(parseFloat(hValue))) {
           h = parseFloat(hValue);
+          debugLog('calculateVcf', `Using h from input field: ${h}`);
         }
         // Then try to get from instance values
         else if (instanceValues['h'] && instanceValues['h'][i+1]) {
           const instanceH = parseFloat(instanceValues['h'][i+1]);
           if (!isNaN(instanceH)) {
             h = instanceH;
+            debugLog('calculateVcf', `Using h from instance values: ${h}`);
           }
         } 
         // Then try data input values as fallback
         else if (dataInputValues[hKey]) {
           h = parseFloat(dataInputValues[hKey]);
+          debugLog('calculateVcf', `Using h from data input values: ${h}`);
         }
-        
-        // Calculate Vcf using instance-specific Hc value and the formula
+
         // Calculate Vcf using the formula: Vcf = (π/4) × [(K1 × Db² - de²) × Hc + di² × h]
         // Calculate each term separately for clarity
         const PI_OVER_4 = Math.PI / 4;
+        debugLog('calculateVcf', `PI_OVER_4 = ${PI_OVER_4}`);
         
         // Ensure values are valid for calculation
         if (isNaN(instanceK1) || instanceK1 <= 0) {
-          console.error('Invalid K1 value, using default 1.0');
+          debugLog('calculateVcf', `⚠️ Invalid K1 value (${instanceK1}), using default 1.0`);
           instanceK1 = 1.0;
         }
         
         if (isNaN(Db) || Db <= 0) {
-          console.error('Invalid Db value, using default 0.3');
+          debugLog('calculateVcf', `⚠️ Invalid Db value (${Db}), using default 0.3`);
           Db = 0.3; // 300mm as fallback
         }
         
         if (isNaN(de) || de <= 0) {
-          console.error('Invalid de value, using default 0.2');
+          debugLog('calculateVcf', `⚠️ Invalid de value (${de}), using default 0.2`);
           de = 0.2; // 200mm as fallback
         }
         
         if (isNaN(instanceHc) || instanceHc <= 0) {
-          console.error('Invalid Hc value, using value from input or default');
+          debugLog('calculateVcf', `⚠️ Invalid Hc value (${instanceHc}), using default value`);
           instanceHc = formationHcValues[0] || 2000; // Use first instance or default
         }
         
         if (isNaN(h) || h <= 0) {
-          console.error('Invalid h value, using default');
+          debugLog('calculateVcf', `⚠️ Invalid h value (${h}), using default value`);
           h = 1000; // Default value
         }
         
+        // Calculation steps
         const k1_times_db_squared = instanceK1 * Math.pow(Db, 2);
+        debugLog('calculateVcf', `k1_times_db_squared = ${instanceK1} * ${Db}² = ${k1_times_db_squared}`);
+        
         const de_squared = Math.pow(de, 2);
-        const first_term = (k1_times_db_squared - de_squared) * instanceHc; // Using instanceHc from formation design
+        debugLog('calculateVcf', `de_squared = ${de}² = ${de_squared}`);
+        
+        const first_term = (k1_times_db_squared - de_squared) * instanceHc;
+        debugLog('calculateVcf', `first_term = (${k1_times_db_squared} - ${de_squared}) * ${instanceHc} = ${first_term}`);
+        
         const di_squared = Math.pow(dimValue, 2);
-        let second_term = 0; // Declare second_term variable
+        debugLog('calculateVcf', `di_squared = ${dimValue}² = ${di_squared}`);
+        
+        let second_term = 0;
         if (isNaN(di_squared) || di_squared <= 0) {
-          console.error('Invalid di² value, using fallback');
+          debugLog('calculateVcf', `⚠️ Invalid di² value (${di_squared}), using fallback`);
           const fallback_di = 0.2000; // 200mm fallback
           const fallback_di_squared = Math.pow(fallback_di, 2);
           second_term = fallback_di_squared * h;
+          debugLog('calculateVcf', `second_term (fallback) = ${fallback_di_squared} * ${h} = ${second_term}`);
         } else {
           second_term = di_squared * h;
+          debugLog('calculateVcf', `second_term = ${di_squared} * ${h} = ${second_term}`);
         }
+        
         let vcf = PI_OVER_4 * (first_term + second_term);
+        debugLog('calculateVcf', `vcf = ${PI_OVER_4} * (${first_term} + ${second_term}) = ${vcf}`);
         
         // Final safety check to prevent NaN
         if (isNaN(vcf)) {
-          console.error('Vcf calculation resulted in NaN, using fallback calculation');
+          debugLog('calculateVcf', `⚠️ Vcf calculation resulted in NaN, using fallback calculation`);
           // Simple fallback calculation based on dimensions
           vcf = PI_OVER_4 * (Math.pow(Db, 2) * instanceHc);
+          debugLog('calculateVcf', `vcf (fallback) = ${PI_OVER_4} * (${Db}² * ${instanceHc}) = ${vcf}`);
         }
         
         // Add to results
@@ -1001,57 +1378,13 @@ export default function SemanticsPage() {
           vcf: vcf
         });
         
-        // Add calculation details to the equations HTML
-        equations += `
-          <div class="mt-6 border border-primary/20 rounded-md overflow-hidden">
-            <div class="bg-primary/10 p-3 border-b border-primary/20">
-              <h4 class="font-semibold">Instance ${instanceNumber} Calculations</h4>
-            </div>
-            <div class="p-4 space-y-4 bg-muted/20">
-              <div>
-                <p class="font-medium mb-2">Input Values:</p>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">K1 = ${instanceK1.toFixed(4)}</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">Hc = ${instanceHc.toFixed(4)} m</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">h = ${h.toFixed(4)} m</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">Db = ${(Db * 1000).toFixed(4)} mm</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">de = ${(de * 1000).toFixed(4)} mm</span>
-                  </div>
-                  <div class="bg-background/50 p-2 rounded border border-border/30">
-                    <span class="font-mono">di = ${(dimValue * 1000).toFixed(4)} mm</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="border-t border-border/30 pt-4">
-                <p class="font-medium">Vcf Calculation:</p>
-                <div class="mt-2 bg-background/60 p-3 rounded">
-                  <p class="font-mono text-sm">Vcf = (π/4) × [(K1 × Db² - de²) × Hc + di² × h]</p>
-                  <ol class="list-decimal list-inside space-y-1 mt-2 font-mono text-sm">
-                    <li>K1 × Db² = ${instanceK1.toFixed(4)} × ${(Db * Db).toFixed(6)} = ${k1_times_db_squared.toFixed(6)}</li>
-                    <li>de² = ${(de * de).toFixed(6)}</li>
-                    <li>K1 × Db² - de² = ${k1_times_db_squared.toFixed(6)} - ${(de * de).toFixed(6)} = ${(k1_times_db_squared - de * de).toFixed(6)}</li>
-                    <li>(K1 × Db² - de²) × Hc = ${(k1_times_db_squared - de * de).toFixed(6)} × ${instanceHc.toFixed(4)} = ${first_term.toFixed(6)}</li>
-                    <li>di² = ${di_squared.toFixed(6)}</li>
-                    <li>di² × h = ${di_squared.toFixed(6)} × ${h.toFixed(4)} = ${second_term.toFixed(6)}</li>
-                    <li>(K1 × Db² - de²) × Hc + di² × h = ${first_term.toFixed(6)} + ${second_term.toFixed(6)} = ${(first_term + second_term).toFixed(6)}</li>
-                    <li>π/4 × [(K1 × Db² - de²) × Hc + di² × h] = ${PI_OVER_4.toFixed(6)} × ${(first_term + second_term).toFixed(6)} = ${vcf.toFixed(6)}</li>
-                  </ol>
-                  <p class="font-mono text-sm mt-2 font-bold">Vcf = ${vcf.toFixed(4)} m³</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
+        debugLog('calculateVcf', `Final Vcf result for instance ${instanceNumber}:`, {
+          'Db (mm)': Db * 1000,
+          'de (mm)': de * 1000,
+          'di (mm)': dimValue * 1000,
+          'h': h,
+          'Vcf': vcf
+        });
       }
       
       // Using the updated methods to persist results
@@ -1184,25 +1517,13 @@ export default function SemanticsPage() {
           for (let i = 1; i <= 5; i++) {
             // First try with the new Hc naming
             if (data[`Hc_${i}`] && !isNaN(parseFloat(data[`Hc_${i}`]))) {
-              // Store values while handling the swapping of instances 1 and 3
-              if (i === 1) {
-                formationHcValues[2] = parseFloat(data[`Hc_${i}`]);
-              } else if (i === 3) {
-                formationHcValues[0] = parseFloat(data[`Hc_${i}`]);
-              } else {
-                formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
-              }
+              // Store values directly without swapping instances 1 and 3
+              formationHcValues[i-1] = parseFloat(data[`Hc_${i}`]);
             } 
             // Then fallback to the old H naming for backward compatibility
             else if (data[`H_${i}`] && !isNaN(parseFloat(data[`H_${i}`]))) {
-              // Store values while handling the swapping of instances 1 and 3
-              if (i === 1) {
-                formationHcValues[2] = parseFloat(data[`H_${i}`]);
-              } else if (i === 3) {
-                formationHcValues[0] = parseFloat(data[`H_${i}`]);
-              } else {
-                formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
-              }
+              // Store values directly without swapping instances 1 and 3
+              formationHcValues[i-1] = parseFloat(data[`H_${i}`]);
             }
           }
           
@@ -1336,37 +1657,52 @@ export default function SemanticsPage() {
         const vcfValue = toFixedPrecision(vcfResult.vcf); // Apply fixed precision to vcf value
         const instanceNumber = vcfResult.instance;
         
+        debugLog('GcGc Calculation', `Processing instance ${instanceNumber}`, {
+          'Vcf value': vcfValue,
+          'Instance': instanceNumber
+        });
+        
         // Find the casing result that corresponds to this instance
         const casingResult = casingResults && casingResults.length > instanceNumber - 1 
           ? casingResults[instanceNumber - 1] 
           : null;
+
+        debugLog('GcGc Calculation', `Corresponding casing result:`, casingResult);
 
         // Get appropriate Hc value based on casing section or instance
         let instanceHc = 0;
         if (casingResult) {
           // Map based on section
           if (casingResult.section === "Production") {
-            instanceHc = formationHcValues[0] || formationHcValues[0] || 2000;
+            instanceHc = formationHcValues[0] || 2000;
+            debugLog('GcGc Calculation', `Production section - using Hc value: ${instanceHc}`);
           } else if (casingResult.section === "Surface") {
-            instanceHc = formationHcValues[2] || formationHcValues[0] || 2000;
+            instanceHc = formationHcValues[4] || formationHcValues[0] || 2000;
+            debugLog('GcGc Calculation', `Surface section - using Hc value: ${instanceHc}`);
           } else if (casingResult.section.includes("Intermediate")) {
             // Extract intermediate number if present
             const match = casingResult.section.match(/intermediate\s+(\d+)/i);
             const intermediateNumber = match && match[1] ? parseInt(match[1]) : 1;
+            debugLog('GcGc Calculation', `Intermediate section ${intermediateNumber} detected`);
             
             // Map to appropriate Hc value based on intermediate number
-            if (intermediateNumber > 1) {
-              instanceHc = formationHcValues[intermediateNumber+1] || formationHcValues[1] || formationHcValues[0] || 2000;
+            if (intermediateNumber > 0 && intermediateNumber <= formationHcValues.length) {
+              instanceHc = formationHcValues[intermediateNumber] || formationHcValues[0] || 2000;
+              debugLog('GcGc Calculation', `Intermediate ${intermediateNumber} - using Hc value: ${instanceHc}`);
             } else {
+              // Default to first intermediate
               instanceHc = formationHcValues[1] || formationHcValues[0] || 2000;
+              debugLog('GcGc Calculation', `Intermediate default - using Hc value from index 1: ${instanceHc}`);
             }
           } else {
             // Fallback to using instance number directly
             instanceHc = formationHcValues[instanceNumber-1] || formationHcValues[0] || 2000;
+            debugLog('GcGc Calculation', `Other section - using Hc value: ${instanceHc}`);
           }
         } else {
           // No casing result, fall back to instance number mapping
           instanceHc = formationHcValues[instanceNumber-1] || formationHcValues[0] || 2000;
+          debugLog('GcGc Calculation', `No casing result - using Hc value: ${instanceHc}`);
         }
         
         // AGGRESSIVE SAFETY: Ensure all values are strictly numeric
@@ -1428,12 +1764,65 @@ export default function SemanticsPage() {
         const PI_OVER_4 = Math.PI / 4;
         let vfd = null;
         
-        // Try to get H from tfd (fluid displacement height) input
-        let H = 250; // Default value
-        if (tfdValue && !isNaN(parseFloat(tfdValue))) {
-          H = parseFloat(tfdValue);
-        } else if (instanceValues['tfd'] && instanceValues['tfd'][instanceNumber] && !isNaN(parseFloat(instanceValues['tfd'][instanceNumber]))) {
-          H = parseFloat(instanceValues['tfd'][instanceNumber]);
+        // Try to get H from casing calculator data
+        let H = 250; // Default fallback value
+        
+        try {
+          // Get depths from casing calculator data
+          const casingData = localStorage.getItem('casingCalculatorData');
+          if (casingData) {
+            const parsedData = JSON.parse(casingData);
+            
+            if (parsedData && parsedData.sectionInputs && parsedData.sectionInputs.length > 0) {
+              // Sections in casingCalculatorData are stored from deepest (index 0) to shallowest (last index)
+              // Map instance to appropriate section based on correct ordering
+              let sectionIndex = 0;
+              
+              if (instanceNumber === 1) {
+                // Instance 1 (Production) uses the deepest section (index 0)
+                sectionIndex = 0;
+              } else if (instanceNumber === 2) {
+                // Instance 2 uses the second deepest (index 1)
+                sectionIndex = 1;
+                if (sectionIndex >= parsedData.sectionInputs.length) sectionIndex = 0;
+              } else if (instanceNumber === 3) {
+                // Instance 3 uses the third deepest (index 2)
+                sectionIndex = 2;
+                if (sectionIndex >= parsedData.sectionInputs.length) sectionIndex = 0;
+              } else if (instanceNumber === 4) {
+                // Instance 4 uses the fourth deepest (index 3)
+                sectionIndex = 3;
+                if (sectionIndex >= parsedData.sectionInputs.length) sectionIndex = 0;
+              } else if (instanceNumber === 5) {
+                // Instance 5 (Surface) uses the shallowest section (last in the array)
+                sectionIndex = parsedData.sectionInputs.length - 1;
+              }
+              
+              // Get depth from the appropriate section
+              if (parsedData.sectionInputs[sectionIndex] && parsedData.sectionInputs[sectionIndex].depth) {
+                const sectionDepth = parseFloat(parsedData.sectionInputs[sectionIndex].depth);
+                if (!isNaN(sectionDepth) && sectionDepth > 0) {
+                  H = sectionDepth;
+                  debugLog('calculateGcGc', `Using depth from casing data for instance ${instanceNumber}: ${H}m (section index ${sectionIndex}, depth order ${sectionIndex + 1})`);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error loading depths from casing calculator data:', error);
+          debugLog('calculateGcGc', `Error loading depths from casing calculator data: ${error}`);
+        }
+        
+        // Fallback: Try to get H from tfd (fluid displacement height) input if casing data isn't available
+        if (H === 250) {
+          debugLog('calculateGcGc', `No valid depth found in casing data, checking tfd inputs`);
+          if (tfdValue && !isNaN(parseFloat(tfdValue))) {
+            H = parseFloat(tfdValue);
+            debugLog('calculateGcGc', `Using H from tfd input field: ${H}`);
+          } else if (instanceValues['tfd'] && instanceValues['tfd'][instanceNumber] && !isNaN(parseFloat(instanceValues['tfd'][instanceNumber]))) {
+            H = parseFloat(instanceValues['tfd'][instanceNumber]);
+            debugLog('calculateGcGc', `Using H from tfd instance values: ${H}`);
+          }
         }
         
         // Try to get h from td (displacement height) input
@@ -1448,6 +1837,21 @@ export default function SemanticsPage() {
         const di_for_vfd = vcfResult.di / 1000;
         if (!isNaN(di_for_vfd) && di_for_vfd > 0 && !isNaN(H) && !isNaN(h) && H > h) {
           vfd = PI_OVER_4 * Math.pow(di_for_vfd, 2) * (H - h);
+          debugLog('calculateGcGc', `Calculated Vfd for instance ${instanceNumber}:`, {
+            'Formula': '(π/4) × di² × (H - h)',
+            'di': di_for_vfd,
+            'H': H,
+            'h': h,
+            'H - h': H - h,
+            'Vfd': vfd
+          });
+        } else {
+          debugLog('calculateGcGc', `Could not calculate Vfd for instance ${instanceNumber}:`, {
+            'di': di_for_vfd,
+            'H': H,
+            'h': h,
+            'Valid values?': !isNaN(di_for_vfd) && di_for_vfd > 0 && !isNaN(H) && !isNaN(h) && H > h
+          });
         }
 
         // Calculate Pymax (maximum pressure at yield point)
@@ -1586,7 +1990,7 @@ export default function SemanticsPage() {
                   <div>
                     <p class="font-medium">Pymax (maximum pressure at yield point):</p>
                     <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(Hc - h)(γfc - γf)]</p>
-                    <p class="text-xs mt-1">Where Hc is Height Above Cementation from Formation Design and h is the height parameter from semantic screen</p>
+                    <p class="text-xs mt-1">Where Hc is Height Above Cementation from Formation Design and h is the height parameter from the semantic screen</p>
                   </div>
                   <div>
                     <p class="font-medium">Pc (confining pressure):</p>
@@ -1644,6 +2048,7 @@ export default function SemanticsPage() {
     }
     
     setIsPumpSelectionLoading(true);
+    debugLog('pumpSelection', 'Starting pump selection process');
     
     try {
       // Extract Ppmax values from GC results
@@ -1662,15 +2067,23 @@ export default function SemanticsPage() {
           if (useSingleDiameter) {
             // Use the globally selected diameter for all instances
             instanceDiametersToSend.push(selectedDiameter);
+            debugLog('pumpSelection', `Instance ${result.instance}: Using global diameter ${selectedDiameter}"`);
           } else {
             // Use instance-specific diameter
             const diameter = instanceDiameters[result.instance] || selectedDiameter;
             instanceDiametersToSend.push(diameter);
+            debugLog('pumpSelection', `Instance ${result.instance}: Using instance-specific diameter ${diameter}"`);
           }
+          
+          debugLog('pumpSelection', `Instance ${result.instance} requirements:`, {
+            'Ppmax': result.ppmax,
+            'Diameter': instanceDiametersToSend[instanceDiametersToSend.length - 1]
+          });
         }
       });
       
       if (ppmaxValues.length === 0) {
+        debugLog('pumpSelection', '⚠️ No valid Ppmax values found');
         showToast('error', "No valid Ppmax values found. Please calculate parameters first.");
         setIsPumpSelectionLoading(false);
         return;
@@ -1685,6 +2098,12 @@ export default function SemanticsPage() {
         const diameter = instanceDiametersToSend[index];
         const diameterKey = diameter.toString() as "3.5" | "4" | "4.5";
         
+        debugLog('pumpSelection', `Processing instance ${instanceNumber}:`, {
+          'Ppmax required': ppmax,
+          'Diameter': diameter,
+          'Diameter key': diameterKey
+        });
+        
         // Filter pumps by diameter and pressure
         const matchingPumps = PUMP_DATA.filter(pump => {
           // Check if this pump has data for the selected diameter
@@ -1693,8 +2112,19 @@ export default function SemanticsPage() {
           
           // Check if this pump's pressure meets or exceeds the required Ppmax
           const pumpPressure = pump.pressures[diameterKey] as number;
-          return pumpPressure >= ppmax;
+          const isMatch = pumpPressure >= ppmax;
+          
+          debugLog('pumpSelection', `Evaluating pump ${pump.type} (Speed ${pump.speed}):`, {
+            'Has diameter data': hasDiameter,
+            'Pump pressure': pumpPressure,
+            'Meets pressure requirement': isMatch,
+            'Pressure difference': pumpPressure - ppmax
+          });
+          
+          return isMatch;
         });
+        
+        debugLog('pumpSelection', `Found ${matchingPumps.length} matching pumps for instance ${instanceNumber}`);
         
         // Sort by pressure (descending), closest to Ppmax first
         const sortedPumps = [...matchingPumps].sort((a, b) => {
@@ -1703,12 +2133,27 @@ export default function SemanticsPage() {
           return Math.abs(aPressure - ppmax) - Math.abs(bPressure - ppmax);
         });
         
+        debugLog('pumpSelection', `Sorted pumps by closest pressure match for instance ${instanceNumber}`, 
+          sortedPumps.map(p => ({
+            type: p.type, 
+            speed: p.speed, 
+            pressure: p.pressures[diameterKey],
+            pressureDiff: (p.pressures[diameterKey] as number) - ppmax
+          }))
+        );
+        
         // Format results for this instance
         const pumpResultsForInstance: PumpResult[] = [];
         
         sortedPumps.forEach((pump, pumpIndex) => {
           const pumpPressure = pump.pressures[diameterKey] as number;
           const pumpFlow = pump.flows[diameterKey] as number;
+          
+          debugLog('pumpSelection', `Processing pump for result: ${pump.type} (Speed ${pump.speed})`, {
+            'Pressure': pumpPressure,
+            'Flow': pumpFlow,
+            'Is first choice': pumpIndex === 0
+          });
           
           // Calculate time factors for the pump
           let tfc = null;
@@ -1724,14 +2169,24 @@ export default function SemanticsPage() {
             let instanceTd = 0;
             if (tdValue && !isNaN(parseFloat(tdValue))) {
               instanceTd = parseFloat(tdValue);
+              debugLog('pumpSelection', `Using td from input field: ${instanceTd}`);
             } else if (instanceValues['td'] && 
                       instanceValues['td'][instanceNumber] && 
                       !isNaN(parseFloat(instanceValues['td'][instanceNumber]))) {
               instanceTd = parseFloat(instanceValues['td'][instanceNumber]);
+              debugLog('pumpSelection', `Using td from instance values: ${instanceTd}`);
             }
             
             // Calculate tfc+tfd = ((Vcf+Vfd)*10^3)/Q
             const tfcPlusTfd = ((gcResultForInstance.vcf + gcResultForInstance.vfd) * 1000) / pumpFlow;
+            
+            debugLog('pumpSelection', `Time calculations for ${pump.type} (Speed ${pump.speed}):`, {
+              'Formula': 'tfc+tfd = ((Vcf+Vfd)*10^3)/Q',
+              'Vcf': gcResultForInstance.vcf,
+              'Vfd': gcResultForInstance.vfd,
+              'Q (flow)': pumpFlow,
+              'Result (tfc+tfd)': tfcPlusTfd
+            });
             
             // Calculate tc = tfc+tfd + td
             tc = tfcPlusTfd + instanceTd;
@@ -1739,6 +2194,16 @@ export default function SemanticsPage() {
             // Split tfcPlusTfd into tfc and tfd (50/50 split as a default approach)
             tfc = tfcPlusTfd / 2;
             tfd = tfcPlusTfd / 2;
+            
+            debugLog('pumpSelection', `Final time values for ${pump.type} (Speed ${pump.speed}):`, {
+              'tfc': tfc,
+              'tfd': tfd,
+              'td': instanceTd,
+              'tc': tc,
+              'tad': tad
+            });
+          } else {
+            debugLog('pumpSelection', `⚠️ Cannot calculate time values for ${pump.type} - missing Vfd or GC result`);
           }
           
           pumpResultsForInstance.push({
@@ -1762,6 +2227,8 @@ export default function SemanticsPage() {
         
         // If no exact matches, try to find alternatives with higher pressure
         if (pumpResultsForInstance.length === 0) {
+          debugLog('pumpSelection', `⚠️ No matching pumps found for instance ${instanceNumber}, searching for alternatives`);
+          
           // Find pumps with diameter that can handle higher pressures
           const alternativePumps = PUMP_DATA.filter(pump => {
             const otherDiameterKeys: Array<"3.5" | "4" | "4.5"> = ["3.5", "4", "4.5"];
@@ -1770,6 +2237,8 @@ export default function SemanticsPage() {
               return pump.pressures[key] !== null && (pump.pressures[key] as number) >= ppmax;
             });
           });
+          
+          debugLog('pumpSelection', `Found ${alternativePumps.length} alternative pumps for instance ${instanceNumber}`);
           
           if (alternativePumps.length > 0) {
             // Find best alternative diameter for each pump
@@ -1789,6 +2258,14 @@ export default function SemanticsPage() {
                 const altDiameter = parseFloat(bestDiameter);
                 const pumpPressure = pump.pressures[bestDiameter as "3.5" | "4" | "4.5"] as number;
                 const pumpFlow = pump.flows[bestDiameter as "3.5" | "4" | "4.5"] as number;
+                
+                debugLog('pumpSelection', `Alternative pump for instance ${instanceNumber}: ${pump.type} (Speed ${pump.speed})`, {
+                  'Original diameter': diameter,
+                  'Alternative diameter': altDiameter,
+                  'Pressure': pumpPressure,
+                  'Flow': pumpFlow,
+                  'Is first choice': pumpIndex === 0
+                });
                 
                 pumpResultsForInstance.push({
                   type: pump.type,
@@ -1818,6 +2295,7 @@ export default function SemanticsPage() {
             // Mark the first one as recommended
             if (pumpResultsForInstance.length > 0) {
               pumpResultsForInstance[0].isRecommended = true;
+              debugLog('pumpSelection', `Marked ${pumpResultsForInstance[0].type} (Speed ${pumpResultsForInstance[0].speed}) as recommended for instance ${instanceNumber}`);
             }
           }
         }
@@ -1828,12 +2306,15 @@ export default function SemanticsPage() {
       
       // Update state with results
       setPumpResults(results);
+      debugLog('pumpSelection', `Pump selection complete. Found ${results.length} total pumps across all instances.`);
       
       showToast('success', "Pump selection completed", {
         description: `Found ${results.length} suitable pumps.`
       });
     } catch (error) {
       console.error('Error in pump selection:', error);
+      debugLog('pumpSelection', `⚠️ Error in pump selection: ${error instanceof Error ? error.message : "Unknown error"}`);
+      
       showToast('error', "Pump selection failed", {
         description: error instanceof Error ? error.message : "Unknown error"
       });
@@ -1893,10 +2374,12 @@ export default function SemanticsPage() {
             newValues[field][result.instance] = fieldValue;
           });
         } else {
-          // Fallback to default 3 instances if no vcfResults
+          // Fallback to default 5 instances if no vcfResults
         newValues[field][1] = fieldValue;
         newValues[field][2] = fieldValue;
         newValues[field][3] = fieldValue;
+        newValues[field][4] = fieldValue;
+        newValues[field][5] = fieldValue;
         }
         
         setInstanceValues(newValues);
@@ -2080,8 +2563,8 @@ export default function SemanticsPage() {
                 </div>
               ))
             ) : (
-              // Fallback to default 3 instances if no vcfResults
-              [1, 2, 3].map(instance => (
+              // Fallback to default 5 instances if no vcfResults
+              [1, 2, 3, 4, 5].map(instance => (
               <div key={`${fieldId}_${instance}`} className="space-y-1">
                 <Label htmlFor={`${fieldId}_${instance}`} className="text-sm text-muted-foreground">
                   Instance {instance}
@@ -2566,6 +3049,68 @@ export default function SemanticsPage() {
                             </div>
                       </CardContent>
                     </Card>
+              )}
+              
+              {/* Debug Summary Section */}
+              {(vcfResults.length > 0 || gcResults.length > 0 || pumpResults.length > 0) && (
+                <div className="mt-6 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => {
+                      try {
+                        const summary = generateDebugSummary(vcfResults, gcResults, pumpResults);
+                        
+                        // Fallback copy method for environments where clipboard API isn't available
+                        if (!navigator.clipboard) {
+                          // Create a temporary textarea element
+                          const textArea = document.createElement('textarea');
+                          textArea.value = summary;
+                          
+                          // Make it invisible
+                          textArea.style.position = 'fixed';
+                          textArea.style.opacity = '0';
+                          textArea.style.left = '-999999px';
+                          textArea.style.top = '-999999px';
+                          
+                          document.body.appendChild(textArea);
+                          textArea.focus();
+                          textArea.select();
+                          
+                          try {
+                            // Execute the copy command
+                            const successful = document.execCommand('copy');
+                            if (successful) {
+                              showToast('success', "Debug summary copied to clipboard");
+                            } else {
+                              throw new Error('Copy command failed');
+                            }
+                          } catch (e) {
+                            showToast('error', "Clipboard copy failed, try manual selection");
+                            console.error("Fallback clipboard copy failed:", e);
+                          }
+                          
+                          document.body.removeChild(textArea);
+                        } else {
+                          // Use the Clipboard API if available
+                          navigator.clipboard.writeText(summary)
+                            .then(() => showToast('success', "Debug summary copied to clipboard"))
+                            .catch((err) => {
+                              showToast('error', "Failed to copy debug summary");
+                              console.error("Clipboard API copy failed:", err);
+                            });
+                        }
+                      } catch (err) {
+                        console.error("Failed to copy debug summary:", err);
+                        showToast('error', "Failed to copy debug summary");
+                      }
+                    }}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>Copy Debug Info</span>
+                  </Button>
+                </div>
               )}
                   </TabsContent>
                   

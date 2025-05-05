@@ -26,6 +26,8 @@ export default function DataInputForm() {
   const [displayedDalphaValue, setDisplayedDalphaValue] = useState('')
   // Get the well type from context
   const { wellType } = useWellType()
+  // Add state to track the number of sections from casing calculator
+  const [numSections, setNumSections] = useState<number>(3) // Default to 3 if not found in localStorage
 
   // Load saved data on component mount
   useEffect(() => {
@@ -53,10 +55,21 @@ export default function DataInputForm() {
           
           // For exploration wells, set γ values to 1.08
           if (wellType === 'exploration') {
-            // Set γ for all instances to 1.08
-            migratedData['γ_1'] = '1.08';
-            migratedData['γ_2'] = '1.08';
-            migratedData['γ_3'] = '1.08';
+            // Load the number of sections from casing calculator data first
+            const casingData = localStorage.getItem('casingCalculatorData');
+            let sectionsCount = 3; // Default if not found
+            
+            if (casingData) {
+              const parsedCasingData = JSON.parse(casingData);
+              if (parsedCasingData.iterations) {
+                sectionsCount = parseInt(parsedCasingData.iterations);
+              }
+            }
+            
+            // Set γ for all instances to 1.08 based on section count
+            for (let i = 1; i <= sectionsCount; i++) {
+              migratedData[`γ_${i}`] = '1.08';
+            }
           }
           
           setFormData(migratedData);
@@ -64,6 +77,16 @@ export default function DataInputForm() {
           // Initialize the displayed dα value if it exists
           if (migratedData['dα']) {
             setDisplayedDalphaValue((parseFloat(migratedData['dα']) * 100000).toFixed(2));
+          }
+        }
+        
+        // Load the number of sections from casing calculator data
+        const casingData = localStorage.getItem('casingCalculatorData');
+        if (casingData) {
+          const data = JSON.parse(casingData);
+          if (data.iterations) {
+            setNumSections(parseInt(data.iterations));
+            console.log(`Loaded ${data.iterations} sections from casing calculator data`);
           }
         }
         
@@ -139,10 +162,16 @@ export default function DataInputForm() {
     if (!singleInputFields[field]) {
       const firstInstanceValue = formData[`${field}_1`] || '';
       if (firstInstanceValue) {
+        const updatedData: Record<string, string> = {};
+        
+        // Dynamically create entries for all sections
+        for (let i = 2; i <= numSections; i++) {
+          updatedData[`${field}_${i}`] = firstInstanceValue;
+        }
+        
         setFormData(prev => ({
           ...prev,
-          [`${field}_2`]: firstInstanceValue,
-          [`${field}_3`]: firstInstanceValue
+          ...updatedData
         }));
       }
     }
@@ -151,11 +180,16 @@ export default function DataInputForm() {
   // Handle single input change (propagate to all instances)
   const handleSingleInputChange = (field: string, value: string) => {
     // No special handling needed for WOB here since we're already storing as tons
+    const updatedData: Record<string, string> = {};
+    
+    // Dynamically create entries for all sections
+    for (let i = 1; i <= numSections; i++) {
+      updatedData[`${field}_${i}`] = value;
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [`${field}_1`]: value,
-      [`${field}_2`]: value,
-      [`${field}_3`]: value
+      ...updatedData
     }));
   }
 
@@ -164,11 +198,16 @@ export default function DataInputForm() {
     try {
       // For exploration wells, ensure γ is always 1.08
       if (wellType === 'exploration') {
+        const updatedData: Record<string, string> = {};
+        
+        // Dynamically create entries for all sections
+        for (let i = 1; i <= numSections; i++) {
+          updatedData[`γ_${i}`] = '1.08';
+        }
+        
         setFormData(prev => ({
           ...prev,
-          'γ_1': '1.08',
-          'γ_2': '1.08',
-          'γ_3': '1.08'
+          ...updatedData
         }));
       }
       
@@ -275,12 +314,15 @@ export default function DataInputForm() {
                 />
               </div>
             ) : (
-              // Multiple inputs mode
+              // Multiple inputs mode - Dynamic based on numSections
               <div className="space-y-3">
-                {[1, 2, 3].map(instance => (
+                {Array.from({ length: numSections }, (_, i) => i + 1).map(instance => (
                   <div key={`${field}_${instance}`} className="space-y-1.5">
                     <Label htmlFor={`${field}_${instance}`} className="text-xs text-muted-foreground">
-                      Instance {instance}
+                      {instance === 1 ? "Production" : 
+                       instance === numSections ? "Surface" : 
+                       numSections === 3 && instance === 2 ? "Intermediate" : 
+                       `Intermediate ${instance - 1}`}
                     </Label>
                     <Input
                       id={`${field}_${instance}`}
@@ -372,10 +414,13 @@ export default function DataInputForm() {
             ) : (
               // Multiple inputs mode
               <div className="space-y-3">
-                {[1, 2, 3].map(instance => (
+                {Array.from({ length: numSections }, (_, i) => i + 1).map(instance => (
                   <div key={`${field}_${instance}`} className="space-y-1.5">
                     <Label htmlFor={`${field}_${instance}`} className="text-xs text-muted-foreground">
-                      Instance {instance}
+                      {instance === 1 ? "Production" : 
+                       instance === numSections ? "Surface" : 
+                       numSections === 3 && instance === 2 ? "Intermediate" : 
+                       `Intermediate ${instance - 1}`}
                     </Label>
                     <Input
                       id={`${field}_${instance}`}
@@ -415,50 +460,6 @@ export default function DataInputForm() {
             </div>
           </div>
         )}
-      </div>
-    )
-  }
-
-  const renderConstants = () => {
-    const fields = ["K1", "K2", "K3", "Yc", "Yfc", "h", "td"]
-    
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-        {fields.map(field => (
-          <div key={field} className="space-y-2 bg-background/70 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
-            <div className="flex items-center gap-2">
-              <Label htmlFor={field} className="text-base font-medium text-primary">{field}</Label>
-              {field === "K1" && (
-                <HelpTooltip text="Factor that consider to the increase of the well dimeter (1.1-1.2)" />
-              )}
-              {field === "K2" && (
-                <HelpTooltip text="Factor that consider sticking of the drill pipes ranges (1.1-1.25)" />
-              )}
-              {field === "K3" && (
-                <HelpTooltip text="Factor that consider the acceleration of the drill pipes when raising ranges (1.02-1.04)" />
-              )}
-              {field === "Yc" && (
-                <HelpTooltip text="The specific weight for the cementing powder (gf/cm3)" />
-              )}
-              {field === "Yfc" && (
-                <HelpTooltip text="The specific weight for the cementing fluid (gf/cm3)" />
-              )}
-              {field === "h" && (
-                <HelpTooltip text="The height of Float Collars (m)" />
-              )}
-              {field === "td" && (
-                <HelpTooltip text="The time spent on bumping the cement (10-15 min)" />
-              )}
-            </div>
-            <Input
-              id={field}
-              placeholder={`Enter ${field}`}
-              value={formData[field] || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(field, e.target.value)}
-              className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
-            />
-          </div>
-        ))}
       </div>
     )
   }
@@ -514,25 +515,6 @@ export default function DataInputForm() {
               </div>
               <div className="mt-4">
                 {renderDrillingPipesCharacteristics()}
-              </div>
-            </div>
-          </motion.div>
-          
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-          >
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-1 bg-primary rounded-full"></div>
-                <h3 className="text-lg font-medium">Constants</h3>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Enter the constant values for calculations
-              </div>
-              <div className="mt-4">
-                {renderConstants()}
               </div>
             </div>
           </motion.div>
