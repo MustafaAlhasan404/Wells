@@ -144,6 +144,21 @@ function getHValueForInstance(data: any, instance: number): number | undefined {
   return undefined;
 }
 
+// Define utility function for sorting calculations by instance
+const sortCalculationsByInstance = (calculations: any[]) => {
+  return [...calculations].sort((a: any, b: any) => {
+    const getInstanceNumber = (calc: any) => 
+      calc.instance ?? (
+        calc.section === "Production" ? 1 : 
+        calc.section === "Intermediate" ? 2 : 
+        calc.section === "Surface" ? 3 : 
+        4 // Fallback
+      );
+    
+    return getInstanceNumber(a) - getInstanceNumber(b);
+  });
+};
+
 // After defining getHValueForInstance, add another helper function that enriches calculation results with H values
 function enrichCalculationsWithHValues(calculations: any[], formData: any): any[] {
   if (!calculations || !formData) return calculations || [];
@@ -251,7 +266,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         localStorage.setItem('drillCollarResults', JSON.stringify(localDrillCollarResults));
       }
       if (calculations.length > 0) {
-        localStorage.setItem('drillCollarCalculations', JSON.stringify(calculations));
+        // Sort calculations before saving to ensure consistent order
+        const sortedCalculations = sortCalculationsByInstance(calculations);
+        localStorage.setItem('drillCollarCalculations', JSON.stringify(sortedCalculations));
       }
     } catch (error) {
       console.error('Failed to save drill collar results to localStorage:', error);
@@ -309,6 +326,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         if (formData) {
           validatedCalculations = enrichCalculationsWithHValues(validatedCalculations, formData);
         }
+        
+        // Sort the calculations by instance number for consistent display
+        validatedCalculations = sortCalculationsByInstance(validatedCalculations);
         
         setCalculations(validatedCalculations as DrillCollarCalculation[]);
         setDrillCollarCalculations(validatedCalculations);
@@ -1046,9 +1066,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           const NB = combinedParams.NB || 0;
           const Mp = combinedParams.Mp || 0;
           if (!tau && Np && NB && n && Mp) {
-            // New denominator: π * n * Mp * 10^-9
-            tau = (30 * ((Np + NB) * Math.pow(10, 3)) / (Math.PI * n * Mp * Math.pow(10, -9))) * Math.pow(10, -6);
-            console.log(`Calculated tau = ${tau} for instance ${instance} (new denominator: π * n * Mp * 10^-9)`);
+            // New denominator: π * n * Mp * 10^-6
+            tau = (30 * ((Np + NB) * Math.pow(10, 3)) / (Math.PI * n * Mp * Math.pow(10, -6))) * Math.pow(10, -6);
+            console.log(`Calculated tau = ${tau} for instance ${instance} (new denominator: π * n * Mp * 10^-6)`);
           }
           
           // Calculate eq (equivalent stress)
@@ -1134,7 +1154,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
             Tec: tData?.Tec_formula || 'Tec = Tc * K1 * K2 * K3',
             Np: tauData?.Np_formula || 'Np = dα * γ * (Lp * Dep²+ L0c * dec² + Lhw * Dhw²) * n^1.7',
             NB: tauData?.NB_formula || 'NB = 3.2 * 10^-4 * (WOB^0.5) * ((DB/10)^1.75) * n',
-            tau: tauData?.tau_formula || 'tau = (30 * ((Np + NB) * 10^3 / (π * n * Mp * 10^-9))) * 10^-6',
+            tau: tauData?.tau_formula || 'tau = (30 * ((Np + NB) * 10^3 / (π * n * Mp * 10^-6))) * 10^-6',
             eq: cNewData?.eq_formula || 'eq = sqrt((Tec*10^-1)² + 4*tau²)',
             C_new: cNewData?.C_new_formula || 'C_new = eq * 1.5'
           },
@@ -1199,6 +1219,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       
       // Always enrich calculations with H values from formData
       validatedCalculations = enrichCalculationsWithHValues(validatedCalculations, formData);
+      
+      // Sort the calculations by instance number for consistent display
+      validatedCalculations = sortCalculationsByInstance(validatedCalculations);
       
       setCalculations(validatedCalculations as DrillCollarCalculation[]);
       setDrillCollarCalculations(validatedCalculations); // Update context too
@@ -1441,10 +1464,10 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       output += `Application: ${NBApplication}\n\n`;
       
       // Tau calculation with formula and substitution
-      const tauFormula = data.formulas.tau || 'tau = (30 * ((Np + NB) * 10^3 / (π * n * Mp * 10^-9))) * 10^-6';
+      const tauFormula = data.formulas.tau || 'tau = (30 * ((Np + NB) * 10^3 / (π * n * Mp * 10^-6))) * 10^-6';
       let tauApplication = '';
       if (data.Np !== undefined && data.NB !== undefined && data.n !== undefined && data.Mp !== undefined) {
-        tauApplication = `tau = (30 · ((${data.Np?.toFixed(2)} + ${data.NB?.toFixed(2)}) · 10^3 / (π · ${data.n?.toFixed(2)} · ${data.Mp?.toFixed(2)} · 10^-9))) · 10^-6 = ${data.tau.toFixed(4)}`;
+        tauApplication = `tau = (30 · ((${data.Np?.toFixed(2)} + ${data.NB?.toFixed(2)}) · 10^3 / (π · ${data.n?.toFixed(2)} · ${data.Mp?.toFixed(2)} · 10^-6))) · 10^-6 = ${data.tau.toFixed(4)}`;
       } else {
         tauApplication = `tau = ${data.tau.toFixed(4)}`;
       }
@@ -1845,7 +1868,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                       <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
                         <div className="mb-1">Formula: {data.formulas.tau || 'Not available'}</div>
                         {data.Np !== undefined && data.NB !== undefined && data.n !== undefined && data.Mp !== undefined ? (
-                          <div>Application: (30 · (({data.Np?.toFixed(2)} + {data.NB?.toFixed(2)}) · 10^3 / (π · {data.n?.toFixed(2)} · {data.Mp?.toFixed(2)} · 10^-9))) · 10^-6 = {data.tau.toFixed(4)}</div>
+                          <div>Application: (30 · (({data.Np?.toFixed(2)} + {data.NB?.toFixed(2)}) · 10^3 / (π · {data.n?.toFixed(2)} · {data.Mp?.toFixed(2)} · 10^-6))) · 10^-6 = {data.tau.toFixed(4)}</div>
                         ) : (
                           <div>Result: {data.tau.toFixed(4)}</div>
                         )}
@@ -2239,7 +2262,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {calculations.map((calc, index) => {
+                    {/* Sort calculations by instance to ensure consistent order between environments */}
+                    {sortCalculationsByInstance(calculations)
+                      .map((calc, index) => {
                       // Convert Lmax to number to ensure toFixed works
                       const lmaxValue = typeof calc.Lmax === 'number' ? calc.Lmax : Number(calc.Lmax);
                       
