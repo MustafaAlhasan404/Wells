@@ -1491,14 +1491,22 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       if (debugCalcs.length > 0) {
         // For each debug calculation, update the corresponding validatedCalculation
         for (const debugCalc of debugCalcs) {
-          // Find matching calculation
+          // Find matching calculation by instance first, then by section name
           const matchingCalcIndex = validatedCalculations.findIndex((calc: DrillCollarCalculation) => 
-            calc.instance === debugCalc.instance || 
-            calc.section === debugCalc.section
+            calc.instance === debugCalc.instance
           );
           
-          if (matchingCalcIndex >= 0) {
-            // Determine metal grade based on SegmaC value
+          // Secondary match by section name only if instance match fails
+          const secondaryMatchIndex = matchingCalcIndex < 0 ? 
+            validatedCalculations.findIndex((calc: DrillCollarCalculation) => 
+              calc.section === debugCalc.section
+            ) : -1;
+          
+          // Use the primary match if found, otherwise try the secondary match
+          const targetIndex = matchingCalcIndex >= 0 ? matchingCalcIndex : secondaryMatchIndex;
+          
+          if (targetIndex >= 0) {
+            // Determine metal grade based on SegmaC value for THIS specific instance
             let metalGrade = 'E 75'; // Default to lowest grade
             
             if (debugCalc.SegmaC <= 517) {
@@ -1513,9 +1521,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
               metalGrade = 'S135'; // If higher, default to highest grade
             }
             
-            // Update the calculation with the correct metal grade and Lmax
-            validatedCalculations[matchingCalcIndex].drillPipeMetalGrade = metalGrade;
-            validatedCalculations[matchingCalcIndex].Lmax = debugCalc.Lmax;
+            // Update the calculation with the correct metal grade and Lmax for this instance
+            validatedCalculations[targetIndex].drillPipeMetalGrade = metalGrade;
+            validatedCalculations[targetIndex].Lmax = debugCalc.Lmax;
             
             console.log(`Updated calculation for instance ${debugCalc.instance} (${debugCalc.section}): Grade=${metalGrade}, Lmax=${debugCalc.Lmax}`);
           }
@@ -1527,13 +1535,19 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         // This explicit sorting fixes the inconsistency issue between local and production
         const instanceA = typeof a.instance === 'number' ? a.instance : 
                           a.section === "Production" ? 1 :
-                          a.section === "Intermediate" ? 2 :
-                          a.section === "Surface" ? 3 : 4;
+                          a.section === "Upper Intermediate" ? 2 :
+                          a.section === "Middle Intermediate" ? 3 :
+                          a.section === "Lower Intermediate" ? 4 :
+                          a.section === "Surface" ? 5 :
+                          a.section === "Intermediate" ? 3 : 6;
                           
         const instanceB = typeof b.instance === 'number' ? b.instance : 
                           b.section === "Production" ? 1 :
-                          b.section === "Intermediate" ? 2 :
-                          b.section === "Surface" ? 3 : 4;
+                          b.section === "Upper Intermediate" ? 2 :
+                          b.section === "Middle Intermediate" ? 3 :
+                          b.section === "Lower Intermediate" ? 4 :
+                          b.section === "Surface" ? 5 :
+                          b.section === "Intermediate" ? 3 : 6;
                           
         return instanceA - instanceB;
       });
@@ -1570,7 +1584,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     // Map instance-specific parameters for each calculation instance
     const instanceParams = [
       // Parameters that have instance-specific values (_1, _2, _3, etc.)
-      'qp', 'Lhw', 'qc', 'Dep', 'qhw', 'Dhw', 'n', 'WOB', 'C', 'P', 'γ', 'H', 'Hc'
+      'qp', 'Lhw', 'qc', 'Dep', 'qhw', 'Dhw', 'n', 'WOB', 'C', 'P', 'γ', 'H'
     ];
     
     // Create instance-specific data objects DYNAMICALLY based on numInstances
@@ -2347,26 +2361,60 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                       <div className="grid grid-cols-1 gap-2">
                         <div className="font-medium">Numerator Calculation:</div>
                         <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                          <div className="mb-1">Formula: {data.numerator_formula || 'Numerator calculation formula'}</div>
-                          <div>Result: {data.numerator?.toFixed(4) || 'N/A'}</div>
+                          <div className="mb-1">Formula: (SegmaC/1.5)² - 4*tau² * 10^12</div>
+                          <div>Application: ({data.SegmaC?.toFixed(2)}/1.5)² - 4*{data.tau?.toFixed(4)}² * 10^12 = {data.numerator?.toFixed(4) || 'N/A'}</div>
                         </div>
                         
                         <div className="font-medium">Denominator Calculation:</div>
                         <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                          <div className="mb-1">Formula: {data.denominator_formula || 'Denominator calculation formula'}</div>
-                          <div>Result: {data.denominator?.toFixed(4) || 'N/A'}</div>
+                          <div className="mb-1">Formula: (7.85 - γ)² * 10^8</div>
+                          <div>Application: (7.85 - {data.γ?.toFixed(4) || '1.08'})² * 10^8 = {data.denominator?.toFixed(4) || 'N/A'}</div>
                         </div>
                         
                         <div className="font-medium">Square Root Result:</div>
                         <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                          <div className="mb-1">Formula: {data.sqrt_result_formula || 'sqrt(Numerator / Denominator)'}</div>
+                          <div className="mb-1">Formula: sqrt(Numerator / Denominator)</div>
                           <div>Application: sqrt({data.numerator?.toFixed(4) || 'N/A'} / {data.denominator?.toFixed(4) || 'N/A'}) = {data.sqrt_result?.toFixed(4) || 'N/A'}</div>
                         </div>
                         
                         <div className="font-medium">Final Lmax Calculation:</div>
                         <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                          <div className="mb-1">Formula: {data.subtraction_formula || 'Lmax calculation formula'}</div>
-                          <div>Result: {data.Lmax.toFixed(4)} (m)</div>
+                          <div className="mb-1">Formula: sqrt_result - ((L0c*qc + Lhw*qhw) / qp)</div>
+                          <div>Application: {data.sqrt_result?.toFixed(4) || 'N/A'} - (({data.L0c?.toFixed(4) || 'N/A'}*{data.qc?.toFixed(2) || 'N/A'} + {data.Lhw?.toFixed(2) || 'N/A'}*{data.qhw?.toFixed(2) || 'N/A'}) / {data.qp?.toFixed(2) || 'N/A'}) = {data.Lmax?.toFixed(4) || 'N/A'}</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Add a detailed Lmax calculation section even when numerator/denominator are missing */}
+                {data.numerator === undefined && data.Lmax !== undefined && (
+                  <Card className="bg-white/80 dark:bg-background/80 md:col-span-2">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Lmax Calculation Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="font-medium">Complete Lmax Formula:</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                          <div className="mb-1">Lmax = sqrt(((SegmaC/1.5)² - 4*tau²) * 10^12 / ((7.85 - γ)² * 10^8)) - ((L0c*qc + Lhw*qhw) / qp)</div>
+                        </div>
+                        
+                        <div className="font-medium">Step 1: Calculate intermediate value using tensile strength and shear stress</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                          <div>sqrt(((SegmaC/1.5)² - 4*tau²) * 10^12 / ((7.85 - γ)² * 10^8))</div>
+                          <div>Using SegmaC = {data.SegmaC?.toFixed(2) || 'N/A'} MPa and tau = {data.tau?.toFixed(4) || 'N/A'}</div>
+                        </div>
+                        
+                        <div className="font-medium">Step 2: Subtract the load factor</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                          <div>- ((L0c*qc + Lhw*qhw) / qp)</div>
+                          <div>Using L0c = {data.L0c?.toFixed(4) || 'N/A'}, qc = {data.qc?.toFixed(2) || 'N/A'}, Lhw = {data.Lhw?.toFixed(2) || 'N/A'}, qhw = {data.qhw?.toFixed(2) || 'N/A'}, qp = {data.qp?.toFixed(2) || 'N/A'}</div>
+                        </div>
+                        
+                        <div className="font-medium">Result:</div>
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                          <div>Lmax = {data.Lmax?.toFixed(2) || 'N/A'} meters</div>
                         </div>
                       </div>
                     </CardContent>
@@ -2560,6 +2608,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                           else displaySection = "Lower Intermediate";
                         }
                       }
+                      
+                      // Log for debugging purposes to verify the data we're showing
+                      console.log(`Rendering row for ${displaySection} (instance ${calc.instance}): Grade=${calc.drillPipeMetalGrade}, Lmax=${lmaxValue}`);
                       
                       return (
                         <tr key={index} className="border-b border-border/40 hover:bg-muted/20 transition-colors">

@@ -256,8 +256,16 @@ export default function DataInputForm() {
         }));
       }
       
+      // Remove any legacy Hc values before saving
+      const cleanedData = { ...formData };
+      for (const key in cleanedData) {
+        if (key === 'Hc' || key.startsWith('Hc_')) {
+          delete cleanedData[key];
+        }
+      }
+      
       // Create an instances array structure for the new format
-      const processedData: Record<string, any> = { ...formData };
+      const processedData: Record<string, any> = { ...cleanedData };
       
       // Initialize instances array with H values
       const instances: Record<string, any>[] = [];
@@ -265,8 +273,8 @@ export default function DataInputForm() {
         const instanceData: Record<string, any> = {};
         
         // Get H value from H_i if it exists
-        if (formData[`H_${i}`]) {
-          instanceData.H = parseFloat(formData[`H_${i}`]);
+        if (cleanedData[`H_${i}`]) {
+          instanceData.H = parseFloat(cleanedData[`H_${i}`]);
         }
         
         instances.push(instanceData);
@@ -275,10 +283,10 @@ export default function DataInputForm() {
       // Add instances array to processed data
       processedData.instances = instances;
       
-      // Save to localStorage instead of API
-      localStorage.setItem('wellsAnalyzerData', JSON.stringify(processedData));
+      // Save to localStorage
+      localStorage.setItem('wellsAnalyzerData', JSON.stringify(processedData))
       
-      // After saving, sync H values with casing depths in casingCalculatorData
+      // Try to sync H values with casing depths
       try {
         const casingData = localStorage.getItem('casingCalculatorData');
         if (casingData) {
@@ -468,8 +476,8 @@ export default function DataInputForm() {
   const renderDrillingParameters = () => {
     // Filter out γ if we're in exploration mode
     const fields = wellType === 'exploration' 
-      ? ["WOB", "C", "P", "H", "Hc"] 
-      : ["WOB", "C", "P", "γ", "H", "Hc"];
+      ? ["WOB", "C", "P", "H"] 
+      : ["WOB", "C", "P", "γ", "H"];
     
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -494,9 +502,6 @@ export default function DataInputForm() {
                 )}
                 {field === "H" && (
                   <HelpTooltip text="Total depth (m)" />
-                )}
-                {field === "Hc" && (
-                  <HelpTooltip text="Height Above Cementation (HAC)" />
                 )}
               </div>
               <div className="flex items-center">

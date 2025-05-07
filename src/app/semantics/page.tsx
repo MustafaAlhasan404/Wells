@@ -191,7 +191,6 @@ const generateDebugSummary = (vcfResults: any[], gcResults: any[], pumpResults: 
       summary += `- Db (mm): ${result.db.toFixed(4)}\n`;
       summary += `- de (mm): ${result.de.toFixed(4)}\n`;
       summary += `- di (mm): ${result.di.toFixed(4)}\n`;
-      summary += `- Hc: ${result.hc.toFixed(4)}\n`;
       summary += `- H (depth): ${result.h ? result.h.toFixed(4) : 'N/A'}\n`;
       summary += `- hp: ${result.hp.toFixed(4)}\n`;
       summary += `- Vcf: ${result.vcf.toFixed(6)}\n`;
@@ -340,7 +339,6 @@ interface VcfResult {
   de: number;  // de (mm)
   di: number;  // di (mm)
   hp: number;  // hp (was h)
-  hc: number;  // Hc value used
   h: number; // H (depth) used for Pc
   vcf: number; // Vcf
 }
@@ -1096,9 +1094,9 @@ export default function SemanticsPage() {
       
       // Check if at least one Hc value is available
       if (formationHcValues.every(v => v === 0 || isNaN(v))) {
-        console.warn('No Hc values found in Formation Design data');
-        showToast('error', "Height Above Cementation (HAC) values not found", {
-          description: "Please enter HAC values in Formation Design - Drill Pipes Design tab first."
+        console.warn('No H (depth) values found in Formation Design data');
+        showToast('error', "Depth (H) values not found", {
+          description: "Please enter H values in Formation Design - Drill Pipes Design tab first."
         });
         setIsLoading(false);
         return;
@@ -1131,7 +1129,7 @@ export default function SemanticsPage() {
                         <h3 class="text-xl font-bold text-primary">Vcf Equations</h3>
                         <div class="bg-muted/30 p-4 rounded-md border border-border/40">
                           <h4 class="font-medium mb-2">General Formula:</h4>
-                          <p class="font-mono text-sm bg-background/80 p-2 rounded">Vcf = (π/4) × [(K1 × Db² - de²) × Hc + di² × h]</p>
+                          <p class="font-mono text-sm bg-background/80 p-2 rounded">Vcf = (π/4) × [(K1 × Db² - de²) × H + di² × h]</p>
                           <p class="text-sm mt-2">Where:</p>
                           <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mt-2">
                             <div class="bg-background/50 p-2 rounded border border-border/30">
@@ -1139,7 +1137,7 @@ export default function SemanticsPage() {
                             </div>
                             ${formationHcValues.map((val, idx) => val > 0 ? 
                               `<div class="bg-background/50 p-2 rounded border border-border/30">
-                                <span class="font-mono">Hc (Instance ${idx+1}) = ${val.toFixed(4)} m</span>
+                                <span class="font-mono">H (depth) (Instance ${idx+1}) = ${val.toFixed(4)} m</span>
                               </div>` : ''
                             ).join('')}
                             <div class="bg-background/50 p-2 rounded border border-border/30">
@@ -1304,7 +1302,7 @@ export default function SemanticsPage() {
           debugLog('calculateVcf', `Using h from data input values: ${h}`);
         }
 
-        // Calculate Vcf using the formula: Vcf = (π/4) × [(K1 × Db² - de²) × Hc + di² × h]
+        // Calculate Vcf using the formula: Vcf = (π/4) × [(K1 × Db² - de²) × H + di² × h]
         // Calculate each term separately for clarity
         const PI_OVER_4 = Math.PI / 4;
         debugLog('calculateVcf', `PI_OVER_4 = ${PI_OVER_4}`);
@@ -1342,8 +1340,27 @@ export default function SemanticsPage() {
         const de_squared = Math.pow(de, 2);
         debugLog('calculateVcf', `de_squared = ${de}² = ${de_squared}`);
         
-        const first_term = (k1_times_db_squared - de_squared) * instanceHc;
-        debugLog('calculateVcf', `first_term = (${k1_times_db_squared} - ${de_squared}) * ${instanceHc} = ${first_term}`);
+        // Get H (depth) for each instance from casingCalculatorData
+        let instanceH = null;
+        try {
+          const casingData = localStorage.getItem('casingCalculatorData');
+          if (casingData) {
+            const parsedData = JSON.parse(casingData);
+            if (parsedData.sectionInputs && parsedData.sectionInputs[i] && parsedData.sectionInputs[i].depth) {
+              instanceH = parseFloat(parsedData.sectionInputs[i].depth);
+            }
+          }
+        } catch (e) {
+          instanceH = null;
+        }
+        // Fallback to instanceHc if not found
+        if (!instanceH || isNaN(instanceH)) {
+          instanceH = instanceHc;
+        }
+
+        // Use H (depth) instead of Hc in the formula
+        const first_term = (k1_times_db_squared - de_squared) * instanceH;
+        debugLog('calculateVcf', `first_term = (${k1_times_db_squared} - ${de_squared}) * ${instanceH} = ${first_term}`);
         
         const di_squared = Math.pow(dimValue, 2);
         debugLog('calculateVcf', `di_squared = ${dimValue}² = ${di_squared}`);
@@ -1367,35 +1384,24 @@ export default function SemanticsPage() {
         if (isNaN(vcf)) {
           debugLog('calculateVcf', `⚠️ Vcf calculation resulted in NaN, using fallback calculation`);
           // Simple fallback calculation based on dimensions
-          vcf = PI_OVER_4 * (Math.pow(Db, 2) * instanceHc);
-          debugLog('calculateVcf', `vcf (fallback) = ${PI_OVER_4} * (${Db}² * ${instanceHc}) = ${vcf}`);
+          vcf = PI_OVER_4 * (Math.pow(Db, 2) * instanceH);
+          debugLog('calculateVcf', `vcf (fallback) = ${PI_OVER_4} * (${Db}² * ${instanceH}) = ${vcf}`);
         }
         
         // Add to results
-        // To get H (depth) for each instance, always use sectionInputs[i].depth from casingCalculatorData
-        let instanceH = null;
-        try {
-          const casingData = localStorage.getItem('casingCalculatorData');
-          if (casingData) {
-            const parsedData = JSON.parse(casingData);
-            if (parsedData.sectionInputs && parsedData.sectionInputs[i] && parsedData.sectionInputs[i].depth) {
-              instanceH = parseFloat(parsedData.sectionInputs[i].depth);
-            }
-          }
-        } catch (e) {
-          instanceH = null;
-        }
-        // Fallback to hp if not found
+        // We already have instanceH from above, no need to recalculate it
+
+        // Fallback to hp if still not set
         if (!instanceH || isNaN(instanceH)) {
           instanceH = h;
         }
+        
         results.push({
           instance: instanceNumber,
           db: Db * 1000, // Convert back to mm for display
           de: de * 1000, // Convert back to mm for display
           di: dimValue * 1000, // Convert back to mm for display
           hp: h, // rename h to hp
-          hc: instanceHc, // add Hc
           h: instanceH, // add H (depth) used for Pc
           vcf: vcf
         });
@@ -1404,7 +1410,6 @@ export default function SemanticsPage() {
           'de (mm)': de * 1000,
           'di (mm)': dimValue * 1000,
           'hp': h,
-          'hc': instanceHc,
           'H (depth)': instanceH,
           'Vcf': vcf
         });
@@ -1423,7 +1428,6 @@ export default function SemanticsPage() {
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Db (mm)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">de (mm)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">di (mm)</th>
-              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Hc</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">H (depth)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">hp</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Vcf</th>
@@ -1436,7 +1440,6 @@ export default function SemanticsPage() {
                 <td class="px-4 py-2 text-center">${r.db.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.de.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.di.toFixed(2)}</td>
-                <td class="px-4 py-2 text-center">${r.hc.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.h ? r.h.toFixed(2) : 'N/A'}</td>
                 <td class="px-4 py-2 text-center">${r.hp.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.vcf.toFixed(4)}</td>
@@ -1599,9 +1602,9 @@ export default function SemanticsPage() {
       
       // Check if all Hc values are 0
       if (formationHcValues.every(v => v === 0 || isNaN(v))) {
-        console.warn('No Hc values found in Formation Design data');
-        showToast('error', "Height Above Cementation (HAC) values not found", {
-          description: "Please enter HAC values in Formation Design - Drill Pipes Design tab first."
+        console.warn('No H (depth) values found in Formation Design data');
+        showToast('error', "Depth (H) values not found", {
+          description: "Please enter H values in Formation Design - Drill Pipes Design tab first."
         });
         setIsLoading(false);
         return;
@@ -1655,8 +1658,8 @@ export default function SemanticsPage() {
                             </div>
                             <div>
                               <p class="font-medium">Pymax (maximum pressure at yield point):</p>
-                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(Hc - h)(γfc - γf)]</p>
-                              <p class="text-xs mt-1">Where Hc is Height Above Cementation from Formation Design and h is the height parameter from the semantic screen</p>
+                              <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(H - h)(γfc - γf)]</p>
+                              <p class="text-xs mt-1">Where H is depth from Formation Design and h is the height parameter from the semantic screen</p>
                             </div>
                             <div>
                               <p class="font-medium">Pc (confining pressure):</p>
@@ -1815,7 +1818,7 @@ export default function SemanticsPage() {
 
         // Calculate Pymax (maximum pressure at yield point)
         const pymax = (instanceGfc && instanceGf && vcfResult.hp) ? 
-                      0.1 * (instanceHc - vcfResult.hp) * (instanceGfc - instanceGf) : null;
+                      0.1 * (vcfResult.h - vcfResult.hp) * (instanceGfc - instanceGf) : null;
         
         // Calculate Pc (confining pressure)
         // Use H (depth) from vcfResult.h
@@ -1911,8 +1914,8 @@ export default function SemanticsPage() {
                   </div>
                   <div>
                     <p class="font-medium">Pymax (maximum pressure at yield point):</p>
-                    <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(Hc - h)(γfc - γf)]</p>
-                    <p class="text-xs mt-1">Where Hc is Height Above Cementation from Formation Design and h is the height parameter from the semantic screen</p>
+                    <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(H - h)(γfc - γf)]</p>
+                    <p class="text-xs mt-1">Where H is depth from Formation Design and h is the height parameter from the semantic screen</p>
                   </div>
                   <div>
                     <p class="font-medium">Pc (confining pressure):</p>

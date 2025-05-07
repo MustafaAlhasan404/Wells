@@ -449,6 +449,8 @@ export function calculateDrillCollarData(
       // Determine metal grade based on SegmaC value
       let metalGrade = 'N/A';
       if (nearestMpi !== null) {
+        // Always use the correct thresholds for metal grade determination
+        // Note: These thresholds match exactly with those used in the UI component
         if (nearestMpi <= 517) {
           metalGrade = 'E 75';
         } else if (nearestMpi <= 655) {
@@ -458,14 +460,11 @@ export function calculateDrillCollarData(
         } else if (nearestMpi <= 930) {
           metalGrade = 'S135';
         } else {
-          // Fallback to finding index in the array if direct mapping fails
-          if (metalGradeIndex >= 0 && metalGradeIndex < drillPipeData.metalGrades.length) {
-            metalGrade = drillPipeData.metalGrades[metalGradeIndex];
-          } else if (drillPipeData.metalGrades.length > 0) {
-            // Fallback to first available metal grade if index is out of bounds
-            metalGrade = drillPipeData.metalGrades[0];
-          }
+          metalGrade = 'S135'; // If higher than 930, default to highest grade S135
         }
+        
+        // Log for debugging purposes
+        console.log(`Instance ${i}: C_new=${C_new}, nearestMpi=${nearestMpi}, selected grade=${metalGrade}`);
       }
       
       // Calculate SegmaC and Lmax
@@ -475,7 +474,7 @@ export function calculateDrillCollarData(
         Lmax = null;
       } else {
         const numerator = ((SegmaC/1.5)**2 - 4 * tau**2) * 10**12;
-        const denominator = ((7.85 - 1.5)**2) * 10**8;
+        const denominator = ((7.85 - γ)**2) * 10**8;
         const sqrt_result = Math.sqrt(numerator / denominator);
         Lmax = sqrt_result - ((L0c*qc + Lhw*qhw) / qp);
       }
