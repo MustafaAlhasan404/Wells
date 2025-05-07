@@ -469,8 +469,15 @@ export async function POST(req: NextRequest) {
             else if (instanceNum === 3) sectionName = "Middle Intermediate";
             else sectionName = "Lower Intermediate";
           } else {
-            // Fallback - use the instance number to generate name
-            sectionName = `Intermediate ${instanceNum - 1}`;
+            // Fallback - use intermediate with a more descriptive naming
+            if (instanceNum === 2) {
+              sectionName = "Upper Intermediate";
+            } else if (instanceNum === totalInstances - 1) {
+              sectionName = "Lower Intermediate";
+            } else {
+              // For any middle sections
+              sectionName = `Middle Intermediate ${instanceNum - 2}`;
+            }
           }
           
           // Initialize the result index for section matching

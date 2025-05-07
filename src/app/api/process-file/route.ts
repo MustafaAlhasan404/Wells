@@ -157,7 +157,12 @@ export async function POST(req: NextRequest) {
       sectionNames = ["Production", "Surface"];
     } else if (iterations === 3) {
       sectionNames = ["Production", "Intermediate", "Surface"];
+    } else if (iterations === 4) {
+      sectionNames = ["Production", "Upper Intermediate", "Lower Intermediate", "Surface"];
+    } else if (iterations === 5) {
+      sectionNames = ["Production", "Upper Intermediate", "Middle Intermediate", "Lower Intermediate", "Surface"];
     } else {
+      // Fallback for other section counts (should not happen in normal use)
       sectionNames = ["Production"];
       for (let i = 0; i < iterations - 2; i++) {
         sectionNames.push(`Intermediate ${i+1}`);

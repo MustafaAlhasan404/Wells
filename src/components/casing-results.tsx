@@ -138,7 +138,18 @@ const CasingResults: React.FC<CasingResultsProps> = ({ results, hadData }) => {
     if (section.toLowerCase().includes("production")) return "Production Section";
     if (section.toLowerCase().includes("surface")) return "Surface Section";
     
-    // Handle numbered intermediate sections
+    // Handle Upper, Middle, Lower Intermediate sections
+    if (section.toLowerCase().includes("upper intermediate")) {
+      return "Upper Intermediate Section";
+    }
+    if (section.toLowerCase().includes("middle intermediate")) {
+      return "Middle Intermediate Section";
+    }
+    if (section.toLowerCase().includes("lower intermediate")) {
+      return "Lower Intermediate Section";
+    }
+    
+    // Handle generic/numbered intermediate sections as fallback
     if (section.toLowerCase().includes("intermediate")) {
       // Extract the number if present (e.g., "Intermediate 1" -> "1")
       const match = section.match(/intermediate\s+(\d+)/i);
