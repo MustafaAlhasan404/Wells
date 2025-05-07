@@ -146,15 +146,26 @@ function getHValueForInstance(data: any, instance: number): number | undefined {
 
 // Define utility function for sorting calculations by instance
 const sortCalculationsByInstance = (calculations: any[]) => {
+  // Make a copy of the array to avoid modifying the original
   return [...calculations].sort((a: any, b: any) => {
-    const getInstanceNumber = (calc: any) => 
-      calc.instance ?? (
-        calc.section === "Production" ? 1 : 
-        calc.section === "Intermediate" ? 2 : 
-        calc.section === "Surface" ? 3 : 
-        4 // Fallback
-      );
+    // Get instance number for comparison - ensure Production always comes first, then Intermediate, then Surface
+    // This is critical for maintaining consistent order between environments
+    const getInstanceNumber = (calc: any) => {
+      // First try to use direct instance property if it exists
+      if (calc.instance !== undefined && calc.instance !== null) {
+        return calc.instance;
+      }
+      
+      // Otherwise derive from section name
+      if (calc.section === "Production") return 1;
+      if (calc.section === "Intermediate") return 2; 
+      if (calc.section === "Surface") return 3;
+      
+      // Default fallback
+      return 4;
+    };
     
+    // Return comparison result
     return getInstanceNumber(a) - getInstanceNumber(b);
   });
 };
@@ -266,7 +277,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         localStorage.setItem('drillCollarResults', JSON.stringify(localDrillCollarResults));
       }
       if (calculations.length > 0) {
-        // Sort calculations before saving to ensure consistent order
+        // Always sort calculations before saving to ensure consistent order
         const sortedCalculations = sortCalculationsByInstance(calculations);
         localStorage.setItem('drillCollarCalculations', JSON.stringify(sortedCalculations));
       }
@@ -327,7 +338,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           validatedCalculations = enrichCalculationsWithHValues(validatedCalculations, formData);
         }
         
-        // Sort the calculations by instance number for consistent display
+        // Always sort calculations before saving to ensure consistent order
         validatedCalculations = sortCalculationsByInstance(validatedCalculations);
         
         setCalculations(validatedCalculations as DrillCollarCalculation[]);
@@ -1220,8 +1231,21 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       // Always enrich calculations with H values from formData
       validatedCalculations = enrichCalculationsWithHValues(validatedCalculations, formData);
       
-      // Sort the calculations by instance number for consistent display
-      validatedCalculations = sortCalculationsByInstance(validatedCalculations);
+      // CRITICAL: Sort calculations by instance with explicit logic to fix order differences between environments
+      validatedCalculations = [...validatedCalculations].sort((a, b) => {
+        // This explicit sorting fixes the inconsistency issue between local and production
+        const instanceA = typeof a.instance === 'number' ? a.instance : 
+                          a.section === "Production" ? 1 :
+                          a.section === "Intermediate" ? 2 :
+                          a.section === "Surface" ? 3 : 4;
+                          
+        const instanceB = typeof b.instance === 'number' ? b.instance : 
+                          b.section === "Production" ? 1 :
+                          b.section === "Intermediate" ? 2 :
+                          b.section === "Surface" ? 3 : 4;
+                          
+        return instanceA - instanceB;
+      });
       
       setCalculations(validatedCalculations as DrillCollarCalculation[]);
       setDrillCollarCalculations(validatedCalculations); // Update context too
@@ -2262,9 +2286,19 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Sort calculations by instance to ensure consistent order between environments */}
-                    {sortCalculationsByInstance(calculations)
-                      .map((calc, index) => {
+                    {/* Force consistent sort order by instance regardless of API response order 
+                        This ensures the depths (H values) are always displayed in the same order:
+                        Production (instance 1) first, Intermediate (instance 2) second, Surface (instance 3) third */}
+                    {[...calculations].sort((a, b) => {
+                      // Get instance number or derive from section
+                      const getInstanceNumber = (calc: any) => {
+                        if (typeof calc.instance === 'number') return calc.instance;
+                        return calc.section === "Production" ? 1 : 
+                               calc.section === "Intermediate" ? 2 : 
+                               calc.section === "Surface" ? 3 : 4;
+                      };
+                      return getInstanceNumber(a) - getInstanceNumber(b);
+                    }).map((calc, index) => {
                       // Convert Lmax to number to ensure toFixed works
                       const lmaxValue = typeof calc.Lmax === 'number' ? calc.Lmax : Number(calc.Lmax);
                       

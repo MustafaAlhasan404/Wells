@@ -607,8 +607,18 @@ export async function POST(req: NextRequest) {
         }
       }
       
+      // Sort calculations consistently by instance number
+      if (calculations && calculations.length > 0) {
+        calculations.sort((a, b) => {
+          const instanceA = a.instance || (a.section === "Production" ? 1 : a.section === "Intermediate" ? 2 : 3);
+          const instanceB = b.instance || (b.section === "Production" ? 1 : b.section === "Intermediate" ? 2 : 3);
+          return instanceA - instanceB;
+        });
+      }
+      
       // Return the results with debug logs
       resetConsoleLog();
+      
       return NextResponse.json({
         drillCollarResults,
         calculations,
