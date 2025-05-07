@@ -350,7 +350,8 @@ export async function POST(req: NextRequest) {
         drillCollarSurface,
         nearestBitSizes,
         rawData,
-        drillCollarData.drillPipeData
+        drillCollarData.drillPipeData,
+        casingValues // Pass the casing data to get depths directly
       );
       
       // Calculate L0c values for each section and add number of columns

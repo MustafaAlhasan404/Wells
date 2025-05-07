@@ -48,9 +48,18 @@ export default function DataInputForm() {
                 // If the value is 1000 or greater, it's likely in the old format
                 // Convert by dividing by 1000
                 migratedData[key] = (value / 1000).toString();
-                console.log(`Migrated WOB value from ${data[key]} to ${migratedData[key]}`);
               }
             }
+          }
+          
+          // Handle H values from instances array if it exists
+          if (migratedData.instances && Array.isArray(migratedData.instances)) {
+            migratedData.instances.forEach((instance: any, index: number) => {
+              if (instance && instance.H !== undefined) {
+                // Map H values from instances to H_i fields
+                migratedData[`H_${index + 1}`] = instance.H.toString();
+              }
+            });
           }
           
           // For exploration wells, set γ values to 1.08
@@ -86,7 +95,6 @@ export default function DataInputForm() {
           const data = JSON.parse(casingData);
           if (data.iterations) {
             setNumSections(parseInt(data.iterations));
-            console.log(`Loaded ${data.iterations} sections from casing calculator data`);
           }
         }
         
@@ -96,7 +104,6 @@ export default function DataInputForm() {
           setSingleInputFields(JSON.parse(savedInputPrefs));
         }
       } catch (error) {
-        console.error('Failed to load data:', error)
         toast.error("Failed to load data", {
           icon: <AlertCircle className="h-4 w-4 text-destructive" />,
           description: "There was an error loading your data. Please try again."
@@ -135,6 +142,44 @@ export default function DataInputForm() {
         ...prev,
         [field]: value
       }));
+    }
+    // Special handling for H values - sync with casing depths
+    else if (field.startsWith('H_')) {
+      // Update form data with the H value
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+      
+      // Also update the corresponding casing depth
+      // Extract instance number (e.g., "H_1" => "1")
+      const instanceNum = field.split('_')[1];
+      if (instanceNum) {
+        try {
+          // Get casing calculator data if it exists
+          const casingData = localStorage.getItem('casingCalculatorData');
+          if (casingData) {
+            const data = JSON.parse(casingData);
+            
+            // Update depth for corresponding section
+            // Usually instance 1 = Production, 2 = Intermediate, 3 = Surface
+            if (instanceNum === '1') {
+              data.depth1 = value;
+            } else if (instanceNum === '2') {
+              data.depth2 = value;
+            } else if (instanceNum === '3') {
+              data.depth3 = value;
+            }
+            
+            // Save updated casing data back to localStorage
+            localStorage.setItem('casingCalculatorData', JSON.stringify(data));
+            
+            console.log(`Synchronized H_${instanceNum} value (${value}) with casing depth`);
+          }
+        } catch (error) {
+          console.error('Failed to sync H value with casing data:', error);
+        }
+      }
     }
     else {
       setFormData(prev => ({
@@ -211,15 +256,67 @@ export default function DataInputForm() {
         }));
       }
       
+      // Create an instances array structure for the new format
+      const processedData: Record<string, any> = { ...formData };
+      
+      // Initialize instances array with H values
+      const instances: Record<string, any>[] = [];
+      for (let i = 1; i <= numSections; i++) {
+        const instanceData: Record<string, any> = {};
+        
+        // Get H value from H_i if it exists
+        if (formData[`H_${i}`]) {
+          instanceData.H = parseFloat(formData[`H_${i}`]);
+        }
+        
+        instances.push(instanceData);
+      }
+      
+      // Add instances array to processed data
+      processedData.instances = instances;
+      
       // Save to localStorage instead of API
-      localStorage.setItem('wellsAnalyzerData', JSON.stringify(formData));
+      localStorage.setItem('wellsAnalyzerData', JSON.stringify(processedData));
+      
+      // After saving, sync H values with casing depths in casingCalculatorData
+      try {
+        const casingData = localStorage.getItem('casingCalculatorData');
+        if (casingData) {
+          const data = JSON.parse(casingData);
+          let updated = false;
+          
+          // Production (index 1)
+          if (formData['H_1']) {
+            data.depth1 = formData['H_1'];
+            updated = true;
+          }
+          
+          // Intermediate (index 2)
+          if (formData['H_2']) {
+            data.depth2 = formData['H_2'];
+            updated = true;
+          }
+          
+          // Surface (index 3)
+          if (formData['H_3']) {
+            data.depth3 = formData['H_3'];
+            updated = true;
+          }
+          
+          if (updated) {
+            localStorage.setItem('casingCalculatorData', JSON.stringify(data));
+            console.log('Synchronized H values with casing depths on save');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to sync H values with casing data on save:', error);
+      }
       
       toast.success("Data saved successfully", {
         icon: <CheckCircle className="h-4 w-4 text-green-500" />,
         description: "Your well data has been saved to your browser."
       });
     } catch (error) {
-      console.error('Failed to save data:', error)
       toast.error("Failed to save data", {
         icon: <AlertCircle className="h-4 w-4 text-destructive" />,
         description: "There was an error saving your data. Please try again."
@@ -358,8 +455,8 @@ export default function DataInputForm() {
   const renderDrillingParameters = () => {
     // Filter out γ if we're in exploration mode
     const fields = wellType === 'exploration' 
-      ? ["WOB", "C", "P", "Hc"] 
-      : ["WOB", "C", "P", "γ", "Hc"];
+      ? ["WOB", "C", "P", "H", "Hc"] 
+      : ["WOB", "C", "P", "γ", "H", "Hc"];
     
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -381,6 +478,9 @@ export default function DataInputForm() {
                 )}
                 {field === "γ" && (
                   <HelpTooltip text="Specific weight" />
+                )}
+                {field === "H" && (
+                  <HelpTooltip text="Total depth (m)" />
                 )}
                 {field === "Hc" && (
                   <HelpTooltip text="Height Above Cementation (HAC)" />
@@ -464,6 +564,48 @@ export default function DataInputForm() {
     )
   }
 
+  const renderConstants = () => {
+    const fields = ["K1", "K2", "K3"];
+    
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        {fields.map(field => (
+          <div key={field} className="space-y-3 bg-background/70 p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Label className="text-base font-medium text-primary">
+                  {field}
+                </Label>
+                {field === "K1" && (
+                  <HelpTooltip text="Correction factor for metal grade selection (Default: 1)" />
+                )}
+                {field === "K2" && (
+                  <HelpTooltip text="Correction factor for metal grade selection (Default: 1)" />
+                )}
+                {field === "K3" && (
+                  <HelpTooltip text="Correction factor for metal grade selection (Default: 1)" />
+                )}
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor={field} className="text-xs text-muted-foreground">
+                Correction Factor
+              </Label>
+              <Input
+                id={field}
+                placeholder={`Enter ${field} (default: 1)`}
+                value={formData[field] || '1'}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(field, e.target.value)}
+                className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -534,6 +676,25 @@ export default function DataInputForm() {
               </div>
               <div className="mt-4">
                 {renderDrillingParameters()}
+              </div>
+            </div>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.5 }}
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-5 w-1 bg-primary rounded-full"></div>
+                <h3 className="text-lg font-medium">Constants</h3>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Enter correction factors for metal grade calculation
+              </div>
+              <div className="mt-4">
+                {renderConstants()}
               </div>
             </div>
           </motion.div>

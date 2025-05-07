@@ -32,11 +32,13 @@ interface DrillCollarCalculation {
   drillPipeMetalGrade: string;
   Lmax: number;
   instance?: number;
+  H?: number | null;
 }
 
 // Define types for debugging data
 interface DebugCalculationData {
   instance: number;
+  section?: string;
   T: number;
   Tc: number;
   Tec: number;
@@ -90,9 +92,105 @@ interface DebugCalculationData {
     eq: string;
     C_new: string;
   };
+  importedData?: {
+    atHead?: number;
+    bitSize?: number;
+    H?: number;
+    qp?: number;
+    Lhw?: number;
+    qc?: number;
+    Dep?: number;
+    qhw?: number;
+    Dhw?: number;
+    n?: number;
+    WOB?: number;
+    C?: number;
+    P?: number;
+    γ?: number;
+    dα?: number;
+    source?: string;
+  };
+  // Add metal grade specific calculation details
+  metalGradeCalculation?: {
+    selectedGrade?: string;
+    tensileStrength?: number;
+    mpiSearchValue?: number;
+    comparisons?: Array<{
+      grade: string;
+      strength: number;
+      distance: number;
+      selected: boolean;
+    }>;
+    selectionMethod?: string;
+    explanation?: string;
+  };
 }
 
 interface DrillCollarCalculatorProps {}
+
+function getHValueForInstance(data: any, instance: number): number | undefined {
+  // 1. Try new format: instances[i-1].H
+  if (data.instances && data.instances[instance - 1] && data.instances[instance - 1].H !== undefined) {
+    return parseFloat(data.instances[instance - 1].H);
+  }
+  // 2. Try old format: H_i
+  if (data[`H_${instance}`] !== undefined) {
+    return parseFloat(data[`H_${instance}`]);
+  }
+  // 3. Try single value: H
+  if (data.H !== undefined) {
+    return parseFloat(data.H);
+  }
+  return undefined;
+}
+
+// After defining getHValueForInstance, add another helper function that enriches calculation results with H values
+function enrichCalculationsWithHValues(calculations: any[], formData: any): any[] {
+  if (!calculations || !formData) return calculations || [];
+  
+  return calculations.map((calc, index) => {
+    if (calc.H === undefined || calc.H === null) {
+      const instance = calc.instance || index + 1;
+      const hValue = getHValueForInstance(formData, instance);
+      return {
+        ...calc,
+        H: hValue
+      };
+    }
+    return calc;
+  });
+}
+
+// Function to map parameters (Ap, Aip, Mp) based on qp values
+const getParametersForQp = (qp: number): { Ap: number, Aip: number, Mp: number } => {
+  // Map of parameters from the table based on qp
+  const parameterMap = [
+    { qp: 14.14, Ap: 16.71, Aip: 45.35, Mp: 0.00006427 },
+    { qp: 19.8, Ap: 23.37, Aip: 38.69, Mp: 0.00008432 },
+    { qp: 23.1, Ap: 27.76, Aip: 34.3, Mp: 0.00009579 },
+    { qp: 29.02, Ap: 34.01, Aip: 92.62, Mp: 0.00018699 },
+    { qp: 38.09, Ap: 45.6, Aip: 81.04, Mp: 0.00023746 }
+  ];
+  
+  // Find the closest qp value
+  let closestParam = parameterMap[0];
+  let minDiff = Math.abs(qp - closestParam.qp);
+  
+  for (const param of parameterMap) {
+    const diff = Math.abs(qp - param.qp);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestParam = param;
+    }
+  }
+  
+  console.log(`Using parameters for qp=${qp}: Ap=${closestParam.Ap}, Aip=${closestParam.Aip}, Mp=${closestParam.Mp}`);
+  return {
+    Ap: closestParam.Ap,
+    Aip: closestParam.Aip,
+    Mp: closestParam.Mp
+  };
+};
 
 export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   // Use the file upload context for file state and results
@@ -122,8 +220,13 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCalculated, setIsCalculated] = useState(false);
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [showDebugInfo, setShowDebugInfo] = useState(true);
   const [debugData, setDebugData] = useState<DebugCalculationData[]>([]);
+  const [showMetalGradeSteps, setShowMetalGradeSteps] = useState(false);
+  const [localInputs, setLocalInputs] = useState<any>(null);
+  const [debugMessages, setDebugMessages] = useState<string[]>([]);
+  const [data, setData] = useState<{[key: string]: any}>({});
+  const [showCopyableDebug, setShowCopyableDebug] = useState(false);
   
   // Get casingResults from the context
   const isCasingReady = casingResults && casingResults.length > 0;
@@ -190,7 +293,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         const parsedCalculations = JSON.parse(savedCalculations);
         
         // Ensure each calculation has a valid section
-        const validatedCalculations = parsedCalculations.map((calc: any, index: number) => {
+        let validatedCalculations = parsedCalculations.map((calc: any, index: number) => {
           // Validate section name in calculations too
           if (!calc.section || calc.section === "Unknown") {
             // Use the instance to determine section if available
@@ -200,6 +303,12 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           }
           return calc;
         });
+        
+        // Add H values to each calculation if missing
+        const formData = getCasingData();
+        if (formData) {
+          validatedCalculations = enrichCalculationsWithHValues(validatedCalculations, formData);
+        }
         
         setCalculations(validatedCalculations as DrillCollarCalculation[]);
         setDrillCollarCalculations(validatedCalculations);
@@ -293,12 +402,24 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         return match ? parseFloat(match[1]) : 0;
       });
       
-      console.log("Extracted values (At Head = DCSG'):", { initialDcsg, atHeadValues, nearestBitSizes });
+      // Get drill collar diameters from results if available
+      const drillCollarDiameters = sectionOrder.map(sectionName => {
+        const result = localDrillCollarResults.find(r => r.section.toLowerCase().includes(sectionName.toLowerCase()));
+        return result?.drillCollar || 0;
+      });
+      
+      console.log("Extracted casing values:", {
+        initialDcsg,
+        atHeadValues,
+        nearestBitSizes,
+        drillCollarDiameters
+      });
       
       return {
         initialDcsg,
         atHeadValues,
-        nearestBitSizes
+        nearestBitSizes,
+        drillCollarDiameters
       };
     } catch (error) {
       console.error("Error extracting casing values:", error);
@@ -307,6 +428,185 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         description: "The casing data is not in the expected format."
       });
       return null;
+    }
+  };
+  
+  // Add this function after getCasingData to extract correction factors
+  const extractCorrectionFactors = () => {
+    if (!casingResults || casingResults.length === 0) return null;
+    
+    try {
+      // Look for K1, K2, K3 values in localStorage (where casing data is stored)
+      const savedData = localStorage.getItem('wellsAnalyzerData');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        const result = {
+          K1: parseFloat(data.K1 || '1') || 1,
+          K2: parseFloat(data.K2 || '1') || 1,
+          K3: parseFloat(data.K3 || '1') || 1
+        };
+        console.log("Extracted correction factors from casing data:", result);
+        return result;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error extracting correction factors:", error);
+      return null;
+    }
+  };
+  
+  // Add this helper function after extractCorrectionFactors
+  const getBValueForGamma = (gamma: number): number => {
+    try {
+      // Default value if all else fails
+      let defaultB = 0.75;
+      
+      // Log that we're trying to look up b for a specific gamma
+      console.log(`Looking up b value for gamma = ${gamma}`);
+      
+      // Try to get b from localStorage if available (for debugging)
+      let storedBValues;
+      try {
+        const storedBValuesStr = localStorage.getItem('gammaTableData');
+        if (storedBValuesStr) {
+          storedBValues = JSON.parse(storedBValuesStr);
+          console.log("Found stored gamma/b table data:", storedBValues);
+        }
+      } catch (error) {
+        console.error("Error loading stored gamma table data:", error);
+      }
+      
+      // Return value if found in stored data
+      if (storedBValues && storedBValues[gamma]) {
+        console.log(`Found b value ${storedBValues[gamma]} for gamma ${gamma} in stored data`);
+        return storedBValues[gamma];
+      }
+      
+      // Hard-coded known values based on gamma
+      const knownValues: Record<string, number> = {
+        "1.08": 0.862,
+        "1.0800": 0.862,
+        "1.09": 0.863,
+        "1.0900": 0.863,
+        "1.1": 0.864,
+        "1.10": 0.864,
+        "1.1000": 0.864,
+        "1.12": 0.866,
+        "1.1200": 0.866,
+        "1.2": 0.868,
+        "1.20": 0.868,
+        "1.2000": 0.868
+      };
+      
+      // Convert gamma to string and look for exact match
+      const gammaStr = gamma.toString();
+      if (knownValues[gammaStr]) {
+        console.log(`Found exact match b value ${knownValues[gammaStr]} for gamma ${gammaStr}`);
+        return knownValues[gammaStr];
+      }
+      
+      // If exact match not found, try approximate match
+      // Convert to 2 decimal places and try again
+      const roundedGamma = Math.round(gamma * 100) / 100;
+      const roundedStr = roundedGamma.toString();
+      if (knownValues[roundedStr]) {
+        console.log(`Found approximate match b value ${knownValues[roundedStr]} for gamma ${roundedStr} (original: ${gammaStr})`);
+        return knownValues[roundedStr];
+      }
+      
+      // If still no match, use the closest gamma value
+      const gammaValues = Object.keys(knownValues).map(g => parseFloat(g));
+      if (gammaValues.length > 0) {
+        let closestGamma = gammaValues[0];
+        let minDiff = Math.abs(gamma - closestGamma);
+        
+        for (const g of gammaValues) {
+          const diff = Math.abs(gamma - g);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestGamma = g;
+          }
+        }
+        
+        console.log(`Using closest match b value ${knownValues[closestGamma.toString()]} for gamma ${closestGamma} (original: ${gamma})`);
+        return knownValues[closestGamma.toString()];
+      }
+      
+      // Last resort: default value
+      console.log(`No match found for gamma ${gamma}, using default b value ${defaultB}`);
+      return defaultB;
+    } catch (error) {
+      console.error("Error getting b value for gamma:", error);
+      return 0.75; // Default if any error occurs
+    }
+  };
+  
+  // Add this helper function to get Mp values (similar to b values)
+  const getMpValueForGamma = (gamma: number): number => {
+    try {
+      // Default value if all else fails
+      let defaultMp = 200; // Reasonable default
+      
+      // Log that we're trying to look up Mp for a specific gamma
+      console.log(`Looking up Mp value for gamma = ${gamma}`);
+      
+      // Hard-coded known values based on gamma
+      const knownValues: Record<string, number> = {
+        "1.08": 227.5,
+        "1.0800": 227.5,
+        "1.09": 228.0,
+        "1.0900": 228.0,
+        "1.1": 228.5,
+        "1.10": 228.5,
+        "1.1000": 228.5,
+        "1.12": 229.5,
+        "1.1200": 229.5,
+        "1.2": 232.0,
+        "1.20": 232.0,
+        "1.2000": 232.0
+      };
+      
+      // Convert gamma to string and look for exact match
+      const gammaStr = gamma.toString();
+      if (knownValues[gammaStr]) {
+        console.log(`Found exact match Mp value ${knownValues[gammaStr]} for gamma ${gammaStr}`);
+        return knownValues[gammaStr];
+      }
+      
+      // If exact match not found, try approximate match
+      // Use same logic as b value lookup
+      const roundedGamma = Math.round(gamma * 100) / 100;
+      const roundedStr = roundedGamma.toString();
+      if (knownValues[roundedStr]) {
+        console.log(`Found approximate match Mp value ${knownValues[roundedStr]} for gamma ${roundedStr} (original: ${gammaStr})`);
+        return knownValues[roundedStr];
+      }
+      
+      // If still no match, use the closest gamma value (same approach as for b)
+      const gammaValues = Object.keys(knownValues).map(g => parseFloat(g));
+      if (gammaValues.length > 0) {
+        let closestGamma = gammaValues[0];
+        let minDiff = Math.abs(gamma - closestGamma);
+        
+        for (const g of gammaValues) {
+          const diff = Math.abs(gamma - g);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestGamma = g;
+          }
+        }
+        
+        console.log(`Using closest match Mp value ${knownValues[closestGamma.toString()]} for gamma ${closestGamma} (original: ${gamma})`);
+        return knownValues[closestGamma.toString()];
+      }
+      
+      // Last resort: default value
+      console.log(`No match found for gamma ${gamma}, using default Mp value ${defaultMp}`);
+      return defaultMp;
+    } catch (error) {
+      console.error("Error getting Mp value for gamma:", error);
+      return 200; // Default if any error occurs
     }
   };
   
@@ -393,6 +693,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     }
   };
   
+  // Modify the calculateDrillCollar function to better capture debug data
   const calculateDrillCollar = async () => {
     const casingValues = extractCasingValues();
     if (!casingValues) {
@@ -408,13 +709,32 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       return;
     }
     
+    // Get correction factors from casing data
+    const correctionFactors = extractCorrectionFactors();
+    
     setIsLoading(true);
     setError(null);
     
     try {
+      // Process form data to map instance-specific values correctly
+      const processedData = preprocessFormData(formData);
+      
+      // Add correction factors to processed data if available
+      if (correctionFactors) {
+        processedData.K1 = correctionFactors.K1;
+        processedData.K2 = correctionFactors.K2;
+        processedData.K3 = correctionFactors.K3;
+      }
+      
+      console.log("Submitting data to API:", {
+        processedData,
+        casingValues,
+        correctionFactors
+      });
+      
       const apiFormData = new FormData();
       apiFormData.append('useDefaultFile', 'true');
-      apiFormData.append('formData', JSON.stringify(formData));
+      apiFormData.append('formData', JSON.stringify(processedData));
       apiFormData.append('casingData', JSON.stringify(casingValues));
       
       const response = await fetch('/api/calculate-drill-collar', {
@@ -428,10 +748,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       }
       
       const data = await response.json();
-      
-      // Log the response data to debug
       console.log("API Response:", data);
-      console.log("Calculations:", data.calculations);
       
       // Create debug calculation data from console logs included in API response
       const debugCalcs: DebugCalculationData[] = [];
@@ -445,98 +762,413 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       if (metalGradesInfo) {
         availableGrades = metalGradesInfo.metalGrades || [];
         availableStrengths = metalGradesInfo.tensileStrengths || [];
-        console.log("Found metal grades:", availableGrades);
-        console.log("Found tensile strengths:", availableStrengths);
+        console.log("Found metal grades info:", { availableGrades, availableStrengths });
+      } else {
+        console.log("No metal grades info found in debug logs. Using defaults.");
+        availableGrades = ['E 75', 'X 95', 'G 105', 'S135'];
+        availableStrengths = [517, 655, 725, 930];
       }
       
-      // Parse calculation data if available
+      // Log all debug data
+      console.log("Debug logs from API:", data.debugLogs);
+      
+      // Create an array of calculation debug objects
+      let calculationInstances = [];
       if (data.calculations && data.calculations.length > 0) {
-        data.calculations.forEach((calc: any, index: number) => {
-          // Create a debug calculation object based on the instance
-          const instance = calc.instance || index + 1;
+        calculationInstances = data.calculations.map((calc: any, index: number) => {
+          return {
+            instance: calc.instance || index + 1,
+            ...calc
+          };
+        });
+      } else if (data.drillCollarResults && data.drillCollarResults.length > 0) {
+        // If no calculations but have results, create instances from results
+        calculationInstances = data.drillCollarResults.map((result: any, index: number) => {
+          return {
+            instance: index + 1,
+            section: result.section,
+            drillPipeMetalGrade: "Unknown"
+          };
+        });
+      } else {
+        // Default to 3 instances if no data
+        calculationInstances = [
+          { instance: 1, section: "Production" },
+          { instance: 2, section: "Intermediate" },
+          { instance: 3, section: "Surface" }
+        ];
+      }
+      
+      console.log("Processing calculations for instances:", calculationInstances);
+      
+      // For each instance, gather debug data
+      for (const calc of calculationInstances) {
+        const instance = calc.instance;
+        
+        console.log(`Processing debug data for instance ${instance}`);
+        
+        // Determine section name based on instance or index
+        let section = calc.section;
+        if (!section) {
+          const sectionNames = ["Production", "Intermediate", "Surface"];
+          section = sectionNames[(instance - 1) % 3] || `Section ${instance}`;
+        }
+        
+        // Find relevant debug logs for this instance
+        const tData = data.debugLogs?.find((log: any) => 
+          log.type === 'T' && log.instance === instance);
+        
+        const tauData = data.debugLogs?.find((log: any) => 
+          log.type === 'tau' && log.instance === instance);
           
-          // Extract formulas and values from console logs if they exist
-          const tData = data.debugLogs?.find((log: any) => 
-            log.type === 'T' && log.instance === instance);
+        const cNewData = data.debugLogs?.find((log: any) => 
+          log.type === 'C_new' && log.instance === instance);
+        
+        // Find metal grade selection info
+        const mpiSelection = data.debugLogs?.find((log: any) =>
+          log.type === 'mpi_selection' && log.instance === instance);
+        
+        const nearestResult = data.debugLogs?.find((log: any) =>
+          log.type === 'nearest_result');
           
-          const tauData = data.debugLogs?.find((log: any) => 
-            log.type === 'tau' && log.instance === instance);
-            
-          const cNewData = data.debugLogs?.find((log: any) => 
-            log.type === 'C_new' && log.instance === instance);
-          
-          // Find metal grade selection info
-          const mpiSelection = data.debugLogs?.find((log: any) =>
-            log.type === 'mpi_selection' && log.instance === instance);
-          
-          const nearestResult = data.debugLogs?.find((log: any) =>
-            log.type === 'nearest_result');
-            
-          // Find the lmax calculation debug log
-          const lmaxCalc = data.debugLogs?.find((log: any) =>
-            log.type === 'lmax_calculation' && log.instance === instance);
-          
-          if (tData || tauData || cNewData) {
-            debugCalcs.push({
-              instance,
-              T: tData?.T || 0,
-              Tc: tData?.Tc || 0,
-              Tec: tData?.Tec || 0,
-              tau: tauData?.tau || 0,
-              eq: cNewData?.eq || 0,
-              C_new: cNewData?.C_new || 0,
-              SegmaC: parseFloat(calc.drillPipeMetalGrade.split(' ')[1]) || 0,
-              Lmax: parseFloat(calc.Lmax) || 0,
-              Lp: tData?.Lp,
-              qp: tData?.qp,
-              Lhw: tData?.Lhw,
-              qhw: tData?.qhw,
-              L0c: tData?.L0c,
-              qc: tData?.qc,
-              b: tData?.b,
-              Ap: tData?.Ap,
-              Aip: tData?.Aip,
-              P: tData?.P,
-              K1: tData?.K1,
-              K2: tData?.K2,
-              K3: tData?.K3,
-              Np: tauData?.Np,
-              NB: tauData?.NB,
-              Mp: tauData?.Mp,
-              dα: tauData?.dα,
-              γ: tauData?.γ,
-              Dep: tauData?.Dep,
-              dec: tauData?.dec,
-              Dhw: tauData?.Dhw,
-              n: tauData?.n,
-              WOB: tauData?.WOB,
-              DB: tauData?.DB,
-              availableGrades,
-              availableStrengths,
-              nearestMpi: mpiSelection?.nearestMpi,
-              numerator: lmaxCalc?.numerator,
-              denominator: lmaxCalc?.denominator,
-              sqrt_result: lmaxCalc?.sqrt_result,
-              numerator_formula: lmaxCalc?.numerator_formula,
-              denominator_formula: lmaxCalc?.denominator_formula,
-              sqrt_result_formula: lmaxCalc?.sqrt_result_formula,
-              subtraction_formula: lmaxCalc?.subtraction_formula,
-              formulas: {
-                T: tData?.T_formula || '',
-                Tc: tData?.Tc_formula || '',
-                Tec: tData?.Tec_formula || '',
-                Np: tauData?.Np_formula || '',
-                NB: tauData?.NB_formula || '',
-                tau: tauData?.tau_formula || '',
-                eq: cNewData?.eq_formula || '',
-                C_new: cNewData?.C_new_formula || ''
-              }
-            });
+        // Find the lmax calculation debug log
+        const lmaxCalc = data.debugLogs?.find((log: any) =>
+          log.type === 'lmax_calculation' && log.instance === instance);
+        
+        // Find metal grade detailed info
+        const metalGradeInfo = data.debugLogs?.find((log: any) =>
+          log.type === 'metal_grade_selection' && log.instance === instance);
+        
+        console.log(`Debug logs for instance ${instance}:`, {
+          tData,
+          tauData,
+          cNewData,
+          mpiSelection,
+          lmaxCalc,
+          metalGradeInfo
+        });
+        
+        // Extract metal grade and strength from drillPipeMetalGrade
+        const metalGrade = calc.drillPipeMetalGrade || 'Unknown';
+        const tensileStrength = parseFloat(metalGrade.split(' ')[1]) || 0;
+        
+        // Create a metal grade calculation info object
+        const metalGradeCalculation = {
+          selectedGrade: metalGrade,
+          tensileStrength: tensileStrength,
+          mpiSearchValue: mpiSelection?.nearestMpi || 0,
+          comparisons: metalGradeInfo?.comparisons || availableGrades.map((grade, i) => ({
+            grade,
+            strength: availableStrengths[i] || 0,
+            distance: Math.abs((availableStrengths[i] || 0) - (mpiSelection?.nearestMpi || 0)),
+            selected: grade === metalGrade
+          })),
+          selectionMethod: metalGradeInfo?.selectionMethod || 'Nearest MPI Match',
+          explanation: metalGradeInfo?.explanation || 'Metal grade selected based on the closest tensile strength to the calculated required value.'
+        };
+        
+        // Get imported parameters for this instance
+        const instanceParams = processedData.instances?.[instance - 1] || {};
+        const instanceParamsLegacy = Object.keys(processedData)
+          .filter(key => key.endsWith(`_${instance}`))
+          .reduce((acc: Record<string, any>, key) => {
+            const paramName = key.substring(0, key.length - 2);
+            acc[paramName] = processedData[key];
+            return acc;
+          }, {});
+        
+        // Extract gamma value for b lookup
+        const gammaValue = instanceParams.γ || instanceParamsLegacy.γ || 1.08;
+        console.log(`Using gamma value ${gammaValue} for instance ${instance} to get b value`);
+        
+        // Get b value based on gamma
+        const bValue = getBValueForGamma(gammaValue);
+        console.log(`Using b value ${bValue} for instance ${instance} with gamma ${gammaValue}`);
+        
+        // Get Mp value based on gamma
+        const mpValue = getMpValueForGamma(gammaValue);
+        console.log(`Using Mp value ${mpValue} for instance ${instance} with gamma ${gammaValue}`);
+        
+        // Get dec (drill collar external diameter) from casingValues or drillCollarResults
+        let decValue = 0;
+        if (data.drillCollarResults && data.drillCollarResults.length > 0) {
+          // Try to find matching section
+          const sectionResult = data.drillCollarResults.find((r: any) => 
+            r.section?.toLowerCase() === section?.toLowerCase()
+          );
+          if (sectionResult && sectionResult.drillCollar) {
+            decValue = sectionResult.drillCollar / 1000; // Convert mm to m
+            console.log(`Found dec value ${decValue} from drill collar results for section ${section}`);
           }
+        }
+        // Fallback to casingValues
+        if (!decValue && casingValues && casingValues.drillCollarDiameters) {
+          decValue = casingValues.drillCollarDiameters[instance - 1] / 1000 || 0; // Convert mm to m
+          console.log(`Using dec value ${decValue} from casingValues for instance ${instance}`);
+        }
+        
+        // Get DB (bit diameter) from nearestBitSizes
+        let dbValue = 0;
+        if (casingValues && casingValues.nearestBitSizes) {
+          // In calculateDrillCollarData, DB uses reversed index: nearestBitSizes[3-i]
+          const index = 3 - instance;
+          if (index >= 0 && index < casingValues.nearestBitSizes.length) {
+            dbValue = casingValues.nearestBitSizes[index] / 1000; // Convert mm to m
+            console.log(`Using DB value ${dbValue} from nearestBitSizes for instance ${instance}`);
+          }
+        }
+        
+        // Combine both parameter formats
+        const combinedParams = {
+          ...instanceParamsLegacy,
+          ...instanceParams,
+          H: instanceParams.H || processedData[`H_${instance}`] || 0,
+          dα: instanceParams.dα || processedData.dα || 0,
+          // Add correction factors if available
+          K1: instanceParams.K1 || processedData.K1 || 1,
+          K2: instanceParams.K2 || processedData.K2 || 1,
+          K3: instanceParams.K3 || processedData.K3 || 1,
+          // Add default values for Ap and Aip if they're missing
+          Ap: instanceParams.Ap || processedData.Ap || 34.01,
+          Aip: instanceParams.Aip || processedData.Aip || 92.62,
+          // Add the b value from our lookup
+          b: instanceParams.b || bValue,
+          // Add Mp value from our lookup
+          Mp: instanceParams.Mp || mpValue,
+          // Add drill collar and bit diameter
+          dec: instanceParams.dec || decValue,
+          DB: instanceParams.DB || dbValue,
+          // Ensure gamma is properly set
+          γ: gammaValue
+        };
+        
+        console.log(`Combined parameters for instance ${instance}:`, combinedParams);
+        
+        // Calculate missing values if needed
+        let T = tData?.T || 0;
+        let Tc = tData?.Tc || 0;
+        let Tec = tData?.Tec || 0;
+        let tau = tauData?.tau || 0;
+        let eq = cNewData?.eq || 0;
+        let C_new = cNewData?.C_new || 0;
+        let SegmaC = tensileStrength || 0;
+        let Lmax = lmaxCalc?.Lmax || parseFloat(calc.Lmax) || 0;
+        
+        // Calculate missing values from available data if possible
+        if ((!T || !Tc || !Tec || !tau || !eq || !C_new) && combinedParams) {
+          // Try to calculate basic values from parameters
+          const gamma = combinedParams.γ || 0;
+          const b = combinedParams.b || 0.75;  // Use the b value
+          
+          // Try to calculate L0c if not already set
+          if (!combinedParams.L0c && combinedParams.WOB && combinedParams.C && combinedParams.qc) {
+            // L0c formula: WOB * 1000 / (C * qc * b)
+            const L0c = (combinedParams.WOB * 1000) / (combinedParams.C * combinedParams.qc * b);
+            combinedParams.L0c = L0c;
+            console.log(`Calculated L0c = ${L0c} for instance ${instance}`);
+          }
+          
+          const Lp = combinedParams.H - (combinedParams.Lhw + (combinedParams.L0c || 0)) || 0;
+          if (Lp > 0) {
+            combinedParams.Lp = Lp;
+            console.log(`Calculated Lp = ${Lp} for instance ${instance}`);
+          }
+          
+          const qp = combinedParams.qp || 0;
+          const Lhw = combinedParams.Lhw || 0;
+          const qhw = combinedParams.qhw || 0;
+          const L0c = combinedParams.L0c || 0;
+          const qc = combinedParams.qc || 0;
+          
+          // Get correct Ap, Aip, and Mp values based on qp
+          let Ap = combinedParams.Ap || 34.01;
+          let Aip = combinedParams.Aip || 92.62;
+          let mpValue = combinedParams.Mp || 227.5;
+          
+          if (qp) {
+            // Use the lookup table to get correct parameters based on qp
+            const params = getParametersForQp(qp);
+            Ap = params.Ap;
+            Aip = params.Aip;
+            // Convert Mp from the small value to the larger one used in calculations
+            mpValue = params.Mp * 1000000; // Convert from table format to app format
+            console.log(`Updated parameters for qp=${qp}: Ap=${Ap}, Aip=${Aip}, Mp=${mpValue}`);
+            
+            // Update combined params with these values
+            combinedParams.Ap = Ap;
+            combinedParams.Aip = Aip;
+            combinedParams.Mp = mpValue;
+          }
+          
+          if (!T && gamma && Lp && qp && b && Ap) {
+            T = ((gamma * Lp * qp + Lhw * qhw + L0c * qc) * b) / Ap;
+            console.log(`Calculated T = ${T} for instance ${instance}`);
+          }
+          
+          if (!Tc && T && combinedParams.P && Aip) {
+            Tc = T + combinedParams.P * (Aip / Ap);
+            console.log(`Calculated Tc = ${Tc} for instance ${instance}`);
+          }
+          
+          if (!Tec && Tc) {
+            const K1 = combinedParams.K1 || 1;
+            const K2 = combinedParams.K2 || 1;
+            const K3 = combinedParams.K3 || 1;
+            Tec = Tc * K1 * K2 * K3;
+            console.log(`Calculated Tec = ${Tec} for instance ${instance}`);
+          }
+          
+          // Calculate Np (pipe torque)
+          const dα = combinedParams.dα || 0;
+          const Dep = combinedParams.Dep || 0;
+          const dec = combinedParams.dec || 0;
+          const Dhw = combinedParams.Dhw || 0;
+          const n = combinedParams.n || 0;
+          
+          if (!combinedParams.Np && dα && gamma && Lp && Dep && L0c && dec && Lhw && Dhw && n) {
+            const Np = dα * gamma * (Lp * Math.pow(Dep, 2) + L0c * Math.pow(dec, 2) + Lhw * Math.pow(Dhw, 2)) * Math.pow(n, 1.7);
+            combinedParams.Np = Np;
+            console.log(`Calculated Np = ${Np} for instance ${instance}`);
+          }
+          
+          // Calculate NB (bit torque)
+          const WOB = combinedParams.WOB || 0;
+          const DB = combinedParams.DB || 0;
+          
+          if (!combinedParams.NB && WOB && DB && n) {
+            const NB = 3.2 * Math.pow(10, -4) * Math.pow(WOB, 0.5) * Math.pow((DB/10), 1.75) * n;
+            combinedParams.NB = NB;
+            console.log(`Calculated NB = ${NB} for instance ${instance}`);
+          }
+          
+          // Calculate tau (shear stress)
+          const Np = combinedParams.Np || 0;
+          const NB = combinedParams.NB || 0;
+          const Mp = combinedParams.Mp || 0;
+          if (!tau && Np && NB && n && Mp) {
+            // New denominator: π * n * Mp * 10^-9
+            tau = (30 * ((Np + NB) * Math.pow(10, 3)) / (Math.PI * n * Mp * Math.pow(10, -9))) * Math.pow(10, -6);
+            console.log(`Calculated tau = ${tau} for instance ${instance} (new denominator: π * n * Mp * 10^-9)`);
+          }
+          
+          // Calculate eq (equivalent stress)
+          if (!eq && Tec && tau) {
+            eq = Math.sqrt(Math.pow((Tec * Math.pow(10, -1)), 2) + 4 * Math.pow(tau, 2));
+            console.log(`Calculated eq = ${eq} for instance ${instance}`);
+          }
+          
+          // Calculate C_new (required tensile strength)
+          if (!C_new && eq) {
+            C_new = eq * 1.5;
+            console.log(`Calculated C_new = ${C_new} for instance ${instance}`);
+          }
+          
+          // Find nearest metal grade based on C_new
+          if (C_new && availableStrengths.length > 0) {
+            // First sort availableStrengths in ascending order
+            const sortedStrengths = [...availableStrengths].sort((a, b) => a - b);
+            // Find the first strength that is >= C_new
+            let SegmaC = sortedStrengths.find(strength => strength >= C_new) || sortedStrengths[sortedStrengths.length - 1];
+            console.log(`Selected SegmaC = ${SegmaC} for C_new = ${C_new}`);
+            
+            // Calculate Lmax using SegmaC
+            if (SegmaC && tau) {
+              const numerator = (Math.pow((SegmaC/1.5), 2) - 4 * Math.pow(tau, 2)) * Math.pow(10, 12);
+              const denominator = (Math.pow((7.85 - 1.5), 2)) * Math.pow(10, 8);
+              const sqrt_result = Math.sqrt(numerator / denominator);
+              Lmax = sqrt_result - ((L0c * qc + Lhw * qhw) / qp);
+              console.log(`Calculated Lmax = ${Lmax} for instance ${instance}`);
+            }
+          }
+        }
+        
+        // Create a debug calculation object based on the instance
+        debugCalcs.push({
+          instance,
+          section,
+          T,
+          Tc,
+          Tec,
+          tau,
+          eq,
+          C_new,
+          SegmaC,
+          Lmax,
+          Lp: combinedParams.Lp || tData?.Lp,
+          qp: combinedParams.qp || tData?.qp,
+          Lhw: combinedParams.Lhw || tData?.Lhw,
+          qhw: combinedParams.qhw || tData?.qhw,
+          L0c: combinedParams.L0c || tData?.L0c,
+          qc: combinedParams.qc || tData?.qc,
+          b: combinedParams.b || tData?.b,
+          Ap: combinedParams.Ap || tData?.Ap,
+          Aip: combinedParams.Aip || tData?.Aip,
+          P: combinedParams.P || tData?.P,
+          K1: combinedParams.K1 || tData?.K1,
+          K2: combinedParams.K2 || tData?.K2,
+          K3: combinedParams.K3 || tData?.K3,
+          Np: combinedParams.Np || tauData?.Np,
+          NB: combinedParams.NB || tauData?.NB,
+          Mp: combinedParams.Mp || tData?.Mp,
+          dα: combinedParams.dα || tauData?.dα,
+          γ: combinedParams.γ || tauData?.γ,
+          Dep: combinedParams.Dep || tauData?.Dep,
+          dec: combinedParams.dec || tauData?.dec,
+          Dhw: combinedParams.Dhw || tauData?.Dhw,
+          n: combinedParams.n || tauData?.n,
+          WOB: combinedParams.WOB || tauData?.WOB,
+          DB: combinedParams.DB || tauData?.DB,
+          availableGrades,
+          availableStrengths,
+          nearestMpi: mpiSelection?.nearestMpi,
+          numerator: lmaxCalc?.numerator,
+          denominator: lmaxCalc?.denominator,
+          sqrt_result: lmaxCalc?.sqrt_result,
+          numerator_formula: lmaxCalc?.numerator_formula,
+          denominator_formula: lmaxCalc?.denominator_formula,
+          sqrt_result_formula: lmaxCalc?.sqrt_result_formula,
+          subtraction_formula: lmaxCalc?.subtraction_formula,
+          formulas: {
+            T: tData?.T_formula || 'T = ((γ * Lp * qp + Lhw * qhw + L0c * qc) * b) / Ap',
+            Tc: tData?.Tc_formula || 'Tc = T + P * (Aip / Ap)',
+            Tec: tData?.Tec_formula || 'Tec = Tc * K1 * K2 * K3',
+            Np: tauData?.Np_formula || 'Np = dα * γ * (Lp * Dep²+ L0c * dec² + Lhw * Dhw²) * n^1.7',
+            NB: tauData?.NB_formula || 'NB = 3.2 * 10^-4 * (WOB^0.5) * ((DB/10)^1.75) * n',
+            tau: tauData?.tau_formula || 'tau = (30 * ((Np + NB) * 10^3 / (π * n * Mp * 10^-9))) * 10^-6',
+            eq: cNewData?.eq_formula || 'eq = sqrt((Tec*10^-1)² + 4*tau²)',
+            C_new: cNewData?.C_new_formula || 'C_new = eq * 1.5'
+          },
+          importedData: {
+            atHead: nearestResult?.atHead || combinedParams.atHead,
+            bitSize: nearestResult?.bitSize || combinedParams.bitSize,
+            H: combinedParams.H,
+            qp: combinedParams.qp,
+            Lhw: combinedParams.Lhw,
+            qc: combinedParams.qc,
+            Dep: combinedParams.Dep,
+            qhw: combinedParams.qhw,
+            Dhw: combinedParams.Dhw,
+            n: combinedParams.n,
+            WOB: combinedParams.WOB,
+            C: combinedParams.C,
+            P: combinedParams.P,
+            γ: combinedParams.γ,
+            dα: combinedParams.dα,
+            source: 'Parameter Data'
+          },
+          metalGradeCalculation
         });
       }
       
+      // Store the debug data
       setDebugData(debugCalcs);
+      console.log("Final debug data collected:", debugCalcs);
+      
+      // If debugCalcs has data, force display of debug info
+      if (debugCalcs.length > 0) {
+        console.log("Setting showDebugInfo to true because debugCalcs has data");
+        setShowDebugInfo(true);
+      }
       
       // Ensure all results have valid section names
       const validatedResults = data.drillCollarResults.map((result: any, index: number) => {
@@ -555,7 +1187,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       setDrillCollarData(data.drillCollarData || {});
       
       // Use extended calculations if available, otherwise use regular calculations
-      const validatedCalculations = (data.extendedCalculations || data.calculations || []).map((calc: any) => {
+      let validatedCalculations = (data.extendedCalculations || data.calculations || []).map((calc: any) => {
         if (!calc.section || calc.section === "Unknown") {
           // Use instance to determine section if available
           if (calc.instance === 1) calc.section = "Production";
@@ -564,6 +1196,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         }
         return calc;
       });
+      
+      // Always enrich calculations with H values from formData
+      validatedCalculations = enrichCalculationsWithHValues(validatedCalculations, formData);
       
       setCalculations(validatedCalculations as DrillCollarCalculation[]);
       setDrillCollarCalculations(validatedCalculations); // Update context too
@@ -587,10 +1222,405 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     }
   };
   
+  // New helper function to properly format data for API call
+  const preprocessFormData = (formData: any): any => {
+    const processedData: any = { ...formData };
+    
+    // Map instance-specific parameters for each calculation instance
+    const instanceParams = [
+      // Parameters that have instance-specific values (_1, _2, _3)
+      'qp', 'Lhw', 'qc', 'Dep', 'qhw', 'Dhw', 'n', 'WOB', 'C', 'P', 'γ', 'H', 'Hc'
+    ];
+    
+    // Create instance-specific data objects
+    const instanceData: Record<string, any>[] = [{}, {}, {}];
+    
+    // Extract instance-specific values and organize them
+    for (const param of instanceParams) {
+      for (let i = 1; i <= 3; i++) {
+        const key = `${param}_${i}`;
+        if (formData[key]) {
+          // Add to instance-specific data
+          instanceData[i-1][param] = parseFloat(formData[key]);
+        }
+      }
+    }
+    
+    // --- Robust H value fetching (like semantic screen) ---
+    for (let i = 1; i <= 3; i++) {
+      const hVal = getHValueForInstance(formData, i);
+      if (hVal !== undefined && !isNaN(hVal)) {
+        instanceData[i-1]["H"] = hVal;
+      }
+    }
+    
+    // Add single parameters that apply to all instances
+    if (formData['dα']) {
+      processedData.dα = parseFloat(formData['dα']);
+      // Add to each instance
+      instanceData.forEach(instance => {
+        instance.dα = parseFloat(formData['dα']);
+      });
+    }
+    
+    // Add instance data to processed data - this is the only approach for H values
+    processedData.instances = instanceData;
+    
+    return processedData;
+  };
+  
+  // Function to generate synthetic debug data if none is available
+  const generateSyntheticDebugData = (): DebugCalculationData[] => {
+    if (calculations.length === 0) {
+      return [];
+    }
+    
+    console.log("Generating synthetic debug data from:", calculations);
+    
+    return calculations.map((calc, index) => {
+      // Extract metal grade and tensile strength
+      const metalGradeParts = calc.drillPipeMetalGrade?.split(' ') || [];
+      const tensileStrength = metalGradeParts.length > 1 ? parseFloat(metalGradeParts[1]) : 0;
+      
+      // Create basic structure with available data
+      return {
+        instance: calc.instance || index + 1,
+        section: calc.section || `Section ${index + 1}`,
+        // Synthetic values for required fields
+        T: 0,
+        Tc: 0,
+        Tec: 0,
+        tau: 0,
+        eq: 0,
+        C_new: 0,
+        SegmaC: tensileStrength || 0,
+        Lmax: typeof calc.Lmax === 'number' ? calc.Lmax : parseFloat(calc.Lmax as string) || 0,
+        // Add metal grade info
+        availableGrades: ['E 75', 'X 95', 'G 105', 'S135'],
+        availableStrengths: [517, 655, 725, 930],
+        // Build metal grade calculation info
+        metalGradeCalculation: {
+          selectedGrade: calc.drillPipeMetalGrade,
+          tensileStrength: tensileStrength,
+          mpiSearchValue: tensileStrength,
+          selectionMethod: 'Based on calculation results',
+          explanation: 'This is synthetic debug data generated from the calculation results as detailed debug information was not available.',
+          comparisons: [
+            { grade: 'E 75', strength: 517, distance: Math.abs(517 - (tensileStrength || 0)), selected: calc.drillPipeMetalGrade === 'E 75' },
+            { grade: 'X 95', strength: 655, distance: Math.abs(655 - (tensileStrength || 0)), selected: calc.drillPipeMetalGrade === 'X 95' },
+            { grade: 'G 105', strength: 725, distance: Math.abs(725 - (tensileStrength || 0)), selected: calc.drillPipeMetalGrade === 'G 105' },
+            { grade: 'S135', strength: 930, distance: Math.abs(930 - (tensileStrength || 0)), selected: calc.drillPipeMetalGrade === 'S135' }
+          ]
+        },
+        // Add empty formulas structure
+        formulas: {
+          T: 'Synthetic data',
+          Tc: 'Synthetic data',
+          Tec: 'Synthetic data',
+          Np: 'Synthetic data',
+          NB: 'Synthetic data',
+          tau: 'Synthetic data',
+          eq: 'Synthetic data',
+          C_new: 'Synthetic data'
+        },
+        // Add basic imported data
+        importedData: {
+          H: calc.H || 0
+        }
+      };
+    });
+  };
+
+  // Function to generate a copyable debug text with all variables and formulas
+  const generateCopyableDebugText = (debugData: DebugCalculationData[]): string => {
+    if (!debugData || debugData.length === 0) {
+      return "No debug data available.";
+    }
+
+    let output = "=== FORMATION DESIGN METAL GRADE CALCULATION DEBUG ===\n\n";
+    
+    debugData.forEach((data, index) => {
+      output += `\n========== INSTANCE ${data.instance} (${data.section || `Section ${index + 1}`}) ==========\n\n`;
+      
+      // Input Parameters
+      output += "--- INPUT PARAMETERS ---\n";
+      if (data.importedData) {
+        Object.entries(data.importedData).forEach(([key, value]) => {
+          if (value !== undefined && key !== 'source') {
+            output += `${key}: ${value}\n`;
+          }
+        });
+      }
+      
+      // Core Values
+      output += "\n--- CORE CALCULATIONS ---\n";
+      
+      // Lp calculation with formula and substitution
+      const LpFormula = "Lp = H - (Lhw + L0c)";
+      let LpApplication = '';
+      if (data.importedData?.H !== undefined && data.Lhw !== undefined && data.L0c !== undefined) {
+        LpApplication = `Lp = ${data.importedData.H?.toFixed(2)} - (${data.Lhw?.toFixed(2)} + ${data.L0c?.toFixed(2)}) = ${data.Lp?.toFixed(2)}`;
+      } else {
+        LpApplication = `Lp = ${data.Lp?.toFixed(2)}`;
+      }
+      output += `Formula: ${LpFormula}\n`;
+      output += `Application: ${LpApplication}\n\n`;
+      
+      // L0c calculation with formula and substitution
+      const L0cFormula = "L0c = (WOB * 1000) / (C * qc * b)";
+      let L0cApplication = '';
+      if (data.WOB !== undefined && data.importedData?.C !== undefined && data.qc !== undefined && data.b !== undefined) {
+        L0cApplication = `L0c = (${data.WOB?.toFixed(2)} * 1000) / (${data.importedData.C} * ${data.qc?.toFixed(2)} * ${data.b?.toFixed(4)}) = ${data.L0c?.toFixed(2)}`;
+      } else {
+        L0cApplication = `L0c = ${data.L0c?.toFixed(2)}`;
+      }
+      output += `Formula: ${L0cFormula}\n`;
+      output += `Application: ${L0cApplication}\n\n`;
+      
+      // T calculation with formula and substitution
+      const TFormula = data.formulas.T || 'T = ((γ * Lp * qp + Lhw * qhw + L0c * qc) * b) / Ap';
+      let TApplication = '';
+      if (data.γ !== undefined && data.Lp !== undefined && data.qp !== undefined && 
+          data.Lhw !== undefined && data.qhw !== undefined && data.L0c !== undefined && 
+          data.qc !== undefined && data.b !== undefined && data.Ap !== undefined) {
+        TApplication = `T = ((${data.γ?.toFixed(2)} · ${data.Lp?.toFixed(2)} · ${data.qp?.toFixed(2)} + ${data.Lhw?.toFixed(2)} · ${data.qhw?.toFixed(2)} + ${data.L0c?.toFixed(2)} · ${data.qc?.toFixed(2)}) · ${data.b?.toFixed(4)}) / ${data.Ap?.toFixed(2)} = ${data.T.toFixed(2)}`;
+      } else {
+        TApplication = `T = ${data.T.toFixed(2)}`;
+      }
+      output += `Formula: ${TFormula}\n`;
+      output += `Application: ${TApplication}\n\n`;
+      
+      // Tc calculation with formula and substitution
+      const TcFormula = data.formulas.Tc || 'Tc = T + P * (Aip / Ap)';
+      let TcApplication = '';
+      if (data.T !== undefined && data.P !== undefined && data.Aip !== undefined && data.Ap !== undefined) {
+        TcApplication = `Tc = ${data.T.toFixed(2)} + ${data.P?.toFixed(2)} · (${data.Aip?.toFixed(2)} / ${data.Ap?.toFixed(2)}) = ${data.Tc.toFixed(2)}`;
+      } else {
+        TcApplication = `Tc = ${data.Tc.toFixed(2)}`;
+      }
+      output += `Formula: ${TcFormula}\n`;
+      output += `Application: ${TcApplication}\n\n`;
+      
+      // Tec calculation with formula and substitution
+      const TecFormula = data.formulas.Tec || 'Tec = Tc * K1 * K2 * K3';
+      let TecApplication = '';
+      if (data.Tc !== undefined && data.K1 !== undefined && data.K2 !== undefined && data.K3 !== undefined) {
+        TecApplication = `Tec = ${data.Tc.toFixed(2)} · ${data.K1?.toFixed(4)} · ${data.K2?.toFixed(4)} · ${data.K3?.toFixed(4)} = ${data.Tec.toFixed(2)}`;
+      } else {
+        TecApplication = `Tec = ${data.Tec.toFixed(2)}`;
+      }
+      output += `Formula: ${TecFormula}\n`;
+      output += `Application: ${TecApplication}\n\n`;
+      
+      // Np calculation with formula and substitution
+      const NpFormula = data.formulas.Np || 'Np = dα * γ * (Lp * Dep²+ L0c * dec² + Lhw * Dhw²) * n^1.7';
+      let NpApplication = '';
+      if (data.dα !== undefined && data.γ !== undefined && data.Lp !== undefined && data.Dep !== undefined && 
+          data.L0c !== undefined && data.dec !== undefined && data.Lhw !== undefined && 
+          data.Dhw !== undefined && data.n !== undefined && data.Np !== undefined) {
+        NpApplication = `Np = ${data.dα?.toFixed(4)} · ${data.γ?.toFixed(2)} · (${data.Lp?.toFixed(2)} · ${data.Dep?.toFixed(2)}² + ${data.L0c?.toFixed(2)} · ${data.dec?.toFixed(2)}² + ${data.Lhw?.toFixed(2)} · ${data.Dhw?.toFixed(2)}²) · ${data.n?.toFixed(2)}^1.7 = ${data.Np?.toFixed(2)}`;
+      } else if (data.Np !== undefined) {
+        NpApplication = `Np = ${data.Np?.toFixed(2)}`;
+      } else {
+        NpApplication = 'Np calculation unavailable';
+      }
+      output += `Formula: ${NpFormula}\n`;
+      output += `Application: ${NpApplication}\n\n`;
+      
+      // NB calculation with formula and substitution
+      const NBFormula = data.formulas.NB || 'NB = 3.2 * 10^-4 * (WOB^0.5) * ((DB/10)^1.75) * n';
+      let NBApplication = '';
+      if (data.WOB !== undefined && data.DB !== undefined && data.n !== undefined && data.NB !== undefined) {
+        NBApplication = `NB = 3.2 · 10^-4 · (${data.WOB?.toFixed(2)}^0.5) · ((${data.DB?.toFixed(2)}/10)^1.75) · ${data.n?.toFixed(2)} = ${data.NB?.toFixed(2)}`;
+      } else if (data.NB !== undefined) {
+        NBApplication = `NB = ${data.NB?.toFixed(2)}`;
+      } else {
+        NBApplication = 'NB calculation unavailable';
+      }
+      output += `Formula: ${NBFormula}\n`;
+      output += `Application: ${NBApplication}\n\n`;
+      
+      // Tau calculation with formula and substitution
+      const tauFormula = data.formulas.tau || 'tau = (30 * ((Np + NB) * 10^3 / (π * n * Mp * 10^-9))) * 10^-6';
+      let tauApplication = '';
+      if (data.Np !== undefined && data.NB !== undefined && data.n !== undefined && data.Mp !== undefined) {
+        tauApplication = `tau = (30 · ((${data.Np?.toFixed(2)} + ${data.NB?.toFixed(2)}) · 10^3 / (π · ${data.n?.toFixed(2)} · ${data.Mp?.toFixed(2)} · 10^-9))) · 10^-6 = ${data.tau.toFixed(4)}`;
+      } else {
+        tauApplication = `tau = ${data.tau.toFixed(4)}`;
+      }
+      output += `Formula: ${tauFormula}\n`;
+      output += `Application: ${tauApplication}\n\n`;
+      
+      // Eq calculation with formula and substitution
+      const eqFormula = data.formulas.eq || 'eq = sqrt((Tec*10^-1)² + 4*tau²)';
+      let eqApplication = '';
+      if (data.Tec !== undefined && data.tau !== undefined) {
+        eqApplication = `eq = sqrt((${data.Tec.toFixed(2)}·10^-1)² + 4·${data.tau.toFixed(4)}²) = ${data.eq.toFixed(4)}`;
+      } else {
+        eqApplication = `eq = ${data.eq.toFixed(4)}`;
+      }
+      output += `Formula: ${eqFormula}\n`;
+      output += `Application: ${eqApplication}\n\n`;
+      
+      // C_new calculation with formula and substitution
+      const CnewFormula = data.formulas.C_new || 'C_new = eq * 1.5';
+      const CnewApplication = `C_new = ${data.eq.toFixed(4)} · 1.5 = ${data.C_new.toFixed(4)}`;
+      output += `Formula: ${CnewFormula}\n`;
+      output += `Application: ${CnewApplication}\n\n`;
+      
+      // Basic values without detailed calculations
+      output += `SegmaC: ${data.SegmaC.toFixed(2)} (MPa)\n`;
+      output += `Lmax: ${data.Lmax.toFixed(2)} (m)\n`;
+      
+      // Section Parameters
+      output += "\n--- SECTION PARAMETERS ---\n";
+      if (data.Lp !== undefined) output += `Lp: ${data.Lp.toFixed(4)}\n`;
+      if (data.qp !== undefined) output += `qp: ${data.qp.toFixed(4)}\n`;
+      if (data.Lhw !== undefined) output += `Lhw: ${data.Lhw.toFixed(4)}\n`;
+      if (data.qhw !== undefined) output += `qhw: ${data.qhw.toFixed(4)}\n`;
+      if (data.L0c !== undefined) output += `L0c: ${data.L0c.toFixed(4)}\n`;
+      if (data.qc !== undefined) output += `qc: ${data.qc.toFixed(4)}\n`;
+      if (data.b !== undefined) output += `b: ${data.b.toFixed(4)}\n`;
+      
+      // Area and Force Parameters
+      output += "\n--- AREA & FORCE PARAMETERS ---\n";
+      if (data.Ap !== undefined) output += `Ap: ${data.Ap.toFixed(4)}\n`;
+      if (data.Aip !== undefined) output += `Aip: ${data.Aip.toFixed(4)}\n`;
+      if (data.P !== undefined) output += `P: ${data.P.toFixed(4)}\n`;
+      if (data.K1 !== undefined) output += `K1: ${data.K1.toFixed(4)}\n`;
+      if (data.K2 !== undefined) output += `K2: ${data.K2.toFixed(4)}\n`;
+      if (data.K3 !== undefined) output += `K3: ${data.K3.toFixed(4)}\n`;
+      
+      // Force and Geometric Parameters
+      output += "\n--- FORCE & GEOMETRIC PARAMETERS ---\n";
+      if (data.Mp !== undefined) output += `Mp: ${data.Mp.toFixed(4) || 'N/A'}\n`;
+      if (data.dα !== undefined) output += `dα: ${data.dα.toFixed(4) || 'N/A'}\n`;
+      if (data.γ !== undefined) output += `γ: ${data.γ.toFixed(4) || 'N/A'}\n`;
+      
+      // Diameters and WOB
+      output += "\n--- DIAMETERS & WOB ---\n";
+      if (data.Dep !== undefined) output += `Dep: ${data.Dep.toFixed(4) || 'N/A'}\n`;
+      if (data.dec !== undefined) output += `dec: ${data.dec.toFixed(4) || 'N/A'}\n`;
+      if (data.Dhw !== undefined) output += `Dhw: ${data.Dhw.toFixed(4) || 'N/A'}\n`;
+      if (data.n !== undefined) output += `n: ${data.n.toFixed(4) || 'N/A'}\n`;
+      if (data.WOB !== undefined) output += `WOB: ${data.WOB.toFixed(4) || 'N/A'}\n`;
+      if (data.DB !== undefined) output += `DB: ${data.DB.toFixed(4) || 'N/A'}\n`;
+      
+      // Lmax Calculation
+      if (data.numerator !== undefined) {
+        output += "\n--- LMAX CALCULATION ---\n";
+        
+        const numeratorFormula = data.numerator_formula || 'Numerator calculation';
+        const numeratorApplication = `${numeratorFormula} = ${data.numerator?.toFixed(4) || 'N/A'}`;
+        output += `${numeratorApplication}\n`;
+        
+        const denominatorFormula = data.denominator_formula || 'Denominator calculation';
+        const denominatorApplication = `${denominatorFormula} = ${data.denominator?.toFixed(4) || 'N/A'}`;
+        output += `${denominatorApplication}\n`;
+        
+        const sqrtFormula = data.sqrt_result_formula || 'Square Root Result calculation';
+        const sqrtApplication = `${sqrtFormula} = ${data.sqrt_result?.toFixed(4) || 'N/A'}`;
+        output += `${sqrtApplication}\n`;
+        
+        const lmaxFormula = data.subtraction_formula || `Lmax calculation`;
+        const lmaxApplication = `${lmaxFormula} = ${data.Lmax.toFixed(4)}`;
+        output += `${lmaxApplication}\n`;
+      }
+      
+      // Metal Grade Analysis
+      output += "\n--- METAL GRADE ANALYSIS ---\n";
+      if (data.metalGradeCalculation) {
+        output += `Selected Metal Grade: ${data.metalGradeCalculation.selectedGrade || 'Not available'}\n`;
+        output += `Required MPI Value: ${data.metalGradeCalculation.mpiSearchValue?.toFixed(2) || 'N/A'} MPa\n`;
+        output += `Selection Method: ${data.metalGradeCalculation.selectionMethod || 'Nearest MPI Match'}\n`;
+        
+        output += `\nGrade Comparison:\n`;
+        if (data.metalGradeCalculation.comparisons) {
+          output += `Grade | Strength (MPa) | Difference\n`;
+          output += `-------------------------------\n`;
+          data.metalGradeCalculation.comparisons.forEach(comparison => {
+            const selectedMark = comparison.selected ? '* ' : '  ';
+            output += `${selectedMark}${comparison.grade} | ${comparison.strength} | ${comparison.distance.toFixed(2)}\n`;
+          });
+        }
+        
+        output += `\nSelection Process: ${data.metalGradeCalculation.explanation || 'The metal grade is selected by finding the grade with tensile strength closest to the required MPI value.'}\n`;
+      }
+    });
+    
+    return output;
+  };
+
+  // Function to create a copyable debug modal
+  const renderCopyableDebugModal = () => {
+    if (!showCopyableDebug) return null;
+    
+    let dataToUse = debugData;
+    // If no debug data is available, generate synthetic data
+    if (!dataToUse || dataToUse.length === 0) {
+      dataToUse = generateSyntheticDebugData();
+    }
+    
+    const debugText = generateCopyableDebugText(dataToUse);
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-medium">Copyable Debug Information</h3>
+            <button
+              onClick={() => setShowCopyableDebug(false)}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-auto p-4">
+            <pre className="text-xs font-mono whitespace-pre-wrap bg-gray-100 dark:bg-gray-800 p-4 rounded-md">
+              {debugText}
+            </pre>
+          </div>
+          
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(debugText);
+                showToast('success', "Debug data copied", {
+                  icon: <Check className="h-4 w-4 text-success" />,
+                  description: "The debug data has been copied to your clipboard."
+                });
+              }}
+              className="flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              Copy to Clipboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Function to render debug calculation data
   const renderDebugInfo = () => {
+    console.log("renderDebugInfo called - showDebugInfo:", showDebugInfo, "debugData length:", debugData.length);
+    
     if (!showDebugInfo || debugData.length === 0) {
-      return null;
+      return (
+        <div className="mt-8">
+          <Button
+            onClick={() => setShowDebugInfo(true)}
+            variant="outline"
+            className="w-full py-6 bg-amber-50/80 hover:bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/20 dark:hover:bg-amber-800/30 dark:text-amber-300 dark:border-amber-700/50"
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Bug className="h-6 w-6" />
+              <span>Show Calculation Debug Information</span>
+            </div>
+          </Button>
+        </div>
+      );
     }
     
     return (
@@ -600,15 +1630,23 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
             <Bug className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             <h3 className="text-lg font-medium text-amber-700 dark:text-amber-400">Debug Information</h3>
           </div>
-          <Button 
-            onClick={() => setShowDebugInfo(false)} 
-            variant="outline" 
-            size="sm"
-            className="text-amber-600 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-          >
-            <Minimize className="h-3.5 w-3.5" />
-            <span className="ml-1.5">Hide Debug</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setShowCopyableDebug(true)}
+              variant="outline"
+              className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:hover:bg-amber-800/50 dark:text-amber-300 dark:border-amber-700/50"
+            >
+              Show Copyable Debug
+            </Button>
+            <Button
+              onClick={() => setShowDebugInfo(false)}
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:hover:bg-amber-800/50 dark:text-amber-300 dark:border-amber-700/50"
+            >
+              <Minimize className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
         <ScrollArea className="h-[500px] w-full rounded-md border border-amber-200 dark:border-amber-800/50">
@@ -619,29 +1657,215 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
               </h4>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Section for imported data */}
+                <Card className="bg-white/80 dark:bg-background/80 md:col-span-2">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Imported Data</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-auto rounded-md border border-amber-200/50 dark:border-amber-800/30">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/80 dark:bg-amber-900/30">
+                            <th className="px-3 py-2 text-left font-medium text-amber-700 dark:text-amber-400">Parameter</th>
+                            <th className="px-3 py-2 text-left font-medium text-amber-700 dark:text-amber-400">Value</th>
+                            <th className="px-3 py-2 text-left font-medium text-amber-700 dark:text-amber-400">Source</th>
+                            <th className="px-3 py-2 text-left font-medium text-amber-700 dark:text-amber-400">Used In</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.importedData?.atHead && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">At Head</td>
+                              <td className="px-3 py-2">{data.importedData.atHead}</td>
+                              <td className="px-3 py-2">Casing Design</td>
+                              <td className="px-3 py-2">Drill Collar Selection</td>
+                            </tr>
+                          )}
+                          {data.importedData?.bitSize && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">Bit Size</td>
+                              <td className="px-3 py-2">{data.importedData.bitSize}</td>
+                              <td className="px-3 py-2">Casing Design</td>
+                              <td className="px-3 py-2">Drill Collar Selection</td>
+                            </tr>
+                          )}
+                          {data.importedData?.H && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">H</td>
+                              <td className="px-3 py-2">{data.importedData.H}</td>
+                              <td className="px-3 py-2">Well Data</td>
+                              <td className="px-3 py-2">Section Depth</td>
+                            </tr>
+                          )}
+                          {data.importedData?.qp && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">qp</td>
+                              <td className="px-3 py-2">{data.importedData.qp}</td>
+                              <td className="px-3 py-2">Well Data</td>
+                              <td className="px-3 py-2">T Calculation</td>
+                            </tr>
+                          )}
+                          {data.importedData?.Lhw && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">Lhw</td>
+                              <td className="px-3 py-2">{data.importedData.Lhw}</td>
+                              <td className="px-3 py-2">Well Data</td>
+                              <td className="px-3 py-2">T Calculation</td>
+                            </tr>
+                          )}
+                          {data.importedData?.qc && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">qc</td>
+                              <td className="px-3 py-2">{data.importedData.qc}</td>
+                              <td className="px-3 py-2">Well Data</td>
+                              <td className="px-3 py-2">T Calculation</td>
+                            </tr>
+                          )}
+                          {data.importedData?.Dep && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">Dep</td>
+                              <td className="px-3 py-2">{data.importedData.Dep}</td>
+                              <td className="px-3 py-2">Well Data</td>
+                              <td className="px-3 py-2">Area & Force Parameters</td>
+                            </tr>
+                          )}
+                          {data.importedData?.P && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">P</td>
+                              <td className="px-3 py-2">{data.importedData.P}</td>
+                              <td className="px-3 py-2">Well Data</td>
+                              <td className="px-3 py-2">Area & Force Parameters</td>
+                            </tr>
+                          )}
+                          {data.importedData?.dα && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">dα</td>
+                              <td className="px-3 py-2">{data.importedData.dα}</td>
+                              <td className="px-3 py-2">Well Data</td>
+                              <td className="px-3 py-2">Force & Geometric Parameters</td>
+                            </tr>
+                          )}
+                          {data.importedData?.WOB && (
+                            <tr className="border-b border-amber-200/50 dark:border-amber-800/30">
+                              <td className="px-3 py-2 font-mono">WOB</td>
+                              <td className="px-3 py-2">{data.importedData.WOB}</td>
+                              <td className="px-3 py-2">Well Data</td>
+                              <td className="px-3 py-2">Force & Geometric Parameters</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+                
                 <Card className="bg-white/80 dark:bg-background/80">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm">Core Values</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="font-medium">Lp:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: Lp = H - (Lhw + L0c)</div>
+                        {data.importedData?.H !== undefined && data.Lhw !== undefined && data.L0c !== undefined ? (
+                          <div>Application: {data.importedData.H?.toFixed(2)} - ({data.Lhw?.toFixed(2)} + {data.L0c?.toFixed(2)}) = {data.Lp?.toFixed(2)}</div>
+                        ) : (
+                          <div>Result: {data.Lp?.toFixed(4) || 'N/A'}</div>
+                        )}
+                      </div>
+
+                      <div className="font-medium">L0c:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: L0c = (WOB * 1000) / (C * qc * b)</div>
+                        {data.WOB !== undefined && data.importedData?.C !== undefined && data.qc !== undefined && data.b !== undefined ? (
+                          <div>Application: ({data.WOB?.toFixed(2)} * 1000) / ({data.importedData.C} * {data.qc?.toFixed(2)} * {data.b?.toFixed(4)}) = {data.L0c?.toFixed(2)}</div>
+                        ) : (
+                          <div>Result: {data.L0c?.toFixed(4) || 'N/A'}</div>
+                        )}
+                      </div>
+                      
                       <div className="font-medium">T:</div>
-                      <div>{data.T.toFixed(4)} (N)</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: {data.formulas.T || 'Not available'}</div>
+                        {data.γ !== undefined && data.Lp !== undefined && data.qp !== undefined && 
+                         data.Lhw !== undefined && data.qhw !== undefined && data.L0c !== undefined && 
+                         data.qc !== undefined && data.b !== undefined && data.Ap !== undefined ? (
+                          <div>Application: (({data.γ?.toFixed(2)} · {data.Lp?.toFixed(2)} · {data.qp?.toFixed(2)} + {data.Lhw?.toFixed(2)} · {data.qhw?.toFixed(2)} + {data.L0c?.toFixed(2)} · {data.qc?.toFixed(2)}) · {data.b?.toFixed(4)}) / {data.Ap?.toFixed(2)} = {data.T.toFixed(2)}</div>
+                        ) : (
+                          <div>Result: {data.T.toFixed(4)} (N)</div>
+                        )}
+                      </div>
                       
                       <div className="font-medium">Tc:</div>
-                      <div>{data.Tc.toFixed(4)} (N)</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: {data.formulas.Tc || 'Not available'}</div>
+                        {data.T !== undefined && data.P !== undefined && data.Aip !== undefined && data.Ap !== undefined ? (
+                          <div>Application: {data.T.toFixed(2)} + {data.P?.toFixed(2)} · ({data.Aip?.toFixed(2)} / {data.Ap?.toFixed(2)}) = {data.Tc.toFixed(2)}</div>
+                        ) : (
+                          <div>Result: {data.Tc.toFixed(4)} (N)</div>
+                        )}
+                      </div>
                       
                       <div className="font-medium">Tec:</div>
-                      <div>{data.Tec.toFixed(4)}</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: {data.formulas.Tec || 'Not available'}</div>
+                        {data.Tc !== undefined && data.K1 !== undefined && data.K2 !== undefined && data.K3 !== undefined ? (
+                          <div>Application: {data.Tc.toFixed(2)} · {data.K1?.toFixed(4)} · {data.K2?.toFixed(4)} · {data.K3?.toFixed(4)} = {data.Tec.toFixed(2)}</div>
+                        ) : (
+                          <div>Result: {data.Tec.toFixed(4)}</div>
+                        )}
+                      </div>
+                      
+                      <div className="font-medium">Np:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: {data.formulas.Np || 'Not available'}</div>
+                        {data.dα !== undefined && data.γ !== undefined && data.Lp !== undefined && 
+                         data.Dep !== undefined && data.L0c !== undefined && data.dec !== undefined && 
+                         data.Lhw !== undefined && data.Dhw !== undefined && data.n !== undefined && 
+                         data.Np !== undefined ? (
+                          <div>Application: {data.dα?.toFixed(4)} · {data.γ?.toFixed(2)} · ({data.Lp?.toFixed(2)} · {data.Dep?.toFixed(2)}² + {data.L0c?.toFixed(2)} · {data.dec?.toFixed(2)}² + {data.Lhw?.toFixed(2)} · {data.Dhw?.toFixed(2)}²) · {data.n?.toFixed(2)}^1.7 = {data.Np?.toFixed(2)}</div>
+                        ) : (
+                          <div>Result: {data.Np?.toFixed(4) || 'N/A'}</div>
+                        )}
+                      </div>
+                      
+                      <div className="font-medium">NB:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: {data.formulas.NB || 'Not available'}</div>
+                        {data.WOB !== undefined && data.DB !== undefined && data.n !== undefined && data.NB !== undefined ? (
+                          <div>Application: 3.2 · 10^-4 · ({data.WOB?.toFixed(2)}^0.5) · (({data.DB?.toFixed(2)}/10)^1.75) · {data.n?.toFixed(2)} = {data.NB?.toFixed(2)}</div>
+                        ) : (
+                          <div>Result: {data.NB?.toFixed(4) || 'N/A'}</div>
+                        )}
+                      </div>
                       
                       <div className="font-medium">tau:</div>
-                      <div>{data.tau.toFixed(4)}</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: {data.formulas.tau || 'Not available'}</div>
+                        {data.Np !== undefined && data.NB !== undefined && data.n !== undefined && data.Mp !== undefined ? (
+                          <div>Application: (30 · (({data.Np?.toFixed(2)} + {data.NB?.toFixed(2)}) · 10^3 / (π · {data.n?.toFixed(2)} · {data.Mp?.toFixed(2)} · 10^-9))) · 10^-6 = {data.tau.toFixed(4)}</div>
+                        ) : (
+                          <div>Result: {data.tau.toFixed(4)}</div>
+                        )}
+                      </div>
                       
                       <div className="font-medium">eq:</div>
-                      <div>{data.eq.toFixed(4)}</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: {data.formulas.eq || 'Not available'}</div>
+                        {data.Tec !== undefined && data.tau !== undefined ? (
+                          <div>Application: sqrt(({data.Tec.toFixed(2)}·10^-1)² + 4·{data.tau.toFixed(4)}²) = {data.eq.toFixed(4)}</div>
+                        ) : (
+                          <div>Result: {data.eq.toFixed(4)}</div>
+                        )}
+                      </div>
                       
                       <div className="font-medium">C_new:</div>
-                      <div>{data.C_new.toFixed(4)}</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Formula: {data.formulas.C_new || 'Not available'}</div>
+                        <div>Application: {data.eq.toFixed(4)} · 1.5 = {data.C_new.toFixed(4)}</div>
+                      </div>
                       
                       <div className="font-medium">SegmaC:</div>
                       <div>{data.SegmaC.toFixed(2)} (MPa)</div>
@@ -715,12 +1939,6 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm">
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="font-medium">Np:</div>
-                      <div>{data.Np?.toFixed(4) || 'N/A'}</div>
-                      
-                      <div className="font-medium">NB:</div>
-                      <div>{data.NB?.toFixed(4) || 'N/A'}</div>
-                      
                       <div className="font-medium">Mp:</div>
                       <div>{data.Mp?.toFixed(4) || 'N/A'}</div>
                       
@@ -767,24 +1985,28 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div className="grid grid-cols-1 gap-2">
-                        <div className="font-medium">Numerator:</div>
+                        <div className="font-medium">Numerator Calculation:</div>
                         <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                          {data.numerator_formula || `${data.numerator?.toFixed(4)}`}
+                          <div className="mb-1">Formula: {data.numerator_formula || 'Numerator calculation formula'}</div>
+                          <div>Result: {data.numerator?.toFixed(4) || 'N/A'}</div>
                         </div>
                         
-                        <div className="font-medium">Denominator:</div>
+                        <div className="font-medium">Denominator Calculation:</div>
                         <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                          {data.denominator_formula || `${data.denominator?.toFixed(4)}`}
+                          <div className="mb-1">Formula: {data.denominator_formula || 'Denominator calculation formula'}</div>
+                          <div>Result: {data.denominator?.toFixed(4) || 'N/A'}</div>
                         </div>
                         
                         <div className="font-medium">Square Root Result:</div>
                         <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                          {data.sqrt_result_formula || `${data.sqrt_result?.toFixed(4)}`}
+                          <div className="mb-1">Formula: {data.sqrt_result_formula || 'sqrt(Numerator / Denominator)'}</div>
+                          <div>Application: sqrt({data.numerator?.toFixed(4) || 'N/A'} / {data.denominator?.toFixed(4) || 'N/A'}) = {data.sqrt_result?.toFixed(4) || 'N/A'}</div>
                         </div>
                         
-                        <div className="font-medium">Lmax Subtraction Formula:</div>
+                        <div className="font-medium">Final Lmax Calculation:</div>
                         <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                          {data.subtraction_formula || `Lmax = ${data.Lmax.toFixed(4)}`}
+                          <div className="mb-1">Formula: {data.subtraction_formula || 'Lmax calculation formula'}</div>
+                          <div>Result: {data.Lmax.toFixed(4)} (m)</div>
                         </div>
                       </div>
                     </CardContent>
@@ -793,90 +2015,84 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                 
                 <Card className="bg-white/80 dark:bg-background/80 md:col-span-2">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Formulas Used</CardTitle>
+                    <CardTitle className="text-sm">Metal Grade Analysis</CardTitle>
+                    <CardDescription>Detailed analysis of metal grade selection for each section</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="font-medium">T Formula:</div>
-                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        {data.formulas.T || 'Not available'}
-                      </div>
-                      
-                      <div className="font-medium">Tc Formula:</div>
-                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        {data.formulas.Tc || 'Not available'}
-                      </div>
-                      
-                      <div className="font-medium">Tec Formula:</div>
-                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        {data.formulas.Tec || 'Not available'}
-                      </div>
-                      
-                      <div className="font-medium">Np Formula:</div>
-                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        {data.formulas.Np || 'Not available'}
-                      </div>
-                      
-                      <div className="font-medium">NB Formula:</div>
-                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        {data.formulas.NB || 'Not available'}
-                      </div>
-                      
-                      <div className="font-medium">tau Formula:</div>
-                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        {data.formulas.tau || 'Not available'}
-                      </div>
-                      
-                      <div className="font-medium">eq Formula:</div>
-                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        {data.formulas.eq || 'Not available'}
-                      </div>
-                      
-                      <div className="font-medium">C_new Formula:</div>
-                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        {data.formulas.C_new || 'Not available'}
-                      </div>
+                  <CardContent>
+                    <div className="space-y-6">
+                      {debugData.map((data, index) => (
+                        <div key={index} className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-3 w-3 rounded-full bg-primary"></div>
+                            <h4 className="font-medium">{data.section || `Section ${index + 1}`}</h4>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-4">
+                              <div>
+                                <div className="font-medium mb-2">Selected Metal Grade:</div>
+                                <div className="bg-green-50 dark:bg-green-900/30 p-2 rounded text-xs">
+                                  <span className="font-mono font-bold">{data.metalGradeCalculation?.selectedGrade || 'Not available'}</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="font-medium mb-2">Required MPI Value:</div>
+                                <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                                  {data.metalGradeCalculation?.mpiSearchValue?.toFixed(2) || 'N/A'} MPa
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="font-medium mb-2">Selection Method:</div>
+                                <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs">
+                                  {data.metalGradeCalculation?.selectionMethod || 'Nearest MPI Match'}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="font-medium mb-2">Grade Comparison:</div>
+                              <div className="overflow-auto rounded-md border border-amber-200/50 dark:border-amber-800/30">
+                                <table className="w-full text-xs">
+                                  <thead>
+                                    <tr className="border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/80 dark:bg-amber-900/30">
+                                      <th className="px-3 py-2 text-left font-medium">Grade</th>
+                                      <th className="px-3 py-2 text-left font-medium">Strength (MPa)</th>
+                                      <th className="px-3 py-2 text-left font-medium">Difference</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {data.metalGradeCalculation?.comparisons?.map((comparison, i) => (
+                                      <tr 
+                                        key={i}
+                                        className={`border-b border-amber-200/50 dark:border-amber-800/30 last:border-0 ${
+                                          comparison.selected ? 'bg-green-50 dark:bg-green-900/20' : ''
+                                        }`}
+                                      >
+                                        <td className="px-3 py-2">{comparison.grade}</td>
+                                        <td className="px-3 py-2">{comparison.strength}</td>
+                                        <td className="px-3 py-2">{comparison.distance.toFixed(2)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="font-medium mb-2">Selection Process:</div>
+                            <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs">
+                              {data.metalGradeCalculation?.explanation || 
+                               'The metal grade is selected by finding the grade with tensile strength closest to the required MPI value.'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
-                
-                {data.availableGrades && data.availableGrades.length > 0 && (
-                  <Card className="bg-white/80 dark:bg-background/80 md:col-span-2">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Metal Grade Selection</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div>
-                        <div className="font-medium">Available Grades:</div>
-                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
-                          {data.availableGrades.map((grade, i) => (
-                            <span key={i} className="inline-block mr-2 mb-1 px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs">
-                              {grade}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <div className="font-medium">Available Strengths (MPa):</div>
-                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
-                          {data.availableStrengths.map((strength, i) => (
-                            <span key={i} className="inline-block mr-2 mb-1 px-2 py-1 bg-amber-100 dark:bg-amber-900/50 rounded text-xs">
-                              {strength}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <div className="font-medium">Selected MPI:</div>
-                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded">
-                          {data.nearestMpi || 'Not available'}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
               </div>
             </div>
           ))}
@@ -901,7 +2117,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
               <h3 className="text-lg font-medium">Drill Collar Design</h3>
             </div>
             
-        <div className="flex gap-2">
+            <div className="flex gap-2">
               <Button 
                 onClick={downloadTemplateFile} 
                 variant="outline" 
@@ -917,24 +2133,24 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                 disabled={isLoading} 
                 className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
               >
-            {isLoading ? (
-              <>
+                {isLoading ? (
+                  <>
                     <LoaderCircle className="h-4 w-4 animate-spin" />
                     <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                <Calculator className="h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    <Calculator className="h-4 w-4" />
                     <span>Calculate</span>
-              </>
-            )}
-          </Button>
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </motion.div>
       ) : null}
       
-          {localDrillCollarResults.length > 0 && (
+      {localDrillCollarResults.length > 0 && (
         <motion.div 
           className="space-y-6"
           key="results"
@@ -957,6 +2173,16 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
               >
                 <FileDown className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Download</span>
+              </Button>
+              
+              <Button 
+                onClick={() => setShowCopyableDebug(true)} 
+                variant="outline" 
+                size="sm"
+                className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:hover:bg-amber-800/50 dark:text-amber-300 dark:border-amber-700/50"
+              >
+                <Bug className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Debug Data</span>
               </Button>
               
               <Button 
@@ -988,7 +2214,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                 <X className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Clear</span>
               </Button>
-                </div>
+            </div>
           </div>
           
           {renderResultsTable()}
@@ -1000,19 +2226,6 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                   <div className="h-5 w-1 bg-primary rounded-full"></div>
                   <h3 className="text-lg font-medium">Metal Grade Results</h3>
                 </div>
-                
-                <Button 
-                  onClick={() => setShowDebugInfo(!showDebugInfo)} 
-                  variant="outline" 
-                  size="sm"
-                  className={cn(
-                    "flex items-center gap-1.5",
-                    showDebugInfo ? "text-amber-600 border-amber-300 dark:border-amber-700" : "text-muted-foreground"
-                  )}
-                >
-                  <Bug className="h-3.5 w-3.5" />
-                  <span>{showDebugInfo ? "Hide Debug" : "Show Debug"}</span>
-                </Button>
               </div>
               
               <div className="overflow-auto rounded-md border border-border/50 bg-background/80">
@@ -1022,6 +2235,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Section</th>
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Metal Grade</th>
                       <th className="px-4 py-3 text-left font-medium text-muted-foreground">Max Length (Lmax)</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Section Depth (H)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1034,6 +2248,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                           <td className="px-4 py-3">{formatSection(calc.section)}</td>
                           <td className="px-4 py-3 font-medium text-primary">{calc.drillPipeMetalGrade}</td>
                           <td className="px-4 py-3">{!isNaN(lmaxValue) ? lmaxValue.toFixed(2) : '0.00'} m</td>
+                          <td className="px-4 py-3" data-h-value={calc.H}>
+                            {calc.H ? `${Number(calc.H).toFixed(2)} m` : 'N/A'}
+                          </td>
                         </tr>
                       );
                     })}
@@ -1043,9 +2260,13 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
             </div>
           )}
           
-          {renderDebugInfo()}
+          {showDebugInfo && debugData.length > 0 ? (
+            renderDebugInfo()
+          ) : null}
         </motion.div>
       )}
+      
+      {renderCopyableDebugModal()}
     </div>
   );
 } 

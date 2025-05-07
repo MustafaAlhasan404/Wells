@@ -160,8 +160,6 @@ export function calculateObjective(y: number, z: number): number {
   const zSquared = Math.pow(z, 2);
   const result = ySquared + yz + zSquared;
   
-  console.log(`OBJECTIVE CALC: y=${y}, z=${z}, y²=${ySquared}, y×z=${yz}, z²=${zSquared}, result=${result}`);
-  
   return result;
 }
 
@@ -178,20 +176,11 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
     return hadDataArray;
   }
   
-  console.log("Starting L value calculations with data:", JSON.stringify(hadDataArray, null, 2));
-  
   // Create a copy of the array to avoid mutating the original
   const updatedData = [...hadDataArray];
   
   // Sort by HAD values (assumption: higher HAD values first)
   updatedData.sort((a, b) => b.had - a.had);
-  
-  console.log("Sorted data:", updatedData.map(item => ({
-    had: item.had,
-    metalType: item.metalType,
-    unitWeight: item.unitWeight,
-    tensileStrength: item.tensileStrength
-  })));
   
   // Get the rows (first 4 or fewer as available)
   const rows = updatedData.slice(0, Math.min(4, updatedData.length));
@@ -206,9 +195,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
   
   if (H === 0) {
     H = rows[0]?.had || 2000; // Default if no depth found
-    console.log("No depth found, using HAD as depth:", H);
-  } else {
-    console.log("Using depth (H) for calculations:", H);
   }
   
   // Check if we need to borrow data from other sections
@@ -216,8 +202,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
   
   // If we have allSectionsData and not enough rows in current section, use data from other sections
   if (allSectionsData && allSectionsData.length > 0 && rows.length < 3) {
-    console.log("Not enough HAD values in current section, borrowing from all sections");
-    
     // Sort all sections data by HAD values
     const sortedAllData = [...allSectionsData].sort((a, b) => b.had - a.had);
     
@@ -235,21 +219,12 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       
       if (rowToAdd) {
         calculationRows.push(rowToAdd);
-        console.log(`Borrowed row with HAD=${rowToAdd.had} from other sections`);
       }
     }
-    
-    console.log("Calculation rows after borrowing:", calculationRows.map(item => ({
-      had: item.had,
-      metalType: item.metalType
-    })));
   }
   
   // We need at least 2 rows for L1 calculation
   if (calculationRows.length >= 2) {
-    console.log("======= IMPROVED SEARCH FOR EXACT OBJECTIVE VALUE (1.0) WITH DEPTH CONSTRAINT =======");
-    console.log(`Depth constraint: L1 + L2 + L3 <= ${H} meters`);
-    
     // Function to calculate y1, z1 for a given L1
     const calculateY1Z1 = (L1: number) => {
       const y1 = (H - L1) / calculationRows[1].had;
@@ -313,16 +288,13 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
           
           // Early exit if we find an excellent match
           if (diff < tolerance) {
-            console.log(`[COARSE SEARCH] Found excellent L1 match: ${L1}, condition=${condition.toFixed(6)}, diff=${diff.toFixed(6)}`);
-          break;
+            break;
+          }
         }
-      }
       }
       
       // Now do binary search for more precision, starting from our best approximation
       if (bestDiff > tolerance) {
-        console.log(`[BINARY SEARCH] Starting binary search around L1=${bestL1}, initial diff=${bestDiff.toFixed(6)}`);
-        
         // Set search range around the best L1 found
         minL1 = Math.max(10, bestL1 - 100);
         maxL1 = Math.min(H * 0.95, bestL1 + 100);
@@ -384,11 +356,8 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
             maxL1 = rightL1;
           }
           
-          console.log(`[BINARY SEARCH] Iteration ${iteration}, L1 range: ${minL1.toFixed(2)}-${maxL1.toFixed(2)}, best diff: ${bestDiff.toFixed(6)}`);
-          
           // Early exit if we find an excellent match
           if (bestDiff < tolerance) {
-            console.log(`[BINARY SEARCH] Found excellent L1 match: ${bestL1}, condition=${calculateObjective(bestY1, bestZ1).toFixed(6)}, diff=${bestDiff.toFixed(6)}`);
             break;
           }
         }
@@ -396,8 +365,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       
       // If we need even more precision, use final fine-tuning
       if (bestDiff > tolerance) {
-        console.log(`[FINE TUNING] Starting fine tuning around L1=${bestL1.toFixed(2)}, initial diff=${bestDiff.toFixed(6)}`);
-        
         // Very small step size for final tuning
         const fineStep = 0.01;
         const fineRange = 1.0; // Search 1 meter in each direction
@@ -420,14 +387,11 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
             
             // Early exit if we find an excellent match
             if (diff < tolerance) {
-              console.log(`[FINE TUNING] Found excellent L1 match: ${testL1}, condition=${condition.toFixed(6)}, diff=${diff.toFixed(6)}`);
               break;
             }
           }
         }
       }
-      
-      console.log(`[FINAL L1] Best L1: ${bestL1.toFixed(2)}, condition: ${calculateObjective(bestY1, bestZ1).toFixed(6)}, diff: ${bestDiff.toFixed(6)}`);
       
       return {
         L1: bestL1,
@@ -455,7 +419,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       
       if (maxL2 <= minL2) {
         // If L1 is too large, there's not enough room for a reasonable L2
-        console.log(`[L2 SEARCH] L1 (${L1.toFixed(2)}) is too large, not enough room for a proper L2.`);
         return { 
           L2: Math.max(10, H - L1 - 10), 
           y2: 0, 
@@ -478,7 +441,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
           
           // Early exit if we find an excellent match
           if (diff < tolerance) {
-            console.log(`[COARSE SEARCH] Found excellent L2 match: ${L2}, condition=${condition.toFixed(6)}, diff=${diff.toFixed(6)}`);
             break;
           }
         }
@@ -486,8 +448,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       
       // Now do binary search for more precision, starting from our best approximation
       if (bestDiff > tolerance) {
-        console.log(`[BINARY SEARCH] Starting binary search around L2=${bestL2}, initial diff=${bestDiff.toFixed(6)}`);
-        
         // Set search range around the best L2 found
         minL2 = Math.max(10, bestL2 - 100);
         maxL2 = Math.min(H - L1 - 10, bestL2 + 100);
@@ -546,11 +506,8 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
             maxL2 = rightL2;
           }
           
-          console.log(`[BINARY SEARCH] Iteration ${iteration}, L2 range: ${minL2.toFixed(2)}-${maxL2.toFixed(2)}, best diff: ${bestDiff.toFixed(6)}`);
-          
           // Early exit if we find an excellent match
           if (bestDiff < tolerance) {
-            console.log(`[BINARY SEARCH] Found excellent L2 match: ${bestL2}, condition=${calculateObjective(bestY2, bestZ2).toFixed(6)}, diff=${bestDiff.toFixed(6)}`);
             break;
           }
         }
@@ -558,8 +515,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       
       // If we need even more precision, use final fine-tuning
       if (bestDiff > tolerance) {
-        console.log(`[FINE TUNING] Starting fine tuning around L2=${bestL2.toFixed(2)}, initial diff=${bestDiff.toFixed(6)}`);
-        
         // Very small step size for final tuning
         const fineStep = 0.01;
         const fineRange = 1.0; // Search 1 meter in each direction
@@ -581,14 +536,11 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
             
             // Early exit if we find an excellent match
             if (diff < tolerance) {
-              console.log(`[FINE TUNING] Found excellent L2 match: ${testL2}, condition=${condition.toFixed(6)}, diff=${diff.toFixed(6)}`);
               break;
             }
           }
         }
       }
-      
-      console.log(`[FINAL L2] Best L2: ${bestL2.toFixed(2)}, condition: ${calculateObjective(bestY2, bestZ2).toFixed(6)}, diff: ${bestDiff.toFixed(6)}`);
       
       return {
         L2: bestL2,
@@ -599,13 +551,8 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
     };
     
     // Improved solve strategy: first find optimal L1, then find optimal L2 given L1
-    console.log("Starting optimization process to find optimal L values...");
-    
     // Adjust calculation strategy based on number of rows
     if (rows.length === 1) {
-      // For a single row, just set L1 to the total depth
-      console.log(`Single row case: Setting L1 = depth (${H})`);
-      
       rows[0].L1 = H;
       // Calculate y1 and z1 for completeness (but they won't be used for condition check)
       const { y1, z1 } = calculateY1Z1(H);
@@ -617,9 +564,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       rows[0].conditionMet = true;
     } 
     else if (rows.length === 2) {
-      // For two rows: Calculate optimal L1, then set L2 = H - L1
-      console.log(`Two-row case: Calculate optimal L1, then L2 = ${H} - L1`);
-      
       // Find optimal L1
       const { L1, y1, z1, condition: condition1 } = findOptimalL1();
       
@@ -628,12 +572,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       
       // Calculate y2, z2 for the assigned L2
       const { y2, z2, condition: condition2 } = calculateY2Z2(L1, L2);
-      
-      console.log(`======= TWO-ROW OPTIMIZATION COMPLETED =======`);
-      console.log(`Final values: L1=${L1.toFixed(2)}, L2=${L2.toFixed(2)}`);
-      console.log(`Total coverage: ${(L1 + L2).toFixed(2)}/${H} meters (100%)`);
-      console.log(`L1 condition: ${condition1.toFixed(6)}, diff from 1: ${Math.abs(condition1-1).toFixed(6)}`);
-      console.log(`L2 condition: ${condition2.toFixed(6)}, diff from 1: ${Math.abs(condition2-1).toFixed(6)}`);
       
       // Apply values to dataset
       rows[0].L1 = L1;
@@ -649,9 +587,7 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       rows[1].conditionMet = Math.abs(condition2 - 1) < 0.001;
     } 
     else if (rows.length >= 3) {
-      // For 3+ rows: Find the best L1, L2 that satisfy conditions as closely as possible
-      console.log(`${rows.length}-row case: Calculate optimal L1 and L2, distribute remaining depth`);
-      
+      // Find the best L1, L2 that satisfy conditions as closely as possible
       // Find optimal L1
       const { L1, y1, z1, condition: condition1 } = findOptimalL1();
       
@@ -666,7 +602,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       if (rows.length === 3) {
         // For 3 rows, assign all remaining depth to L3
         L3 = remainingDepth;
-        console.log(`Three-row case: Assigning remaining ${L3.toFixed(2)}m to L3`);
       } 
       else if (rows.length >= 4) {
         // For 4+ rows, optimize L3 so that the condition check for row 3 is as close to 1 as possible
@@ -696,14 +631,7 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
         L3 = bestL3;
         // Assign the rest to L4
         L4 = remainingDepth - L3;
-        console.log(`Four-row case: Optimized L3=${L3.toFixed(2)}m (condition3=${bestCondition3.toFixed(6)}), L4=${L4.toFixed(2)}m`);
       }
-      
-      console.log(`======= MULTI-ROW OPTIMIZATION COMPLETED =======`);
-      console.log(`Final values: L1=${L1.toFixed(2)}, L2=${L2.toFixed(2)}, L3=${L3.toFixed(2)}, L4=${L4.toFixed(2)}`);
-      console.log(`Total coverage: ${(L1 + L2 + L3 + L4).toFixed(2)}/${H} meters (100%)`);
-      console.log(`L1 condition: ${condition1.toFixed(6)}, diff from 1: ${Math.abs(condition1-1).toFixed(6)}`);
-      console.log(`L2 condition: ${condition2.toFixed(6)}, diff from 1: ${Math.abs(condition2-1).toFixed(6)}`);
       
       // Apply values to dataset
       rows[0].L1 = L1;
@@ -754,7 +682,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
   } 
   else if (rows.length === 1 && rows[0].depth) {
     // Special case for single row with depth already set
-    console.log(`Single row with depth ${rows[0].depth}, assigning L1 directly.`);
     rows[0].L1 = rows[0].depth;
   }
   
@@ -789,10 +716,6 @@ export function calculateLValues(hadDataArray: HADData[], allSectionsData?: HADD
       lValues.push(`L4=${row.L4.toFixed(2)}`);
     }
   }
-  
-  console.log(`Final depth verification: ${lValues.join(' + ')} = ${totalL.toFixed(2)}/${H} (${(totalL/H*100).toFixed(1)}%)`);
-  
-  console.log("Final calculated data:", JSON.stringify(rows, null, 2));
   
   return updatedData;
 }

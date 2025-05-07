@@ -48,7 +48,6 @@ const debugLog = (section: string, message: string, data?: any) => {
   if (!DEBUG_ENABLED) return;
   
   console.group(`🔍 DEBUG [${section}]`);
-  console.log(message);
   if (data !== undefined) {
     console.log('Data:', data);
   }

@@ -94,11 +94,6 @@ export function FileUploadProvider({ children }: { children: ReactNode }) {
   
   // Custom setter with logging for pump results
   const setPumpResults = (results: PumpResult[]) => {
-    console.log("FileUploadContext: Setting pump results", {
-      count: results.length,
-      instances: results.length > 0 ? Array.from(new Set(results.map(p => p.instance))) : [],
-      firstResult: results[0] || null
-    });
     setPumpResultsInternal(results);
   };
 

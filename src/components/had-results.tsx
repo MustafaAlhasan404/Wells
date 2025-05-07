@@ -54,9 +54,6 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData, casingResults = [] }) 
     });
     
     setProcessedData(processed);
-    
-    // Force UI refresh after calculation
-    console.log('HAD data processed:', new Date().toISOString());
   }, [hadData, JSON.stringify(hadData)]); // Added JSON.stringify to detect deep changes
   
   if (!processedData) return null;

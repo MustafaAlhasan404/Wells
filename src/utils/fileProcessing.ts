@@ -16,14 +16,11 @@ export async function findAtBodyValue(
   atHeadValue: number
 ): Promise<string | null> {
   try {
-    console.log(`Finding at_body value for at_head: ${atHeadValue}`);
     const workbook = XLSX.read(new Uint8Array(fileBuffer), { type: 'array' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     
     // First try direct cell exploration to match Python's behavior
     try {
-      console.log("Attempting direct cell exploration for at_head/at_body columns");
-      
       // These are common column positions in standard templates
       const potentialAtHeadColumns = ["A", "B", "C", "D"];
       const potentialAtBodyColumns = ["B", "C", "D", "E", "F"];
@@ -40,12 +37,10 @@ export async function findAtBodyValue(
           
           if (cell && cell.v) {
             const cellValue = typeof cell.v === 'string' ? cell.v.toLowerCase() : String(cell.v).toLowerCase();
-            console.log(`Checking cell ${cellRef} for at_head: "${cellValue}"`);
             
             if (cellValue.includes('at head') || cellValue.includes('od') || 
                 cellValue.includes('outside diameter') || cellValue.includes('outer diameter')) {
               atHeadColLetter = col;
-              console.log(`Found at_head column at ${cellRef}: "${cellValue}"`);
               break;
             }
           }
@@ -58,12 +53,10 @@ export async function findAtBodyValue(
           
           if (cell && cell.v) {
             const cellValue = typeof cell.v === 'string' ? cell.v.toLowerCase() : String(cell.v).toLowerCase();
-            console.log(`Checking cell ${cellRef} for at_body: "${cellValue}"`);
             
             if (cellValue.includes('at body') || cellValue.includes('weight') || 
                 cellValue.includes('nominal') || cellValue.includes('lb/ft')) {
               atBodyColLetter = col;
-              console.log(`Found at_body column at ${cellRef}: "${cellValue}"`);
               break;
             }
           }
@@ -71,7 +64,6 @@ export async function findAtBodyValue(
         
         if (atHeadColLetter && atBodyColLetter) {
           // Found both columns, now search for matching at_head value
-          console.log(`Found columns via direct cell access - at_head: ${atHeadColLetter}, at_body: ${atBodyColLetter}`);
           
           // Start from the row after header and look for matching at_head value
           for (let dataRow = row + 1; dataRow <= 1000; dataRow++) {
@@ -100,7 +92,6 @@ export async function findAtBodyValue(
             
             // Check if this row matches our target at_head value with a more generous tolerance
             if (rowAtHead !== null && !isNaN(rowAtHead) && Math.abs(rowAtHead - atHeadValue) < 0.1) {
-              console.log(`Found matching at_head value ${rowAtHead} at row ${dataRow}`);
               
               // Get corresponding at_body value
               const atBodyCell = sheet[`${atBodyColLetter}${dataRow}`];
@@ -123,17 +114,13 @@ export async function findAtBodyValue(
                     numericAtBodyValue = parseFloat(match[1]);
                   }
                 } catch (e) {
-                  console.error(`Error parsing at_body value: ${atBodyValue}`, e);
                 }
                 
                 // Ensure we have a valid numeric value and it's different from at_head
                 if (numericAtBodyValue !== null && !isNaN(numericAtBodyValue) && 
                     Math.abs(numericAtBodyValue - atHeadValue) >= 0.1) {
-                  console.log(`Found valid at_body value: "${atBodyValue}" for at_head: ${rowAtHead}`);
                   return atBodyValue;
                 } else {
-                  console.log(`Found invalid or duplicate at_body value: "${atBodyValue}" for at_head: ${rowAtHead}`);
-                  // Continue searching since this at_body value is the same as at_head or invalid
                 }
               }
             }
@@ -141,18 +128,10 @@ export async function findAtBodyValue(
         }
       }
     } catch (directCellError) {
-      console.error("Error in direct cell exploration for at_head/at_body:", directCellError);
     }
     
     // Fall back to the original method with enhanced flexibility
-    console.log("Falling back to enhanced column detection method for at_head/at_body");
     const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-    
-    // Log the first few rows to help with debugging
-    console.log("First 5 rows of data:");
-    for (let i = 0; i < Math.min(5, data.length); i++) {
-      console.log(`Row ${i}:`, data[i]);
-    }
     
     let atHeadCol = -1;
     let atBodyCol = -1;
@@ -178,14 +157,10 @@ export async function findAtBodyValue(
       'At body', 'at body'
     ];
     
-    console.log("Searching for at_head and at_body columns with expanded variations");
-    
     // First try exact matches
     for (let rowIdx = 0; rowIdx < Math.min(15, data.length); rowIdx++) {
       const row = data[rowIdx];
       if (!row) continue;
-      
-      console.log(`Examining row ${rowIdx} for at_head/at_body headers:`, row);
       
       for (let colIdx = 0; colIdx < row.length; colIdx++) {
         if (row[colIdx] === undefined || row[colIdx] === null) continue;
@@ -197,12 +172,10 @@ export async function findAtBodyValue(
         // Check for exact matches
         if (atHeadCol === -1 && atHeadVariations.includes(cellValue.toLowerCase())) {
           atHeadCol = colIdx;
-          console.log(`Found exact match for at_head column at index ${colIdx}: "${cellValue}"`);
         }
         
         if (atBodyCol === -1 && atBodyVariations.includes(cellValue.toLowerCase())) {
           atBodyCol = colIdx;
-          console.log(`Found exact match for at_body column at index ${colIdx}: "${cellValue}"`);
         }
       }
       
@@ -226,14 +199,12 @@ export async function findAtBodyValue(
           if (atHeadCol === -1) {
             if (atHeadVariations.some(v => cellValue.includes(v))) {
               atHeadCol = colIdx;
-              console.log(`Found partial match for at_head column at index ${colIdx}: "${cellValue}"`);
             }
           }
           
           if (atBodyCol === -1) {
             if (atBodyVariations.some(v => cellValue.includes(v))) {
               atBodyCol = colIdx;
-              console.log(`Found partial match for at_body column at index ${colIdx}: "${cellValue}"`);
             }
           }
         }
@@ -244,33 +215,20 @@ export async function findAtBodyValue(
     
     // Last resort: try to infer columns by position
     if (atHeadCol === -1 || atBodyCol === -1) {
-      console.log("Trying to infer at_head/at_body columns by position");
-      
-      // In many templates, at_head is column 0 or 1, and at_body is column 1 or 2
       if (data.length > 0 && data[0].length >= 3) {
         if (atHeadCol === -1) {
           atHeadCol = 0;  // First column is often at_head/OD
-          console.log("Inferring at_head column as the first column (index 0)");
         }
         
         if (atBodyCol === -1) {
           atBodyCol = 1;  // Second column is often at_body/weight
-          console.log("Inferring at_body column as the second column (index 1)");
         }
       }
     }
     
     if (atHeadCol === -1 || atBodyCol === -1) {
-      console.error("Could not find required columns for at_head/at_body:", { 
-        atHeadFound: atHeadCol !== -1, 
-        atBodyFound: atBodyCol !== -1,
-        atHeadVariations,
-        atBodyVariations
-      });
       return null;
     }
-    
-    console.log(`Found columns - at_head at index ${atHeadCol}, at_body at index ${atBodyCol}`);
     
     // Search for matching at_head value with increased tolerance
     const TOLERANCE = 0.5;  // Increased tolerance to match more flexibly
@@ -296,11 +254,9 @@ export async function findAtBodyValue(
         }
         
         if (rowAtHead !== null && !isNaN(rowAtHead)) {
-          console.log(`Checking row ${rowIdx} with at_head value: ${rowAtHead} (target: ${atHeadValue})`);
           
           // Check with increased tolerance
           if (Math.abs(rowAtHead - atHeadValue) < TOLERANCE) {
-            console.log(`Found matching at_head value ${rowAtHead} with tolerance ${TOLERANCE}`);
             
             // Get at_body value
             let atBodyValue: string;
@@ -313,19 +269,16 @@ export async function findAtBodyValue(
                 atBodyValue = atBodyValue.split(' ').pop() || atBodyValue;
               }
               
-              console.log(`Found at_body value: "${atBodyValue}" for at_head: ${rowAtHead}`);
               return atBodyValue;
             }
           }
         }
       } catch (e) {
-        console.error(`Error parsing row ${rowIdx}:`, e);
         continue;
       }
     }
     
     // If we still haven't found a match, try a more aggressive approach
-    console.log("No exact match found, trying more aggressive matching");
     
     // Try to find the closest match instead of an exact match
     let closestRow = -1;
@@ -370,21 +323,16 @@ export async function findAtBodyValue(
         ? row[atHeadCol] 
         : parseFloat(String(row[atHeadCol]).replace(/[^\d.]/g, ''));
       
-      console.log(`Using closest match: at_head ${rowAtHead} with difference ${minDiff}`);
-      
       let atBodyValue = String(row[atBodyCol] || '');
       if (atBodyValue.includes(' ')) {
         atBodyValue = atBodyValue.split(' ').pop() || atBodyValue;
       }
       
-      console.log(`Found closest at_body value: "${atBodyValue}" for at_head: ${rowAtHead}`);
       return atBodyValue;
     }
     
-    console.log(`No matching or close at_body value found for at_head value: ${atHeadValue}`);
     return null;
   } catch (error) {
-    console.error('Error finding at_body value:', error);
     return null;
   }
 }
@@ -442,7 +390,6 @@ export async function extractValuesFromXlsx(
     
     return null;
   } catch (error) {
-    console.error('Error extracting values from XLSX:', error);
     return null;
   }
 }
@@ -458,7 +405,6 @@ export async function findNearestBitSizeAndInternalDiameter(
   bitSize: number
 ): Promise<[number | null, number | null]> {
   try {
-    console.log(`Processing file for bit size ${bitSize}`);
     const workbook = XLSX.read(new Uint8Array(fileBuffer), { type: 'array' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     
@@ -466,8 +412,6 @@ export async function findNearestBitSizeAndInternalDiameter(
     // This method directly accesses cells by reference rather than using sheet_to_json
     // which more closely matches the Python openpyxl access pattern
     try {
-      console.log("Attempting direct cell exploration for column detection");
-      
       // These are common column positions in standard templates
       const potentialBitSizeColumns = ["C", "D", "E", "F"];
       const potentialIdColumns = ["G", "H", "I", "J"];
@@ -484,11 +428,9 @@ export async function findNearestBitSizeAndInternalDiameter(
           
           if (cell && cell.v) {
             const cellValue = typeof cell.v === 'string' ? cell.v.toLowerCase() : String(cell.v).toLowerCase();
-            console.log(`Checking cell ${cellRef}: "${cellValue}"`);
             
             if (cellValue.includes('bit') || cellValue.includes('hole') || cellValue.includes('size') || cellValue.includes('diameter')) {
               bitSizeColLetter = col;
-              console.log(`Found bit size column at ${cellRef}: "${cellValue}"`);
               break;
             }
           }
@@ -501,11 +443,9 @@ export async function findNearestBitSizeAndInternalDiameter(
           
           if (cell && cell.v) {
             const cellValue = typeof cell.v === 'string' ? cell.v.toLowerCase() : String(cell.v).toLowerCase();
-            console.log(`Checking cell ${cellRef}: "${cellValue}"`);
             
             if (cellValue.includes('id') || cellValue.includes('internal') || cellValue.includes('inside') || cellValue.includes('diameter')) {
               idColLetter = col;
-              console.log(`Found ID column at ${cellRef}: "${cellValue}"`);
               break;
             }
           }
@@ -513,7 +453,6 @@ export async function findNearestBitSizeAndInternalDiameter(
         
         if (bitSizeColLetter && idColLetter) {
           // Found both columns, extract data
-          console.log(`Found columns via direct cell access - Bit Size: ${bitSizeColLetter}, ID: ${idColLetter}`);
           
           // Collect values
           const bitSizes: number[] = [];
@@ -563,7 +502,6 @@ export async function findNearestBitSizeAndInternalDiameter(
                 idValue !== null && !isNaN(idValue)) {
               bitSizes.push(bitSizeValue);
               internalDiameters.push(idValue);
-              console.log(`Found pair at row ${dataRow}: Bit Size = ${bitSizeValue}, ID = ${idValue}`);
             }
           }
           
@@ -580,18 +518,14 @@ export async function findNearestBitSizeAndInternalDiameter(
               }
             }
             
-            console.log(`Direct cell method found nearest match: ${bitSizes[nearestIndex]} with ID: ${internalDiameters[nearestIndex]}`);
             return [bitSizes[nearestIndex], internalDiameters[nearestIndex]];
           }
         }
       }
     } catch (directCellError) {
-      console.error("Error in direct cell exploration:", directCellError);
-      // Continue to the original method if direct cell method fails
     }
     
     // Fall back to the original method if direct cell exploration didn't work
-    console.log("Falling back to original column detection method");
     const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
     
     let bitSizeCol = -1;
@@ -627,16 +561,11 @@ export async function findNearestBitSizeAndInternalDiameter(
       'internal-diameter', 'inner-diameter', 'internal.diameter', 'inner.diameter'
     ];
     
-    console.log("Searching for bit size and internal diameter columns");
-    
     // Enhanced exact match first - check for exact matches before using includes
     for (let rowIdx = 0; rowIdx < Math.min(10, data.length); rowIdx++) {
       const row = data[rowIdx];
       if (!row) continue;
       
-      console.log(`Examining row ${rowIdx} for headers:`, row);
-      
-      // Try exact matches first
       for (let colIdx = 0; colIdx < row.length; colIdx++) {
         let cellValue = '';
         
@@ -652,14 +581,12 @@ export async function findNearestBitSizeAndInternalDiameter(
         if (bitSizeCol === -1) {
           if (bitSizeVariations.includes(cellValue)) {
             bitSizeCol = colIdx;
-            console.log(`Found exact match for bit size column at index ${colIdx} with value: "${cellValue}"`);
           }
         }
         
         if (internalDiameterCol === -1) {
           if (internalDiameterVariations.includes(cellValue)) {
             internalDiameterCol = colIdx;
-            console.log(`Found exact match for internal diameter column at index ${colIdx} with value: "${cellValue}"`);
           }
         }
       }
@@ -689,12 +616,10 @@ export async function findNearestBitSizeAndInternalDiameter(
             // First check if it contains "bit" or "hole"
             if (cellValue.includes('bit') || cellValue.includes('hole')) {
               bitSizeCol = colIdx;
-              console.log(`Found bit size column at index ${colIdx} with value: "${cellValue}"`);
             }
             // Then check for other variations
             else if (bitSizeVariations.some(variation => cellValue.includes(variation))) {
               bitSizeCol = colIdx;
-              console.log(`Found bit size variation at index ${colIdx} with value: "${cellValue}"`);
             }
           }
           
@@ -703,17 +628,14 @@ export async function findNearestBitSizeAndInternalDiameter(
             if (cellValue === 'id' || cellValue.includes(' id ') || cellValue.includes('i.d') || 
                 cellValue.startsWith('id ') || cellValue.endsWith(' id')) {
               internalDiameterCol = colIdx;
-              console.log(`Found ID column at index ${colIdx} with value: "${cellValue}"`);
             }
             // Then check for internal diameter
             else if (cellValue.includes('internal') && cellValue.includes('diameter')) {
               internalDiameterCol = colIdx;
-              console.log(`Found internal diameter column at index ${colIdx} with value: "${cellValue}"`);
             }
             // Finally check other variations
             else if (internalDiameterVariations.some(variation => cellValue.includes(variation))) {
               internalDiameterCol = colIdx;
-              console.log(`Found ID variation at index ${colIdx} with value: "${cellValue}"`);
             }
           }
         }
@@ -726,8 +648,6 @@ export async function findNearestBitSizeAndInternalDiameter(
     
     // Special case for the exact Excel format from the image (Wall Thickness in column G)
     if (internalDiameterCol === -1) {
-      console.log("Trying special case detection for wall thickness in column G");
-      // Check for headers that might contain "wall thickness" or just "wall" in early rows
       for (let rowIdx = 0; rowIdx < 10 && internalDiameterCol === -1; rowIdx++) {
         const row = data[rowIdx];
         if (!row || row.length < 7) continue;
@@ -737,7 +657,6 @@ export async function findNearestBitSizeAndInternalDiameter(
           const cellText = typeof cellG === 'string' ? cellG.toLowerCase() : String(cellG).toLowerCase();
           if (cellText.includes('wall') || cellText.includes('thickness')) {
             internalDiameterCol = 6;
-            console.log(`Special case: Found wall thickness in column G (index 6) with text: "${cellText}"`);
             break;
           }
         }
@@ -748,20 +667,11 @@ export async function findNearestBitSizeAndInternalDiameter(
     // try to use column G as wall thickness column
     if (internalDiameterCol === -1 && bitSizeCol !== -1) {
       internalDiameterCol = 6; // Column G
-      console.log("Last resort: Using column G (index 6) for wall thickness");
     }
     
     if (bitSizeCol === -1 || internalDiameterCol === -1) {
-      console.error("Required columns not found after all attempts:", {
-        bitSizeFound: bitSizeCol !== -1,
-        internalDiameterFound: internalDiameterCol !== -1,
-        bitSizeVariations,
-        internalDiameterVariations
-      });
       return [null, null];
     }
-    
-    console.log(`Found columns - Bit Size at index ${bitSizeCol}, Internal Diameter at index ${internalDiameterCol}`);
     
     // Extract values from the columns with enhanced numeric parsing
     let bitSizes: number[] = [];
@@ -813,10 +723,7 @@ export async function findNearestBitSizeAndInternalDiameter(
       }
     }
     
-    console.log(`Extracted ${bitSizes.length} valid bit size/internal diameter pairs`);
-    
     if (bitSizes.length === 0) {
-      console.error("No valid bit size/internal diameter pairs found in the file");
       return [null, null];
     }
     
@@ -832,11 +739,8 @@ export async function findNearestBitSizeAndInternalDiameter(
       }
     }
     
-    console.log(`Found nearest bit size match: ${bitSizes[nearestIndex]} with internal diameter: ${internalDiameters[nearestIndex]}`);
-    
     return [bitSizes[nearestIndex], internalDiameters[nearestIndex]];
   } catch (error) {
-    console.error('Error finding nearest bit size and internal diameter:', error);
     return [null, null];
   }
 }
@@ -902,7 +806,6 @@ export async function findReferenceFromXlsx(
     
     return [`Internal Diameter: ${internalDiameterValue}, At head: Not found`, null];
   } catch (error) {
-    console.error('Error finding reference:', error);
     return [`Internal Diameter: ${internalDiameterValue}, At head: Error`, null];
   }
 }
@@ -939,55 +842,40 @@ export async function extractAdditionalInfo(
       
       const rowText = row.map(cell => typeof cell === 'string' ? cell.trim().toLowerCase() : String(cell).trim().toLowerCase());
       
-      // Log row for debugging
-      if (rowIdx < 10) {
-        console.log(`Row ${rowIdx} headers:`, rowText);
-      }
-      
       if (rowText.includes('at head')) {
         atHeadCol = rowText.indexOf('at head');
-        console.log('Found at_head column at index', atHeadCol);
       }
       if (rowText.includes('external pressure mpa')) {
         externalPressureCol = rowText.indexOf('external pressure mpa');
-        console.log('Found external pressure column at index', externalPressureCol);
       }
       if (rowText.includes('metal type')) {
         metalTypeCol = rowText.indexOf('metal type');
-        console.log('Found metal type column at index', metalTypeCol);
       }
       if (rowText.includes('tensile strength at body tonf')) {
         tensileStrengthCol = rowText.indexOf('tensile strength at body tonf');
-        console.log('Found tensile strength column at index', tensileStrengthCol);
       }
       if (rowText.includes('unit weight length lbs/ft')) {
         unitWeightCol = rowText.indexOf('unit weight length lbs/ft');
-        console.log('Found unit weight column at index', unitWeightCol);
       }
       if (rowText.includes('internal diameter')) {
         internalDiameterCol = rowText.indexOf('internal diameter');
-        console.log('Found internal diameter column at index', internalDiameterCol);
       }
       // Wall thickness column detection with improved logging
       if (rowText.includes('wall thickness mm')) {
         wallThicknessCol = rowText.indexOf('wall thickness mm');
-        console.log('Found wall thickness column at index', wallThicknessCol, 'with exact match: wall thickness mm');
       }
       // Add more variations for wall thickness column detection
       else if (rowText.includes('wall thickness')) {
         wallThicknessCol = rowText.indexOf('wall thickness');
-        console.log('Found wall thickness column at index', wallThicknessCol, 'with partial match: wall thickness');
       }
       else if (rowText.includes('thickness mm')) {
         wallThicknessCol = rowText.indexOf('thickness mm');
-        console.log('Found wall thickness column at index', wallThicknessCol, 'with partial match: thickness mm');
       }
       else if (rowText.includes('wall') && rowText.some(cell => cell.includes('mm'))) {
         // Look for a cell that contains "wall"
         for (let i = 0; i < rowText.length; i++) {
           if (rowText[i].includes('wall')) {
             wallThicknessCol = i;
-            console.log('Found wall thickness column at index', wallThicknessCol, 'with term: wall');
             break;
           }
         }
@@ -999,7 +887,6 @@ export async function extractAdditionalInfo(
           const cellText = rowText[i].toLowerCase();
           if (cellText.includes('wall') || cellText.includes('thickness')) {
             wallThicknessCol = i;
-            console.log('Found wall thickness column at index', wallThicknessCol, 'with text:', rowText[i]);
             break;
           }
         }
@@ -1010,21 +897,11 @@ export async function extractAdditionalInfo(
         const colGText = rowText[6]; // Column G is index 6 (0-based)
         if (colGText && (colGText.includes('wall') || colGText.includes('thickness'))) {
           wallThicknessCol = 6;
-          console.log(`Special case: Found wall thickness column in column G (index 6) with text: "${colGText}"`);
         }
       }
       
       if (atHeadCol !== -1 && externalPressureCol !== -1 && metalTypeCol !== -1 && 
           tensileStrengthCol !== -1 && unitWeightCol !== -1 && internalDiameterCol !== -1) {
-        console.log('Column detection summary:', {
-          atHeadCol,
-          externalPressureCol,
-          metalTypeCol,
-          tensileStrengthCol,
-          unitWeightCol,
-          internalDiameterCol,
-          wallThicknessCol
-        });
         break;
       }
     }
@@ -1037,7 +914,6 @@ export async function extractAdditionalInfo(
     // Last resort fallback for wall thickness - if we still don't have it, use column G (index 6)
     if (wallThicknessCol === -1) {
       wallThicknessCol = 6; // Column G (index 6)
-      console.log("Fallback: Using column G (index 6) for wall thickness as last resort");
     }
     
     // Find matching rows
@@ -1084,13 +960,10 @@ export async function extractAdditionalInfo(
                 wallThickness = parseFloat(numStr);
               }
               
-              console.log(`Row ${rowIdx}: Parsed wall thickness value: ${wallThickness} from original: "${row[wallThicknessCol]}"`);
-              
               if (!isNaN(wallThickness)) {
                 additionalInfo.wallThickness = wallThickness;
               }
             } catch (error) {
-              console.warn('Could not parse wall thickness value:', row[wallThicknessCol]);
             }
           } else {
             // If wall thickness not found but we have internalDiameter and external diameter (atHead),
@@ -1100,11 +973,9 @@ export async function extractAdditionalInfo(
                 // Wall thickness = (OD - ID) / 2
                 const calculatedWallThickness = (additionalInfo.atHead - additionalInfo.internalDiameter) / 2;
                 if (!isNaN(calculatedWallThickness) && calculatedWallThickness > 0) {
-                  console.log(`Row ${rowIdx}: Calculated wall thickness: ${calculatedWallThickness.toFixed(2)} mm from OD: ${additionalInfo.atHead} mm and ID: ${additionalInfo.internalDiameter} mm`);
                   additionalInfo.wallThickness = calculatedWallThickness;
                 }
               } catch (error) {
-                console.warn('Error calculating wall thickness:', error);
               }
             }
           }
@@ -1118,7 +989,6 @@ export async function extractAdditionalInfo(
     
     return matchingRows;
   } catch (error) {
-    console.error('Error extracting additional info:', error);
     return [];
   }
 } 

@@ -87,6 +87,59 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
       [field]: value
     };
     setSectionInputs(updatedInputs);
+    
+    // If the depth field was changed, sync it with the H values in wellsAnalyzerData
+    if (field === 'depth' && typeof value === 'string') {
+      try {
+        // Get the section name based on index
+        let sectionName;
+        if (sectionInputs.length === 2) {
+          sectionName = ["Production", "Surface"][index];
+        } else if (sectionInputs.length === 3) {
+          sectionName = ["Production", "Intermediate", "Surface"][index];
+        } else if (index === 0) {
+          sectionName = "Production";
+        } else if (index === sectionInputs.length - 1) {
+          sectionName = "Surface";
+        } else {
+          sectionName = `Intermediate ${index}`;
+        }
+        
+        // Map section to instance number
+        let instanceNum;
+        if (sectionName === "Production") {
+          instanceNum = 1;
+        } else if (sectionName === "Surface") {
+          instanceNum = 3;
+        } else if (sectionName === "Intermediate") {
+          instanceNum = 2;
+        } else {
+          // For multiple intermediate sections, map to closest standard instance
+          instanceNum = index + 1;
+        }
+        
+        // Get wellsAnalyzerData if it exists
+        const formData = localStorage.getItem('wellsAnalyzerData');
+        if (formData) {
+          const data = JSON.parse(formData);
+          
+          // Update H value for corresponding section
+          data[`H_${instanceNum}`] = value;
+          
+          // Also update instances array if it exists
+          if (data.instances && data.instances[instanceNum - 1]) {
+            data.instances[instanceNum - 1].H = parseFloat(value);
+          }
+          
+          // Save updated form data back to localStorage
+          localStorage.setItem('wellsAnalyzerData', JSON.stringify(data));
+          
+          console.log(`Synchronized casing depth for section ${sectionName} (value: ${value}) with H_${instanceNum}`);
+        }
+      } catch (error) {
+        console.error('Failed to sync casing depth with H value:', error);
+      }
+    }
   };
 
   // Function to download the template Excel file
@@ -150,6 +203,14 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
       setHadData(responseData.hadData || null);
       setShowInput(false);
       
+      // Save the HAD data to localStorage for use in the formation-design page
+      if (responseData.hadData) {
+        localStorage.setItem('casingCalculator', JSON.stringify({
+          casingResults: responseData.results || [],
+          hadData: responseData.hadData || null
+        }));
+      }
+      
       showToast('success', "Calculations completed", {
         icon: <CheckCircle className="h-4 w-4 text-green-500" />,
         description: "All calculations have been successfully processed."
@@ -176,6 +237,8 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
     setCasingFileName("");
     // Show input form
     setShowInput(true);
+    // Clear localStorage data
+    localStorage.removeItem('casingCalculator');
     // Show toast notification
     showToast('success', "Data cleared", {
       description: "All casing calculation results have been reset."
@@ -206,10 +269,128 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
             updatedInputs = updatedInputs.slice(0, iterationsCount);
           }
           
+          // Check if we need to sync with wellsAnalyzerData
+          const wellsData = localStorage.getItem('wellsAnalyzerData');
+          if (wellsData) {
+            try {
+              const formData = JSON.parse(wellsData);
+              let updated = false;
+              
+              // Update depths from wellsAnalyzerData if they exist
+              for (let i = 0; i < updatedInputs.length; i++) {
+                let sectionName;
+                if (updatedInputs.length === 2) {
+                  sectionName = ["Production", "Surface"][i];
+                } else if (updatedInputs.length === 3) {
+                  sectionName = ["Production", "Intermediate", "Surface"][i];
+                } else if (i === 0) {
+                  sectionName = "Production";
+                } else if (i === updatedInputs.length - 1) {
+                  sectionName = "Surface";
+                } else {
+                  sectionName = `Intermediate ${i}`;
+                }
+                
+                // Map section to instance number
+                let instanceNum;
+                if (sectionName === "Production") {
+                  instanceNum = 1;
+                } else if (sectionName === "Surface") {
+                  instanceNum = 3;
+                } else if (sectionName === "Intermediate") {
+                  instanceNum = 2;
+                } else {
+                  // For multiple intermediate sections, map to closest standard instance
+                  instanceNum = i + 1;
+                }
+                
+                // Get H value from formData
+                let hValue;
+                
+                // First try instances format
+                if (formData.instances && formData.instances[instanceNum - 1] && formData.instances[instanceNum - 1].H !== undefined) {
+                  hValue = formData.instances[instanceNum - 1].H.toString();
+                } 
+                // Then try H_i format
+                else if (formData[`H_${instanceNum}`] !== undefined) {
+                  hValue = formData[`H_${instanceNum}`];
+                }
+                // Finally try single H format
+                else if (i === 0 && formData.H !== undefined) {
+                  hValue = formData.H;
+                }
+                
+                // Update depth if H value exists and depth is empty
+                if (hValue && (!updatedInputs[i].depth || updatedInputs[i].depth === "")) {
+                  updatedInputs[i].depth = hValue.toString();
+                  updated = true;
+                }
+              }
+              
+              if (updated) {
+                console.log('Synchronized casing depths with H values from formation data');
+              }
+            } catch (error) {
+              console.error('Failed to sync H values with casing depths:', error);
+            }
+          }
+          
           setSectionInputs(updatedInputs);
         }
       } catch (error) {
         console.error('Failed to load saved data:', error);
+      }
+    } else {
+      // If no saved casing data, try to initialize from wellsAnalyzerData
+      try {
+        const wellsData = localStorage.getItem('wellsAnalyzerData');
+        if (wellsData) {
+          const formData = JSON.parse(wellsData);
+          const iterationsCount = parseInt(iterations);
+          let newSectionInputs = [...sectionInputs];
+          let updated = false;
+          
+          // Update depths from wellsAnalyzerData
+          for (let i = 0; i < iterationsCount; i++) {
+            // Map index to instance number
+            let instanceNum;
+            if (i === 0) {
+              instanceNum = 1; // Production
+            } else if (i === iterationsCount - 1) {
+              instanceNum = 3; // Surface
+            } else {
+              instanceNum = 2; // Intermediate
+            }
+            
+            // Get H value from formData
+            let hValue;
+            
+            // First try instances format
+            if (formData.instances && formData.instances[instanceNum - 1] && formData.instances[instanceNum - 1].H !== undefined) {
+              hValue = formData.instances[instanceNum - 1].H.toString();
+            } 
+            // Then try H_i format
+            else if (formData[`H_${instanceNum}`] !== undefined) {
+              hValue = formData[`H_${instanceNum}`];
+            }
+            // Finally try single H format
+            else if (i === 0 && formData.H !== undefined) {
+              hValue = formData.H;
+            }
+            
+            if (hValue) {
+              newSectionInputs[i].depth = hValue.toString();
+              updated = true;
+            }
+          }
+          
+          if (updated) {
+            setSectionInputs(newSectionInputs);
+            console.log('Initialized casing depths from formation H values');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize from wellsAnalyzerData:', error);
       }
     }
   };
