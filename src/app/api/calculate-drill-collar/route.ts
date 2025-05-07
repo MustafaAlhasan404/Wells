@@ -448,34 +448,105 @@ export async function POST(req: NextRequest) {
           
           // Find corresponding section in drillCollarResults
           let sectionName = "";
+          
+          // Get the total number of instances from calculations length
+          const totalInstances = calculations.length;
+          
           if (instanceNum === 1) {
             sectionName = "Production";
-          } else if (instanceNum === 3) {  // Last instance (3) should be Surface
+          } else if (instanceNum === totalInstances) {  // Last instance should be Surface
             sectionName = "Surface";
-          } else {
-            // All middle sections are just "Intermediate"
+          } else if (totalInstances === 3 && instanceNum === 2) {
+            // Standard 3-section case
             sectionName = "Intermediate";
+          } else if (totalInstances === 4) {
+            // 4-section case
+            if (instanceNum === 2) sectionName = "Upper Intermediate";
+            else sectionName = "Lower Intermediate";
+          } else if (totalInstances >= 5) {
+            // 5-section case
+            if (instanceNum === 2) sectionName = "Upper Intermediate";
+            else if (instanceNum === 3) sectionName = "Middle Intermediate";
+            else sectionName = "Lower Intermediate";
+          } else {
+            // Fallback - use the instance number to generate name
+            sectionName = `Intermediate ${instanceNum - 1}`;
           }
           
-          // If no exact match by name, try to find the section by position
-          let resultIndex = drillCollarResults.findIndex(r => r.section === sectionName);
+          // Initialize the result index for section matching
+          let resultIndex = -1;
           
-          // If no exact match found for Intermediate sections (which might be multiple)
-          if (resultIndex < 0 && sectionName === "Intermediate") {
-            // This is instance 2, so find the first intermediate section
-            // For multiple intermediate sections, we'll always use the first one for instance 2
-            resultIndex = drillCollarResults.findIndex(r => r.section === "Intermediate");
+          // If no exact match found for any Intermediate sections
+          if (resultIndex < 0 && (
+              sectionName === "Intermediate" || 
+              sectionName === "Upper Intermediate" || 
+              sectionName === "Middle Intermediate" || 
+              sectionName === "Lower Intermediate" ||
+              sectionName.startsWith("Intermediate ")
+          )) {
+            // First try to find an exact match for the specific intermediate section name
+            resultIndex = drillCollarResults.findIndex(r => r.section === sectionName);
             
-            // If still not found, use position-based assignment (first non-production section)
+            // If that fails, try a fuzzy match
+            if (resultIndex < 0) {
+              // For Upper Intermediate
+              if (sectionName === "Upper Intermediate") {
+                resultIndex = drillCollarResults.findIndex(r => 
+                  r.section.includes("Upper") || 
+                  (r.section.includes("Intermediate") && r.section !== "Intermediate")
+                );
+              }
+              // For Middle Intermediate
+              else if (sectionName === "Middle Intermediate") {
+                resultIndex = drillCollarResults.findIndex(r => 
+                  r.section.includes("Middle") || 
+                  (r.section.includes("Intermediate") && 
+                   !r.section.includes("Upper") && 
+                   !r.section.includes("Lower"))
+                );
+              }
+              // For Lower Intermediate
+              else if (sectionName === "Lower Intermediate") {
+                resultIndex = drillCollarResults.findIndex(r => 
+                  r.section.includes("Lower") || 
+                  (r.section.includes("Intermediate") && r.section !== "Intermediate")
+                );
+              }
+              // For generic Intermediate
+              else {
+                resultIndex = drillCollarResults.findIndex(r => r.section.includes("Intermediate"));
+              }
+            }
+            
+            // If still not found, use position-based assignment
             if (resultIndex < 0) {
               // Find all sections that are not Production and not Surface
               const intermediateSections = drillCollarResults
                 .map((r, idx) => ({section: r.section, index: idx}))
                 .filter(item => item.section !== "Production" && item.section !== "Surface");
               
+              // Sort intermediate sections by index to maintain order
+              intermediateSections.sort((a, b) => a.index - b.index);
+              
+              // Assign based on position in calculations array
               if (intermediateSections.length > 0) {
-                // Use the first one
-                resultIndex = intermediateSections[0].index;
+                // For Upper Intermediate, use first intermediate section
+                if (sectionName === "Upper Intermediate" && intermediateSections.length > 0) {
+                  resultIndex = intermediateSections[0].index;
+                }
+                // For Lower Intermediate, use last intermediate section
+                else if (sectionName === "Lower Intermediate" && intermediateSections.length > 0) {
+                  resultIndex = intermediateSections[intermediateSections.length - 1].index;
+                }
+                // For Middle Intermediate, use middle intermediate section if available
+                else if (sectionName === "Middle Intermediate" && intermediateSections.length > 1) {
+                  const middleIndex = Math.floor(intermediateSections.length / 2);
+                  resultIndex = intermediateSections[middleIndex].index;
+                }
+                // For any other intermediate, use first available
+                else {
+                  resultIndex = intermediateSections[0].index;
+                }
               }
             }
           }
@@ -616,134 +687,41 @@ export async function POST(req: NextRequest) {
         });
       }
       
-      // Return the results with debug logs
+      // Reset console.log to its original implementation before returning
       resetConsoleLog();
       
-      return NextResponse.json({
-        drillCollarResults,
+      // Make a final check to ensure all section names are correctly reflected in the results
+      if (drillCollarResults.length > 0) {
+        // Update section names to match the structure in data-input-form.tsx for consistency
+        if (drillCollarResults.length === 4) {
+          // For 4 sections: Production, Upper Intermediate, Lower Intermediate, Surface
+          drillCollarResults[0].section = "Production";
+          drillCollarResults[1].section = "Upper Intermediate";
+          drillCollarResults[2].section = "Lower Intermediate";
+          drillCollarResults[3].section = "Surface";
+        } 
+        else if (drillCollarResults.length === 5) {
+          // For 5 sections: Production, Upper Intermediate, Middle Intermediate, Lower Intermediate, Surface
+          drillCollarResults[0].section = "Production";
+          drillCollarResults[1].section = "Upper Intermediate";
+          drillCollarResults[2].section = "Middle Intermediate";
+          drillCollarResults[3].section = "Lower Intermediate";
+          drillCollarResults[4].section = "Surface";
+        }
+        // Always make sure first is Production and last is Surface
+        if (drillCollarResults.length >= 2) {
+          drillCollarResults[0].section = "Production";
+          drillCollarResults[drillCollarResults.length - 1].section = "Surface";
+        }
+        
+        console.log("Final drill collar results with updated section names:", 
+          drillCollarResults.map(r => `${r.section}: ${r.drillCollar} mm, ${r.numberOfColumns} columns`));
+      }
+      
+      // Return the result
+      return NextResponse.json({ 
+        drillCollarResults, 
         calculations,
-        drillCollarData: {
-          production: drillCollarProduction,
-          intermediate: drillCollarIntermediate,
-          surface: drillCollarSurface
-        },
-        // Map the calculations to all sections shown in the drill collar results
-        extendedCalculations: (() => {
-          // Create a new array matching the drill collar results sections exactly
-          const extended = [];
-          
-          console.log(`Creating extended calculations for ${drillCollarResults.length} sections`);
-          
-          // Map each section in drillCollarResults to a calculation
-          for (let i = 0; i < drillCollarResults.length; i++) {
-            const section = drillCollarResults[i];
-            
-            // Find the appropriate instance to base this calculation on
-            let baseInstance;
-            if (section.section === "Production") {
-              baseInstance = 1;
-            } else if (section.section === "Surface") {
-              baseInstance = 3;
-            } else {
-              baseInstance = 2; // Intermediate sections use instance 2
-            }
-            
-            // Find the reference calculation
-            const refCalc = calculations.find(c => c.instance === baseInstance);
-            
-            if (refCalc) {
-              extended.push({
-                instance: i + 1, // Use the section index + 1 as instance number
-                drillPipeMetalGrade: refCalc.drillPipeMetalGrade,
-                Lmax: refCalc.Lmax,
-                section: section.section // Use the exact section name
-              });
-              
-              console.log(`Added calculation for ${section.section} based on instance ${baseInstance}`);
-            }
-          }
-          
-          return extended;
-        })(),
-        debugInfo: {
-          bValues: (() => {
-            // First generate b values for the calculation instances
-            const mainBValues = calculations.map((calc, index) => {
-              const instanceNum = calc.instance;
-              // Get gamma value
-              const gamma = parseFloat(formData2[`γ_${instanceNum}`] || '0');
-              // Find matching row in Excel for this gamma
-              const gammaColumnName = findColumnName(rawData, ['γ', 'gamma', 'y']);
-              const bColumnName = findColumnName(rawData, ['b', 'B', 'b value']);
-              
-              let foundBValue = null;
-              if (gammaColumnName && bColumnName) {
-                const matchingRow = rawData.find((row: any) => {
-                  const rowGamma = parseFloat(row[gammaColumnName] || '0');
-                  return Math.abs(rowGamma - gamma) < 0.01;
-                }) as Record<string, any> | null;
-                
-                if (matchingRow) {
-                  foundBValue = parseFloat((matchingRow as any)[bColumnName] || '0');
-                  if (foundBValue === 0 || isNaN(foundBValue)) {
-                    foundBValue = 0.75; // The default value used
-                  }
-                }
-              }
-              
-              return {
-                instance: instanceNum,
-                gamma,
-                bValue: foundBValue !== null ? foundBValue : 0.75,
-                section: instanceNum === 1 ? "Production" : 
-                         instanceNum === 2 ? "Intermediate" : "Surface"
-              };
-            });
-            
-            // Find all sections in drillCollarResults
-            const allSections = drillCollarResults.map(r => r.section);
-            
-            // Now ensure we have a b value for every section in drillCollarResults
-            const allBValues = [...mainBValues];
-            
-            // Add b values for any missing sections
-            drillCollarResults.forEach((result, idx) => {
-              // Check if this section already has a b value in mainBValues
-              const hasMatchingBValue = mainBValues.some(bv => bv.section === result.section);
-              
-              if (!hasMatchingBValue) {
-                // This is a section without a matching calculation instance
-                // Use the instance 3 data for gamma and b value
-                const gamma = parseFloat(formData2['γ_3'] || '1.08');
-                const gammaColumnName = findColumnName(rawData, ['γ', 'gamma', 'y']);
-                const bColumnName = findColumnName(rawData, ['b', 'B', 'b value']);
-                
-                let foundBValue = null;
-                if (gammaColumnName && bColumnName) {
-                  const matchingRow = rawData.find((row: any) => {
-                    const rowGamma = parseFloat(row[gammaColumnName] || '0');
-                    return Math.abs(rowGamma - gamma) < 0.01;
-                  }) as Record<string, any> | null;
-                  
-                  if (matchingRow) {
-                    foundBValue = parseFloat((matchingRow as any)[bColumnName] || '0');
-                  }
-                }
-                
-                // Add to the list
-                allBValues.push({
-                  instance: 3, // Assume it's instance 3
-                  gamma,
-                  bValue: foundBValue !== null ? foundBValue : 0.75,
-                  section: result.section
-                });
-              }
-            });
-            
-            return allBValues;
-          })()
-        },
-        // Include the captured debug logs
         debugLogs
       });
       

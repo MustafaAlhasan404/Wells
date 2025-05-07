@@ -97,12 +97,29 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
           sectionName = ["Production", "Surface"][index];
         } else if (sectionInputs.length === 3) {
           sectionName = ["Production", "Intermediate", "Surface"][index];
-        } else if (index === 0) {
-          sectionName = "Production";
-        } else if (index === sectionInputs.length - 1) {
-          sectionName = "Surface";
+        } else if (sectionInputs.length === 4) {
+          if (index === 0) {
+            sectionName = "Production";
+          } else if (index === sectionInputs.length - 1) {
+            sectionName = "Surface";
+          } else if (index === 1) {
+            sectionName = "Upper Intermediate";
+          } else {
+            sectionName = "Lower Intermediate";
+          }
         } else {
-          sectionName = `Intermediate ${index}`;
+          // For 5 sections
+          if (index === 0) {
+            sectionName = "Production";
+          } else if (index === sectionInputs.length - 1) {
+            sectionName = "Surface";
+          } else if (index === 1) {
+            sectionName = "Upper Intermediate";
+          } else if (index === 2) {
+            sectionName = "Middle Intermediate";
+          } else {
+            sectionName = "Lower Intermediate";
+          }
         }
         
         // Map section to instance number
@@ -110,11 +127,17 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
         if (sectionName === "Production") {
           instanceNum = 1;
         } else if (sectionName === "Surface") {
-          instanceNum = 3;
+          instanceNum = sectionInputs.length; // Use the actual count for surface instance
         } else if (sectionName === "Intermediate") {
           instanceNum = 2;
+        } else if (sectionName === "Upper Intermediate") {
+          instanceNum = 2;
+        } else if (sectionName === "Middle Intermediate") {
+          instanceNum = 3;
+        } else if (sectionName === "Lower Intermediate") {
+          instanceNum = 4;
         } else {
-          // For multiple intermediate sections, map to closest standard instance
+          // For any other intermediate sections
           instanceNum = index + 1;
         }
         
@@ -498,17 +521,23 @@ export default function CasingCalculator({}: CasingCalculatorProps) {
               sectionName = "Production";
             } else if (index === sectionInputs.length - 1) {
               sectionName = "Surface";
+            } else if (index === 1) {
+              sectionName = "Upper Intermediate";
             } else {
-              sectionName = `Intermediate ${index}`;
+              sectionName = "Lower Intermediate";
             }
           } else {
-            // For 5 or more sections
+            // For 5 sections
             if (index === 0) {
               sectionName = "Production";
             } else if (index === sectionInputs.length - 1) {
               sectionName = "Surface";
+            } else if (index === 1) {
+              sectionName = "Upper Intermediate";
+            } else if (index === 2) {
+              sectionName = "Middle Intermediate";
             } else {
-              sectionName = `Intermediate ${index}`;
+              sectionName = "Lower Intermediate";
             }
           }
           

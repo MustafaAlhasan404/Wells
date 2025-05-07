@@ -62,10 +62,33 @@ export function calculateDrillCollar(
   nearestBitSizes: number[],
   drillCollarDiameters: number[]
 ): DrillCollarResult[] {
-  const sectionOrder = ["Production", "Intermediate", "Surface"];
   const results: DrillCollarResult[] = [];
-  for (let i = 0; i < sectionOrder.length; i++) {
-    const sectionName = sectionOrder[i];
+  
+  // Get the count of sections
+  const sectionCount = Math.min(atHeadValues.length, nearestBitSizes.length);
+  
+  for (let i = 0; i < sectionCount; i++) {
+    // Generate section name based on index and total count
+    let sectionName: string;
+    if (sectionCount === 3) {
+      // Standard 3-section names
+      sectionName = ["Production", "Intermediate", "Surface"][i];
+    } else if (sectionCount === 4) {
+      if (i === 0) sectionName = "Production";
+      else if (i === sectionCount - 1) sectionName = "Surface";
+      else if (i === 1) sectionName = "Upper Intermediate";
+      else sectionName = "Lower Intermediate";
+    } else if (sectionCount >= 5) {
+      if (i === 0) sectionName = "Production";
+      else if (i === sectionCount - 1) sectionName = "Surface";
+      else if (i === 1) sectionName = "Upper Intermediate";
+      else if (i === 2) sectionName = "Middle Intermediate";
+      else sectionName = "Lower Intermediate";
+    } else {
+      // Default fallback for unexpected counts
+      sectionName = i === 0 ? "Production" : i === sectionCount - 1 ? "Surface" : `Intermediate ${i}`;
+    }
+    
     const atHead = atHeadValues[i];
     const bitSize = nearestBitSizes[i];
     // Calculate drill collar (2 * at_head - bit_size)
@@ -84,34 +107,30 @@ export function calculateDrillCollar(
 }
 
 /**
- * Find the nearest value in an array
- * @param array Array of values
- * @param value Value to find the nearest for
+ * Helper to find nearest value in array
+ * @param arr Array of values
+ * @param target Target value to find the nearest for
  * @returns The nearest value in the array
  */
-export function findNearest(array: number[], value: number): number {
-  // Filter out NaN values
-  const validArray = array.filter(val => !isNaN(val));
+export function findNearest(arr: number[], target: number): number {
+  if (!arr || arr.length === 0) return 0;
   
-  if (validArray.length === 0) {
-    return NaN;
+  // If target is less than or equal to the first value, return the first value
+  if (target <= arr[0]) return arr[0];
+  
+  // Find the closest match
+  let nearest = arr[0];
+  let minDiff = Math.abs(target - nearest);
+  
+  for (let i = 1; i < arr.length; i++) {
+    let diff = Math.abs(target - arr[i]);
+    if (diff < minDiff) {
+      minDiff = diff;
+      nearest = arr[i];
+    }
   }
   
-  // Sort the array in ascending order
-  const sortedArray = [...validArray].sort((a, b) => a - b);
-  
-  // Find values greater than or equal to the target
-  const valuesGreaterOrEqual = sortedArray.filter(item => item >= value);
-  
-  // If there are values greater than or equal to the target, return the smallest one
-  if (valuesGreaterOrEqual.length > 0) {
-    const result = valuesGreaterOrEqual[0];
-    return result;
-  }
-  
-  // If no value is greater than or equal, return the largest value in the array
-  const result = sortedArray[sortedArray.length - 1];
-  return result;
+  return nearest;
 }
 
 /**
@@ -183,6 +202,7 @@ export function calculateDrillCollarData(
   try {
     // Check if we're using the new format with instances array
     const useNewFormat = !!data.instances && Array.isArray(data.instances);
+    const instanceCount = useNewFormat ? data.instances.length : 3;
     
     // Get depths from instances array only
     const getDepthForInstance = (instance: number): number => {
@@ -201,8 +221,8 @@ export function calculateDrillCollarData(
       }
     };
     
-    // Process each instance
-    for (let i = 1; i <= 3; i++) {
+    // Process each instance - use dynamic instance count
+    for (let i = 1; i <= instanceCount; i++) {
       // Determine how to get instance data based on format
       let instanceData: Record<string, any> = {};
       
@@ -315,14 +335,21 @@ export function calculateDrillCollarData(
         Tec = Tc * K1 * K2 * K3;
       }
       
-      // Determine dec based on instance
+      // Determine dec based on instance and section name
       let dec: number;
       if (i === 1) {
+        // Production section
         dec = drillCollarProduction / 1000;
-      } else if (i === 2) {
+      } else if (i === instanceCount) {
+        // Surface section (always the last section)
+        dec = drillCollarSurface / 1000;
+      } else if (i === 2 && instanceCount === 3) {
+        // Intermediate section in 3-section configuration
         dec = drillCollarIntermediate / 1000;
       } else {
-        dec = drillCollarSurface / 1000;
+        // For additional intermediate sections, use the intermediate value
+        // In a future improvement, we could add more drill collar params for additional sections
+        dec = drillCollarIntermediate / 1000;
       }
         
       // Calculate Np - ensure required parameters are present
@@ -335,12 +362,36 @@ export function calculateDrillCollarData(
       // Calculate DB and NB
       // FIXED: Use the correct bit size for this section instead of reversed index
       // Get the section name based on instance
-      const sectionNames = ["Production", "Intermediate", "Surface"];
-      const sectionName = data.instances && data.instances[i-1]?.section 
-        || sectionNames[(i-1) % 3];
+      let sectionName;
+      if (data.instances && data.instances[i-1]?.section) {
+        // Use the section name from the instances array if available
+        sectionName = data.instances[i-1].section;
+      } else {
+        // Generate section names based on instance count
+        if (instanceCount === 3) {
+          const sectionNames = ["Production", "Intermediate", "Surface"];
+          sectionName = sectionNames[(i-1) % 3];
+        } else if (instanceCount === 4) {
+          if (i === 1) sectionName = "Production";
+          else if (i === instanceCount) sectionName = "Surface";
+          else if (i === 2) sectionName = "Upper Intermediate";
+          else sectionName = "Lower Intermediate";
+        } else if (instanceCount >= 5) {
+          if (i === 1) sectionName = "Production";
+          else if (i === instanceCount) sectionName = "Surface";
+          else if (i === 2) sectionName = "Upper Intermediate";
+          else if (i === 3) sectionName = "Middle Intermediate";
+          else sectionName = "Lower Intermediate";
+        } else {
+          // Default fallback
+          const sectionNames = ["Production", "Intermediate", "Surface"];
+          sectionName = sectionNames[(i-1) % 3];
+        }
+      }
       
       // Find the index corresponding to this section
-      const sectionIndex = sectionNames.findIndex(name => 
+      const standardSectionNames = ["Production", "Intermediate", "Surface"];
+      const sectionIndex = standardSectionNames.findIndex((name: string) => 
         sectionName.toLowerCase().includes(name.toLowerCase())
       );
       
@@ -395,12 +446,26 @@ export function calculateDrillCollarData(
         metalGradeIndex = -1;
       }
       
+      // Determine metal grade based on SegmaC value
       let metalGrade = 'N/A';
-      if (metalGradeIndex >= 0 && metalGradeIndex < drillPipeData.metalGrades.length) {
-        metalGrade = drillPipeData.metalGrades[metalGradeIndex];
-      } else if (drillPipeData.metalGrades.length > 0) {
-        // Fallback to first available metal grade if index is out of bounds
-        metalGrade = drillPipeData.metalGrades[0];
+      if (nearestMpi !== null) {
+        if (nearestMpi <= 517) {
+          metalGrade = 'E 75';
+        } else if (nearestMpi <= 655) {
+          metalGrade = 'X 95';
+        } else if (nearestMpi <= 725) {
+          metalGrade = 'G 105';
+        } else if (nearestMpi <= 930) {
+          metalGrade = 'S135';
+        } else {
+          // Fallback to finding index in the array if direct mapping fails
+          if (metalGradeIndex >= 0 && metalGradeIndex < drillPipeData.metalGrades.length) {
+            metalGrade = drillPipeData.metalGrades[metalGradeIndex];
+          } else if (drillPipeData.metalGrades.length > 0) {
+            // Fallback to first available metal grade if index is out of bounds
+            metalGrade = drillPipeData.metalGrades[0];
+          }
+        }
       }
       
       // Calculate SegmaC and Lmax

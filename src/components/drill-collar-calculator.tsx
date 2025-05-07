@@ -1094,22 +1094,48 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
             console.log(`Calculated C_new = ${C_new} for instance ${instance}`);
           }
           
-          // Find nearest metal grade based on C_new
-          if (C_new && availableStrengths.length > 0) {
-            // First sort availableStrengths in ascending order
-            const sortedStrengths = [...availableStrengths].sort((a, b) => a - b);
-            // Find the first strength that is >= C_new
-            let SegmaC = sortedStrengths.find(strength => strength >= C_new) || sortedStrengths[sortedStrengths.length - 1];
-            console.log(`Selected SegmaC = ${SegmaC} for C_new = ${C_new}`);
-            
-            // Calculate Lmax using SegmaC
-            if (SegmaC && tau) {
-              const numerator = (Math.pow((SegmaC/1.5), 2) - 4 * Math.pow(tau, 2)) * Math.pow(10, 12);
-              const denominator = (Math.pow((7.85 - 1.5), 2)) * Math.pow(10, 8);
-              const sqrt_result = Math.sqrt(numerator / denominator);
-              Lmax = sqrt_result - ((L0c * qc + Lhw * qhw) / qp);
-              console.log(`Calculated Lmax = ${Lmax} for instance ${instance}`);
-            }
+          // Find nearest metal grade and mpi based on C_new
+          let selectedMetalGrade = null;
+          let selectedSegmaC = null;
+          let metalGradeCalculation = undefined;
+          if (C_new && availableStrengths.length > 0 && availableGrades.length > 0) {
+            // Find the closest mpi value
+            let minDiff = Math.abs(C_new - availableStrengths[0]);
+            let idx = 0;
+            const comparisons = availableStrengths.map((mpi, i) => {
+              const diff = Math.abs(C_new - mpi);
+              if (diff < minDiff) {
+                minDiff = diff;
+                idx = i;
+              }
+              return {
+                grade: availableGrades[i],
+                strength: mpi,
+                distance: diff,
+                selected: false
+              };
+            });
+            selectedMetalGrade = availableGrades[idx];
+            selectedSegmaC = availableStrengths[idx];
+            comparisons[idx].selected = true;
+            metalGradeCalculation = {
+              selectedGrade: selectedMetalGrade,
+              tensileStrength: selectedSegmaC,
+              mpiSearchValue: C_new,
+              comparisons,
+              selectionMethod: 'closest',
+              explanation: `Selected the metal grade whose minimum tensile strength (mpi) is closest to C_new.`
+            };
+            SegmaC = selectedSegmaC;
+          }
+          
+          // Calculate Lmax using SegmaC
+          if (SegmaC && tau) {
+            const numerator = (Math.pow((SegmaC/1.5), 2) - 4 * Math.pow(tau, 2)) * Math.pow(10, 12);
+            const denominator = (Math.pow((7.85 - 1.5), 2)) * Math.pow(10, 8);
+            const sqrt_result = Math.sqrt(numerator / denominator);
+            Lmax = sqrt_result - ((L0c * qc + Lhw * qhw) / qp);
+            console.log(`Calculated Lmax = ${Lmax} for instance ${instance}`);
           }
         }
         
@@ -1225,11 +1251,76 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           else if (calc.instance === 3) calc.section = "Surface";
           else calc.section = "Intermediate";
         }
+        
+        // If we have corresponding debug data, use it to update the metal grade and Lmax
+        if (debugCalcs && debugCalcs.length > 0) {
+          const matchingDebug = debugCalcs.find(debug => 
+            debug.instance === calc.instance || 
+            debug.section === calc.section
+          );
+          
+          if (matchingDebug) {
+            // Determine metal grade based on SegmaC value
+            let metalGrade = 'E 75'; // Default to lowest grade
+            
+            if (matchingDebug.SegmaC <= 517) {
+              metalGrade = 'E 75';
+            } else if (matchingDebug.SegmaC <= 655) {
+              metalGrade = 'X 95';
+            } else if (matchingDebug.SegmaC <= 725) {
+              metalGrade = 'G 105';
+            } else if (matchingDebug.SegmaC <= 930) {
+              metalGrade = 'S135';
+            }
+            
+            // Update the calculation with the correct metal grade and Lmax
+            calc.drillPipeMetalGrade = metalGrade;
+            calc.Lmax = matchingDebug.Lmax;
+            
+            console.log(`Updated calculation for ${calc.section}: Metal Grade=${metalGrade}, Lmax=${matchingDebug.Lmax}`);
+          }
+        }
+        
         return calc;
       });
       
       // Always enrich calculations with H values from formData
       validatedCalculations = enrichCalculationsWithHValues(validatedCalculations, formData);
+      
+      // Update calculations with the debug data if available
+      if (debugCalcs.length > 0) {
+        // For each debug calculation, update the corresponding validatedCalculation
+        for (const debugCalc of debugCalcs) {
+          // Find matching calculation
+          const matchingCalcIndex = validatedCalculations.findIndex((calc: DrillCollarCalculation) => 
+            calc.instance === debugCalc.instance || 
+            calc.section === debugCalc.section
+          );
+          
+          if (matchingCalcIndex >= 0) {
+            // Determine metal grade based on SegmaC value
+            let metalGrade = 'E 75'; // Default to lowest grade
+            
+            if (debugCalc.SegmaC <= 517) {
+              metalGrade = 'E 75';
+            } else if (debugCalc.SegmaC <= 655) {
+              metalGrade = 'X 95';
+            } else if (debugCalc.SegmaC <= 725) {
+              metalGrade = 'G 105';
+            } else if (debugCalc.SegmaC <= 930) {
+              metalGrade = 'S135';
+            } else {
+              metalGrade = 'S135'; // If higher, default to highest grade
+            }
+            
+            // Update the calculation with the correct metal grade and Lmax
+            validatedCalculations[matchingCalcIndex].drillPipeMetalGrade = metalGrade;
+            validatedCalculations[matchingCalcIndex].Lmax = debugCalc.Lmax;
+            
+            console.log(`Updated calculation for instance ${debugCalc.instance} (${debugCalc.section}): Grade=${metalGrade}, Lmax=${debugCalc.Lmax}`);
+          }
+        }
+      }
       
       // CRITICAL: Sort calculations by instance with explicit logic to fix order differences between environments
       validatedCalculations = [...validatedCalculations].sort((a, b) => {
@@ -1574,25 +1665,7 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         output += `${lmaxApplication}\n`;
       }
       
-      // Metal Grade Analysis
-      output += "\n--- METAL GRADE ANALYSIS ---\n";
-      if (data.metalGradeCalculation) {
-        output += `Selected Metal Grade: ${data.metalGradeCalculation.selectedGrade || 'Not available'}\n`;
-        output += `Required MPI Value: ${data.metalGradeCalculation.mpiSearchValue?.toFixed(2) || 'N/A'} MPa\n`;
-        output += `Selection Method: ${data.metalGradeCalculation.selectionMethod || 'Nearest MPI Match'}\n`;
-        
-        output += `\nGrade Comparison:\n`;
-        if (data.metalGradeCalculation.comparisons) {
-          output += `Grade | Strength (MPa) | Difference\n`;
-          output += `-------------------------------\n`;
-          data.metalGradeCalculation.comparisons.forEach(comparison => {
-            const selectedMark = comparison.selected ? '* ' : '  ';
-            output += `${selectedMark}${comparison.grade} | ${comparison.strength} | ${comparison.distance.toFixed(2)}\n`;
-          });
-        }
-        
-        output += `\nSelection Process: ${data.metalGradeCalculation.explanation || 'The metal grade is selected by finding the grade with tensile strength closest to the required MPI value.'}\n`;
-      }
+      // Removed Metal Grade Analysis section
     });
     
     return output;
@@ -1917,6 +1990,19 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                       <div className="font-medium">SegmaC:</div>
                       <div>{data.SegmaC.toFixed(2)} (MPa)</div>
                       
+                      <div className="font-medium">Metal Grade:</div>
+                      <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
+                        <div className="mb-1">Metal grade based on SegmaC value</div>
+                        <div>
+                          {data.SegmaC <= 517 ? 'E 75' : 
+                           data.SegmaC <= 655 ? 'X 95' :
+                           data.SegmaC <= 725 ? 'G 105' :
+                           data.SegmaC <= 930 ? 'S135' : 'Higher than S135 needed'}
+                          {' '} 
+                          (SegmaC: {data.SegmaC.toFixed(2)} MPa)
+                        </div>
+                      </div>
+                      
                       <div className="font-medium">Lmax:</div>
                       <div>{data.Lmax.toFixed(2)} (m)</div>
                     </div>
@@ -2059,87 +2145,6 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                     </CardContent>
                   </Card>
                 )}
-                
-                <Card className="bg-white/80 dark:bg-background/80 md:col-span-2">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Metal Grade Analysis</CardTitle>
-                    <CardDescription>Detailed analysis of metal grade selection for each section</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      {debugData.map((data, index) => (
-                        <div key={index} className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 w-3 rounded-full bg-primary"></div>
-                            <h4 className="font-medium">{data.section || `Section ${index + 1}`}</h4>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-4">
-                              <div>
-                                <div className="font-medium mb-2">Selected Metal Grade:</div>
-                                <div className="bg-green-50 dark:bg-green-900/30 p-2 rounded text-xs">
-                                  <span className="font-mono font-bold">{data.metalGradeCalculation?.selectedGrade || 'Not available'}</span>
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="font-medium mb-2">Required MPI Value:</div>
-                                <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                                  {data.metalGradeCalculation?.mpiSearchValue?.toFixed(2) || 'N/A'} MPa
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="font-medium mb-2">Selection Method:</div>
-                                <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs">
-                                  {data.metalGradeCalculation?.selectionMethod || 'Nearest MPI Match'}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div>
-                              <div className="font-medium mb-2">Grade Comparison:</div>
-                              <div className="overflow-auto rounded-md border border-amber-200/50 dark:border-amber-800/30">
-                                <table className="w-full text-xs">
-                                  <thead>
-                                    <tr className="border-b border-amber-200/50 dark:border-amber-800/30 bg-amber-50/80 dark:bg-amber-900/30">
-                                      <th className="px-3 py-2 text-left font-medium">Grade</th>
-                                      <th className="px-3 py-2 text-left font-medium">Strength (MPa)</th>
-                                      <th className="px-3 py-2 text-left font-medium">Difference</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {data.metalGradeCalculation?.comparisons?.map((comparison, i) => (
-                                      <tr 
-                                        key={i}
-                                        className={`border-b border-amber-200/50 dark:border-amber-800/30 last:border-0 ${
-                                          comparison.selected ? 'bg-green-50 dark:bg-green-900/20' : ''
-                                        }`}
-                                      >
-                                        <td className="px-3 py-2">{comparison.grade}</td>
-                                        <td className="px-3 py-2">{comparison.strength}</td>
-                                        <td className="px-3 py-2">{comparison.distance.toFixed(2)}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="font-medium mb-2">Selection Process:</div>
-                            <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs">
-                              {data.metalGradeCalculation?.explanation || 
-                               'The metal grade is selected by finding the grade with tensile strength closest to the required MPI value.'}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             </div>
           ))}

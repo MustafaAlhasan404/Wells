@@ -291,15 +291,25 @@ export default function DataInputForm() {
             updated = true;
           }
           
-          // Intermediate (index 2)
+          // Intermediate sections
           if (formData['H_2']) {
             data.depth2 = formData['H_2'];
             updated = true;
           }
           
-          // Surface (index 3)
           if (formData['H_3']) {
             data.depth3 = formData['H_3'];
+            updated = true;
+          }
+          
+          // Support for additional intermediate sections (4 and 5)
+          if (formData['H_4']) {
+            data.depth4 = formData['H_4'];
+            updated = true;
+          }
+          
+          if (formData['H_5']) {
+            data.depth5 = formData['H_5'];
             updated = true;
           }
           
@@ -419,6 +429,9 @@ export default function DataInputForm() {
                       {instance === 1 ? "Production" : 
                        instance === numSections ? "Surface" : 
                        numSections === 3 && instance === 2 ? "Intermediate" : 
+                       numSections === 4 ? (instance === 2 ? "Upper Intermediate" : "Lower Intermediate") :
+                       numSections === 5 ? (instance === 2 ? "Upper Intermediate" : 
+                                          instance === 3 ? "Middle Intermediate" : "Lower Intermediate") :
                        `Intermediate ${instance - 1}`}
                     </Label>
                     <Input
@@ -520,6 +533,9 @@ export default function DataInputForm() {
                       {instance === 1 ? "Production" : 
                        instance === numSections ? "Surface" : 
                        numSections === 3 && instance === 2 ? "Intermediate" : 
+                       numSections === 4 ? (instance === 2 ? "Upper Intermediate" : "Lower Intermediate") :
+                       numSections === 5 ? (instance === 2 ? "Upper Intermediate" : 
+                                          instance === 3 ? "Middle Intermediate" : "Lower Intermediate") :
                        `Intermediate ${instance - 1}`}
                     </Label>
                     <Input
