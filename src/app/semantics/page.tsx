@@ -1135,11 +1135,23 @@ export default function SemanticsPage() {
                             <div class="bg-background/50 p-2 rounded border border-border/30">
                               <span class="font-mono">K1 = ${K1.toFixed(4)} (coefficient)</span>
                             </div>
-                            ${formationHcValues.map((val, idx) => val > 0 ? 
-                              `<div class="bg-background/50 p-2 rounded border border-border/30">
-                                <span class="font-mono">H (depth) (Instance ${idx+1}) = ${val.toFixed(4)} m</span>
-                              </div>` : ''
-                            ).join('')}
+                            ${formationHcValues.map((val, idx) => {
+                              if (val <= 0) return '';
+                              
+                              // Determine section name based on index
+                              let sectionName;
+                              if (idx === 0) {
+                                sectionName = "Production";
+                              } else if (idx === formationHcValues.length - 1) {
+                                sectionName = "Surface";
+                              } else {
+                                sectionName = "Intermediate";
+                              }
+                              
+                              return `<div class="bg-background/50 p-2 rounded border border-border/30">
+                                <span class="font-mono">H (depth) (${sectionName}) = ${val.toFixed(4)} m</span>
+                              </div>`;
+                            }).join('')}
                             <div class="bg-background/50 p-2 rounded border border-border/30">
                               <span class="font-mono">Db = Bit diameter (m)</span>
                             </div>
@@ -1161,13 +1173,23 @@ export default function SemanticsPage() {
         const result = casingResults[i];
         const instanceNumber = i + 1;
         
-        debugLog('calculateVcf', `Processing instance ${instanceNumber}`, result);
+        // Determine section name based on index
+        let sectionName;
+        if (i === 0) {
+          sectionName = "Production";
+        } else if (i === casingResults.length - 1) {
+          sectionName = "Surface";
+        } else {
+          sectionName = "Intermediate";
+        }
+        
+        debugLog('calculateVcf', `Processing ${sectionName} section (instance ${instanceNumber})`, result);
         
         // Get values from the casing table
         let Db = parseFloat(result.nearestBitSize || '0') / 1000; // Nearest bit size in m
         let de = parseFloat(result.atBody || '0') / 1000; // Using atBody (DCSG') for de instead of dcsg
 
-        debugLog('calculateVcf', `Initial values for instance ${instanceNumber}:`, {
+        debugLog('calculateVcf', `Initial values for ${sectionName} section:`, {
           'Db (m)': Db,
           'de (m)': de,
           'Section': result.section
@@ -1176,10 +1198,10 @@ export default function SemanticsPage() {
         // --- Get Dim from HAD data ---
         let dimValue: number | null = null;
         if (hadData) {
-          const sectionName = getHadSectionName(result.section);
-          debugLog('calculateVcf', `Looking for HAD data for section: ${sectionName}`);
+          const hadSectionName = getHadSectionName(result.section);
+          debugLog('calculateVcf', `Looking for HAD data for section: ${hadSectionName}`);
           
-          const sectionData = hadData[sectionName];
+          const sectionData = hadData[hadSectionName];
           if (sectionData) {
             const atHeadKeys = Object.keys(sectionData);
             debugLog('calculateVcf', `Found HAD section data with keys: ${atHeadKeys.join(', ')}`);
@@ -1419,12 +1441,35 @@ export default function SemanticsPage() {
       updateVcfResults(results);
       updateEquationHTML(equations);
       
+      // --- Sort results: Surface first, then Intermediate(s), then Production last ---
+      const sortedResults = [...results].sort((a, b) => {
+        const getSectionPriority = (r: any) => {
+          // Try to infer section from instance or h value if needed
+          if (r.h && results.length > 2) {
+            // Surface is usually the shallowest (smallest h)
+            // Production is usually the deepest (largest h)
+            // Intermediates are in between
+            const hValues = results.map(x => x.h);
+            const minH = Math.min(...hValues);
+            const maxH = Math.max(...hValues);
+            if (r.h === minH) return 0; // Surface
+            if (r.h === maxH) return 2; // Production
+            return 1; // Intermediate(s)
+          }
+          // Fallback: use instance number
+          if (r.instance === 1) return 2; // Production last
+          if (r.instance === results.length) return 0; // Surface first
+          return 1; // Intermediate(s)
+        };
+        return getSectionPriority(a) - getSectionPriority(b);
+      });
+
       // Set results HTML
       const resultsTable = `
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead>
             <tr>
-              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Instance</th>
+              <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Section</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">Db (mm)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">de (mm)</th>
               <th class="px-4 py-2 bg-primary text-primary-foreground text-center">di (mm)</th>
@@ -1434,9 +1479,19 @@ export default function SemanticsPage() {
             </tr>
           </thead>
           <tbody>
-            ${results.map(r => `
+            ${sortedResults.map((r: any, idx: number) => {
+              // Assign section name based on sorted order
+              let sectionName;
+              if (idx === 0) {
+                sectionName = "Surface";
+              } else if (idx === sortedResults.length - 1) {
+                sectionName = "Production";
+              } else {
+                sectionName = "Intermediate";
+              }
+              return `
               <tr class="bg-transparent border-b border-gray-200 dark:border-gray-700">
-                <td class="px-4 py-2 text-center">${r.instance}</td>
+                <td class="px-4 py-2 text-center">${sectionName}</td>
                 <td class="px-4 py-2 text-center">${r.db.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.de.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.di.toFixed(2)}</td>
@@ -1444,7 +1499,7 @@ export default function SemanticsPage() {
                 <td class="px-4 py-2 text-center">${r.hp.toFixed(2)}</td>
                 <td class="px-4 py-2 text-center">${r.vcf.toFixed(4)}</td>
               </tr>
-            `).join('')}
+            `}).join('')}
           </tbody>
         </table>
       `;
@@ -3097,24 +3152,36 @@ export default function SemanticsPage() {
                           </Select>
                         ) : (
                           <div className="space-y-3">
-                            {vcfResults.map(result => (
-                              <div key={`diameter-${result.instance}`} className="flex items-center gap-3">
-                                <Label className="w-24 text-sm">Instance {result.instance}</Label>
-                                <Select
-                                  value={instanceDiameters[result.instance]?.toString() || "4"}
-                                  onValueChange={(value) => updateInstanceDiameter(result.instance, parseFloat(value))}
-                                >
-                                  <SelectTrigger className="w-full focus:ring-1 focus:ring-primary">
-                                    <SelectValue placeholder="Select diameter" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="3.5">3.5"</SelectItem>
-                                    <SelectItem value="4">4"</SelectItem>
-                                    <SelectItem value="4.5">4.5"</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            ))}
+                            {vcfResults.map((result, idx) => {
+                              // Determine section name based on index
+                              let sectionName;
+                              if (idx === 0) {
+                                sectionName = "Production";
+                              } else if (idx === vcfResults.length - 1) {
+                                sectionName = "Surface";
+                              } else {
+                                sectionName = "Intermediate";
+                              }
+                              
+                              return (
+                                <div key={`diameter-${result.instance}`} className="flex items-center gap-3">
+                                  <Label className="w-24 text-sm">{sectionName}</Label>
+                                  <Select
+                                    value={instanceDiameters[result.instance]?.toString() || "4"}
+                                    onValueChange={(value) => updateInstanceDiameter(result.instance, parseFloat(value))}
+                                  >
+                                    <SelectTrigger className="w-full focus:ring-1 focus:ring-primary">
+                                      <SelectValue placeholder="Select diameter" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="3.5">3.5"</SelectItem>
+                                      <SelectItem value="4">4"</SelectItem>
+                                      <SelectItem value="4.5">4.5"</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -3206,10 +3273,24 @@ export default function SemanticsPage() {
                             const selectedPumpIndex = selectedPumpIndices[instance] || 0;
                             const selectedPump = pumpsForInstance[selectedPumpIndex] || recommendedPump;
                             
+                            // Determine section name based on instance number
+                            // Find the index of this instance in the sorted list of unique instances
+                            const uniqueInstances = [...new Set(pumpResults.map(p => p.instance))].sort((a, b) => a - b);
+                            const idx = uniqueInstances.indexOf(instance);
+                            
+                            let sectionName;
+                            if (idx === 0) {
+                              sectionName = "Production";
+                            } else if (idx === uniqueInstances.length - 1) {
+                              sectionName = "Surface";
+                            } else {
+                              sectionName = "Intermediate";
+                            }
+                            
                             return (
                               <div key={`instance-${instance}`} className="border border-border/30 rounded-md overflow-hidden">
                                 <div className="bg-zinc-900 px-3 py-2 border-b border-zinc-800 flex justify-between items-center">
-                                  <h4 className="font-medium">Instance {instance}</h4>
+                                  <h4 className="font-medium">{sectionName}</h4>
                                   
                                   {/* Simplified pump selection dropdown */}
                                   <div className="flex items-center gap-2">

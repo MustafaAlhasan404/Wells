@@ -67,6 +67,22 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData, casingResults = [] }) 
     );
   }
 
+  // Sort sections in order: Surface -> Intermediate -> Production
+  const sortedSectionNames = [...sectionNames].sort((a, b) => {
+    // Helper function to get section priority (Surface first, Production last)
+    const getSectionPriority = (section: string): number => {
+      if (section.toLowerCase().includes("surface")) return 0;
+      if (section.toLowerCase().includes("lower intermediate")) return 1;
+      if (section.toLowerCase().includes("middle intermediate")) return 2;
+      if (section.toLowerCase().includes("upper intermediate")) return 3;
+      if (section.toLowerCase().includes("intermediate")) return 4;
+      if (section.toLowerCase().includes("production")) return 5;
+      return 6; // Any other section
+    };
+    
+    return getSectionPriority(a) - getSectionPriority(b);
+  });
+
   // Helper function to get external diameter from casing results for a section
   const getExternalDiameter = (sectionName: string, atHead?: string): number => {
     if (!casingResults || casingResults.length === 0) return 0;
@@ -90,16 +106,16 @@ const HADResults: React.FC<HADResultsProps> = ({ hadData, casingResults = [] }) 
 
   return (
     <>
-      <Tabs defaultValue={sectionNames[0]} className="w-full">
+      <Tabs defaultValue={sortedSectionNames[0]} className="w-full">
         <TabsList className="w-full mb-4 flex flex-wrap justify-start">
-          {sectionNames.map(section => (
+          {sortedSectionNames.map(section => (
             <TabsTrigger key={section} value={section}>
               {section}
             </TabsTrigger>
           ))}
         </TabsList>
         
-        {sectionNames.map(section => (
+        {sortedSectionNames.map(section => (
           <TabsContent key={section} value={section} className="py-2">
             <div className="space-y-4">
               {Object.entries(processedData[section]).map(([atHead, data]) => (

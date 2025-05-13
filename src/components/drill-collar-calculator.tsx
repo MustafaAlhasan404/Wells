@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Save, FileUp, Calculator, CheckCircle, AlertCircle, X, LoaderCircle, Minimize, Maximize, Download, Layers, FileDown, Check, Bug } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { useFileUpload } from "@/context/FileUploadContext"
+import { useWellType } from "@/context/WellTypeContext"
 import { cn } from "@/lib/utils"
 import { EnhancedTable } from "@/components/ui/enhanced-table"
 import { showToast } from "@/utils/toast-utils"
@@ -232,6 +233,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     casingResults,
     hadData
   } = useFileUpload();
+  
+  // Get wellType from context
+  const { wellType } = useWellType();
   
   // Local state for drill collar results
   const [localDrillCollarResults, setLocalDrillCollarResults] = useState<DrillCollarResult[]>([]);
@@ -569,6 +573,12 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
   // Add this helper function after extractCorrectionFactors
   const getBValueForGamma = (gamma: number): number => {
     try {
+      // Check wellType first - if exploration, always return 1
+      if (wellType === 'exploration') {
+        console.log(`Using fixed b value of 1 for exploration well (gamma=${gamma})`);
+        return 1;
+      }
+      
       // Default value if all else fails
       let defaultB = 0.75;
       
@@ -730,6 +740,22 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       );
       }
       
+    // Sort results in order: Surface -> Intermediate -> Production
+    const sortedResults = [...localDrillCollarResults].sort((a, b) => {
+      // Helper function to get section priority (Surface first, Production last)
+      const getSectionPriority = (section: string): number => {
+        if (section.toLowerCase().includes("surface")) return 0;
+        if (section.toLowerCase().includes("lower intermediate")) return 1;
+        if (section.toLowerCase().includes("middle intermediate")) return 2;
+        if (section.toLowerCase().includes("upper intermediate")) return 3;
+        if (section.toLowerCase().includes("intermediate")) return 4;
+        if (section.toLowerCase().includes("production")) return 5;
+        return 6; // Any other section
+      };
+      
+      return getSectionPriority(a.section) - getSectionPriority(b.section);
+    });
+      
     return (
       <div className="overflow-auto rounded-md border border-border/50 bg-background/80">
         <table className="w-full text-sm">
@@ -743,12 +769,12 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
             </tr>
           </thead>
           <tbody>
-            {localDrillCollarResults.map((result, index) => (
+            {sortedResults.map((result, index) => (
               <tr 
                 key={index} 
                 className={cn(
                   "border-b border-border/40 hover:bg-muted/20 transition-colors",
-                  index === localDrillCollarResults.length - 1 && "border-b-0"
+                  index === sortedResults.length - 1 && "border-b-0"
                 )}
               >
                 <td className="px-4 py-3">{formatSection(result.section)}</td>
@@ -1583,54 +1609,120 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     
     // Map instance-specific parameters for each calculation instance
     const instanceParams = [
-      // Parameters that have instance-specific values (_1, _2, _3, etc.)
       'qp', 'Lhw', 'qc', 'Dep', 'qhw', 'Dhw', 'n', 'WOB', 'C', 'P', 'γ', 'H'
     ];
     
-    // Create instance-specific data objects DYNAMICALLY based on numInstances
+    // Helper function to get UI section order
+    function getUISectionOrder(numSections: number): { label: string, instance: number }[] {
+      if (numSections === 2) {
+        return [
+          { label: "Surface", instance: 2 },
+          { label: "Production", instance: 1 },
+        ];
+      } else if (numSections === 3) {
+        return [
+          { label: "Surface", instance: 3 },
+          { label: "Intermediate", instance: 2 },
+          { label: "Production", instance: 1 },
+        ];
+      } else if (numSections === 4) {
+        return [
+          { label: "Surface", instance: 4 },
+          { label: "Lower Intermediate", instance: 3 },
+          { label: "Upper Intermediate", instance: 2 },
+          { label: "Production", instance: 1 },
+        ];
+      } else if (numSections === 5) {
+        return [
+          { label: "Surface", instance: 5 },
+          { label: "Lower Intermediate", instance: 4 },
+          { label: "Middle Intermediate", instance: 3 },
+          { label: "Upper Intermediate", instance: 2 },
+          { label: "Production", instance: 1 },
+        ];
+      } else {
+        // Fallback for other section counts
+        const arr = [
+          { label: "Surface", instance: numSections },
+        ];
+        for (let i = numSections - 1; i > 1; i--) {
+          arr.push({ label: `Intermediate ${i - 1}`, instance: i });
+        }
+        arr.push({ label: "Production", instance: 1 });
+        return arr;
+      }
+    }
+    
+    // Get UI section order (Surface, Intermediates, Production)
+    const uiOrder = getUISectionOrder(numInstances);
+    
+    // Define explicit calculation order with correctly labeled sections
+    const getCalcOrder = (numSections: number): { label: string, uiLabel: string, instance: number }[] => {
+      if (numSections === 2) {
+        return [
+          { label: "Production", uiLabel: "Production", instance: 1 },
+          { label: "Surface", uiLabel: "Surface", instance: 2 },
+        ];
+      } else if (numSections === 3) {
+        return [
+          { label: "Production", uiLabel: "Production", instance: 1 },
+          { label: "Intermediate", uiLabel: "Intermediate", instance: 2 },
+          { label: "Surface", uiLabel: "Surface", instance: 3 },
+        ];
+      } else if (numSections === 4) {
+        return [
+          { label: "Production", uiLabel: "Production", instance: 1 },
+          { label: "Upper Intermediate", uiLabel: "Upper Intermediate", instance: 2 },
+          { label: "Lower Intermediate", uiLabel: "Lower Intermediate", instance: 3 },
+          { label: "Surface", uiLabel: "Surface", instance: 4 },
+        ];
+      } else if (numSections === 5) {
+        return [
+          { label: "Production", uiLabel: "Production", instance: 1 },
+          { label: "Upper Intermediate", uiLabel: "Upper Intermediate", instance: 2 },
+          { label: "Middle Intermediate", uiLabel: "Middle Intermediate", instance: 3 },
+          { label: "Lower Intermediate", uiLabel: "Lower Intermediate", instance: 4 },
+          { label: "Surface", uiLabel: "Surface", instance: 5 },
+        ];
+      } else {
+        // Fallback for other section counts
+        const arr = [];
+        arr.push({ label: "Production", uiLabel: "Production", instance: 1 });
+        for (let i = 2; i < numSections; i++) {
+          arr.push({ label: `Intermediate ${i-1}`, uiLabel: `Intermediate ${numSections-i}`, instance: i });
+        }
+        arr.push({ label: "Surface", uiLabel: "Surface", instance: numSections });
+        return arr;
+      }
+    };
+    
+    const calcOrder = getCalcOrder(numInstances);
+    
+    // Create a map from UI label to instance index
+    const uiLabelToInstance: Record<string, number> = {};
+    for (const section of uiOrder) {
+      uiLabelToInstance[section.label.toLowerCase().trim()] = section.instance;
+    }
+    
+    // Create instance-specific data objects
     const instanceData: Record<string, any>[] = Array(numInstances).fill(null).map(() => ({}));
     
-    // Extract instance-specific values and organize them
-    for (const param of instanceParams) {
-      // First pass - get explicit values
-      for (let i = 1; i <= numInstances; i++) {
-        const key = `${param}_${i}`;
-        if (formData[key]) {
-          // Add to instance-specific data
-          instanceData[i-1][param] = parseFloat(formData[key]);
+    // For each calculation instance, find the matching UI section and map its values
+    for (const [calcIdx, calcSection] of calcOrder.entries()) {
+      // Find the matching UI section by label (normalized to handle case/spacing differences)
+      const uiLabel = calcSection.uiLabel.toLowerCase().trim();
+      const uiInstance = uiLabelToInstance[uiLabel];
+      
+      // Map each parameter from the UI instance to the calculation instance
+      for (const param of instanceParams) {
+        const key = `${param}_${uiInstance}`;
+        if (formData[key] !== undefined) {
+          instanceData[calcIdx][param] = parseFloat(formData[key]);
         }
       }
       
-      // Second pass - propagate values to higher instances if missing
-      // Copy from instance 3 (which typically has complete data)
-      for (let i = 4; i <= numInstances; i++) {
-        if (instanceData[i-1][param] === undefined && instanceData[2] && instanceData[2][param] !== undefined) {
-          instanceData[i-1][param] = instanceData[2][param];
-          console.log(`Propagated ${param} value from instance 3 to instance ${i}: ${instanceData[2][param]}`);
-        }
-      }
-    }
-    
-    // Apply additional default values for instances 4-5 if needed
-    for (let i = 4; i <= numInstances; i++) {
-      // Ensure critical parameters have default values
-      if (instanceData[i-1]['qp'] === undefined) instanceData[i-1]['qp'] = 29.02;
-      if (instanceData[i-1]['qc'] === undefined) instanceData[i-1]['qc'] = 362.0;
-      if (instanceData[i-1]['Lhw'] === undefined) instanceData[i-1]['Lhw'] = 108.0;
-      if (instanceData[i-1]['qhw'] === undefined) instanceData[i-1]['qhw'] = 73.4;
-      if (instanceData[i-1]['Dep'] === undefined) instanceData[i-1]['Dep'] = 0.127;
-      if (instanceData[i-1]['Dhw'] === undefined) instanceData[i-1]['Dhw'] = 0.127;
-      if (instanceData[i-1]['n'] === undefined) instanceData[i-1]['n'] = 100.0;
-      if (instanceData[i-1]['C'] === undefined) instanceData[i-1]['C'] = 0.75;
-      if (instanceData[i-1]['P'] === undefined) instanceData[i-1]['P'] = 70.0;
-    }
-    
-    // --- Robust H value fetching (like semantic screen) ---
-    for (let i = 1; i <= numInstances; i++) {
-      const hVal = getHValueForInstance(formData, i);
-      if (hVal !== undefined && !isNaN(hVal)) {
-        instanceData[i-1]["H"] = hVal;
-      }
+      // Add section label for debug display
+      instanceData[calcIdx].section = calcSection.label;
     }
     
     // Add single parameters that apply to all instances
@@ -1642,9 +1734,24 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       });
     }
     
-    // Add instance data to processed data
-    processedData.instances = instanceData;
+    // Fill missing parameters with defaults or propagate from previous instance
+    const defaults = {
+      qp: 29.02, Lhw: 108, qc: 362, Dep: 0.127, qhw: 73.4, Dhw: 0.127, n: 100, C: 0.75, P: 70
+    };
+    for (let i = 0; i < instanceData.length; i++) {
+      for (const param of instanceParams) {
+        if (instanceData[i][param] === undefined) {
+          // Try to propagate from previous instance, else use default
+          if (i > 0 && instanceData[i-1][param] !== undefined) {
+            instanceData[i][param] = instanceData[i-1][param];
+          } else if (defaults[param as keyof typeof defaults] !== undefined) {
+            instanceData[i][param] = defaults[param as keyof typeof defaults];
+          }
+        }
+      }
+    }
     
+    processedData.instances = instanceData;
     return processedData;
   };
   
@@ -2428,6 +2535,47 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     );
   };
 
+  // Helper to get section order: Surface, Intermediate(s), Production
+  function getSectionOrder(numSections: number): { label: string, instance: number }[] {
+    if (numSections === 2) {
+      return [
+        { label: "Surface", instance: 2 },
+        { label: "Production", instance: 1 },
+      ];
+    } else if (numSections === 3) {
+      return [
+        { label: "Surface", instance: 3 },
+        { label: "Intermediate", instance: 2 },
+        { label: "Production", instance: 1 },
+      ];
+    } else if (numSections === 4) {
+      return [
+        { label: "Surface", instance: 4 },
+        { label: "Lower Intermediate", instance: 3 },
+        { label: "Upper Intermediate", instance: 2 },
+        { label: "Production", instance: 1 },
+      ];
+    } else if (numSections === 5) {
+      return [
+        { label: "Surface", instance: 5 },
+        { label: "Lower Intermediate", instance: 4 },
+        { label: "Middle Intermediate", instance: 3 },
+        { label: "Upper Intermediate", instance: 2 },
+        { label: "Production", instance: 1 },
+      ];
+    } else {
+      // Fallback for other section counts
+      const arr = [
+        { label: "Surface", instance: numSections },
+      ];
+      for (let i = numSections - 1; i > 1; i--) {
+        arr.push({ label: `Intermediate ${i - 1}`, instance: i });
+      }
+      arr.push({ label: "Production", instance: 1 });
+      return arr;
+    }
+  }
+
   return (
     <div className="space-y-6">
       {!localDrillCollarResults.length ? (
@@ -2570,20 +2718,40 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                         This ensures the depths (H values) are always displayed in the same order:
                         Production (instance 1) first, Intermediate (instance 2) second, Surface (instance 3) third */}
                     {[...calculations].sort((a, b) => {
-                      // Get instance number or derive from section
-                      const getInstanceNumber = (calc: any) => {
-                        if (typeof calc.instance === 'number') return calc.instance;
-                        // Map section names to instance numbers based on consistent order
-                        if (calc.section === "Production") return 1;
-                        if (calc.section === "Upper Intermediate") return 2;
-                        if (calc.section === "Middle Intermediate") return 3;
-                        if (calc.section === "Lower Intermediate") return 4;
-                        if (calc.section === "Surface") return 5;
-                        if (calc.section === "Intermediate") return 3; // For backward compatibility
-                        // Default fallback
-                        return 6;
+                      // Sort sections in order: Surface -> Intermediate -> Production
+                      const getSectionPriority = (calc: any): number => {
+                        // Get section name
+                        let section = calc.section;
+                        if (!section && calc.instance) {
+                          const totalInstances = calculations.length;
+                          if (calc.instance === 1) {
+                            section = "Production";
+                          } else if (calc.instance === totalInstances) {
+                            section = "Surface";
+                          } else if (totalInstances === 3 && calc.instance === 2) {
+                            section = "Intermediate";
+                          } else if (totalInstances === 4) {
+                            if (calc.instance === 2) section = "Upper Intermediate";
+                            else section = "Lower Intermediate";
+                          } else if (totalInstances >= 5) {
+                            if (calc.instance === 2) section = "Upper Intermediate";
+                            else if (calc.instance === 3) section = "Middle Intermediate";
+                            else section = "Lower Intermediate";
+                          }
+                        }
+                        
+                        // Assign priority based on section name
+                        if (section?.toLowerCase().includes("surface")) return 0;
+                        if (section?.toLowerCase().includes("lower intermediate")) return 1;
+                        if (section?.toLowerCase().includes("middle intermediate")) return 2;
+                        if (section?.toLowerCase().includes("upper intermediate")) return 3;
+                        if (section?.toLowerCase().includes("intermediate")) return 4;
+                        if (section?.toLowerCase().includes("production")) return 5;
+                        return 6; // Any other section
                       };
-                      return getInstanceNumber(a) - getInstanceNumber(b);
+                      
+                      // Return the difference in priorities as a number
+                      return getSectionPriority(a) - getSectionPriority(b);
                     }).map((calc, index) => {
                       // Convert Lmax to number to ensure toFixed works
                       const lmaxValue = typeof calc.Lmax === 'number' ? calc.Lmax : Number(calc.Lmax);

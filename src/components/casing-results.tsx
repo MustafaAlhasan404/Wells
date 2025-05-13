@@ -217,10 +217,26 @@ const CasingResults: React.FC<CasingResultsProps> = ({ results, hadData }) => {
     return "-";
   };
 
+  // Reverse the order of results for display: Surface -> Intermediate -> Production
+  const displayResults = [...results].sort((a, b) => {
+    // Helper function to get section priority (Surface first, Production last)
+    const getSectionPriority = (section: string): number => {
+      if (section.toLowerCase().includes("surface")) return 0;
+      if (section.toLowerCase().includes("lower intermediate")) return 1;
+      if (section.toLowerCase().includes("middle intermediate")) return 2;
+      if (section.toLowerCase().includes("upper intermediate")) return 3;
+      if (section.toLowerCase().includes("intermediate")) return 4;
+      if (section.toLowerCase().includes("production")) return 5;
+      return 6; // Any other section
+    };
+    
+    return getSectionPriority(a.section) - getSectionPriority(b.section);
+  });
+
   return (
     <EnhancedTable
       headers={["Section", "Nearest Bit Size", "DCSG", "DCSG'", "Internal Diameter", "Dim"]}
-      rows={results.map(result => {
+      rows={displayResults.map(result => {
         let dim = "-";
         let internalDiameter = result.internalDiameter;
         

@@ -398,7 +398,15 @@ export async function POST(req: NextRequest) {
           );
           
           let b = 0;
-          if (matchingRow && bColumnName && matchingRow[bColumnName] !== undefined) {
+          
+          // Check if this is an exploration well (gamma = 1.08)
+          const isExplorationWell = Math.abs(gamma - 1.08) < 0.001;
+          
+          if (isExplorationWell) {
+            // For exploration wells, always use b = 1
+            b = 1;
+            console.log(`Using fixed b=1 for exploration well (gamma=${gamma})`);
+          } else if (matchingRow && bColumnName && matchingRow[bColumnName] !== undefined) {
             b = parseFloat(matchingRow[bColumnName]);
             console.log(`Found matching row for gamma=${gamma}:`, matchingRow);
             console.log(`Using b=${b} from Excel data`);
@@ -626,23 +634,32 @@ export async function POST(req: NextRequest) {
               
               let b = 0;
               
-              // Find matching row in Excel for this gamma
-              let matchingRow: Record<string, any> | null = null;
-              if (gammaColumnName && bColumnName) {
-                matchingRow = rawData.find((row: any) => {
-                  const rowGamma = parseFloat(row[gammaColumnName] || '0');
-                  return Math.abs(rowGamma - gamma) < 0.01;
-                }) as Record<string, any> | null;
-              }
-
-              if (matchingRow && bColumnName && matchingRow[bColumnName] !== undefined) {
-                b = parseFloat((matchingRow as any)[bColumnName]);
-                console.log(`Found matching row for gamma=${gamma} for missing sections:`, matchingRow);
-                console.log(`Using b=${b} from Excel data for missing sections`);
+              // Check if this is an exploration well (gamma = 1.08)
+              const isExplorationWell = Math.abs(gamma - 1.08) < 0.001;
+              
+              if (isExplorationWell) {
+                // For exploration wells, always use b = 1
+                b = 1;
+                console.log(`Using fixed b=1 for exploration well (gamma=${gamma})`);
               } else {
-                // Fallback to form data or default
-                b = parseFloat(formData2[`b_${instanceNum}`] || '0');
-                console.log(`No b value found in Excel for gamma=${gamma} for missing sections, using fallback b=${b}`);
+                // Find matching row in Excel for this gamma
+                let matchingRow: Record<string, any> | null = null;
+                if (gammaColumnName && bColumnName) {
+                  matchingRow = rawData.find((row: any) => {
+                    const rowGamma = parseFloat(row[gammaColumnName] || '0');
+                    return Math.abs(rowGamma - gamma) < 0.01;
+                  }) as Record<string, any> | null;
+                }
+
+                if (matchingRow && bColumnName && matchingRow[bColumnName] !== undefined) {
+                  b = parseFloat(matchingRow[bColumnName]);
+                  console.log(`Found matching row for gamma=${gamma} for missing sections:`, matchingRow);
+                  console.log(`Using b=${b} from Excel data for missing sections`);
+                } else {
+                  // Fallback to form data or default
+                  b = parseFloat(formData2[`b_${instanceNum}`] || '0');
+                  console.log(`No b value found in Excel for gamma=${gamma} for missing sections, using fallback b=${b}`);
+                }
               }
               
               // If b is still 0, use a default value to avoid division by zero

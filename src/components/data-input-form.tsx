@@ -14,6 +14,47 @@ import { motion } from "framer-motion"
 import { HelpTooltip } from "@/components/ui/help-tooltip"
 import { useWellType } from "@/context/WellTypeContext"
 
+// Helper to get section order: Surface, Intermediate(s), Production
+function getSectionOrder(numSections: number): { label: string, instance: number }[] {
+  if (numSections === 2) {
+    return [
+      { label: "Surface", instance: 2 },
+      { label: "Production", instance: 1 },
+    ];
+  } else if (numSections === 3) {
+    return [
+      { label: "Surface", instance: 3 },
+      { label: "Intermediate", instance: 2 },
+      { label: "Production", instance: 1 },
+    ];
+  } else if (numSections === 4) {
+    return [
+      { label: "Surface", instance: 4 },
+      { label: "Lower Intermediate", instance: 3 },
+      { label: "Upper Intermediate", instance: 2 },
+      { label: "Production", instance: 1 },
+    ];
+  } else if (numSections === 5) {
+    return [
+      { label: "Surface", instance: 5 },
+      { label: "Lower Intermediate", instance: 4 },
+      { label: "Middle Intermediate", instance: 3 },
+      { label: "Upper Intermediate", instance: 2 },
+      { label: "Production", instance: 1 },
+    ];
+  } else {
+    // Fallback for other section counts
+    const arr = [
+      { label: "Surface", instance: numSections },
+    ];
+    for (let i = numSections - 1; i > 1; i--) {
+      arr.push({ label: `Intermediate ${i - 1}`, instance: i });
+    }
+    arr.push({ label: "Production", instance: 1 });
+    return arr;
+  }
+}
+
 export default function DataInputForm() {
   const [formData, setFormData] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
@@ -431,22 +472,16 @@ export default function DataInputForm() {
             ) : (
               // Multiple inputs mode - Dynamic based on numSections
               <div className="space-y-3">
-                {Array.from({ length: numSections }, (_, i) => i + 1).map(instance => (
-                  <div key={`${field}_${instance}`} className="space-y-1.5">
-                    <Label htmlFor={`${field}_${instance}`} className="text-xs text-muted-foreground">
-                      {instance === 1 ? "Production" : 
-                       instance === numSections ? "Surface" : 
-                       numSections === 3 && instance === 2 ? "Intermediate" : 
-                       numSections === 4 ? (instance === 2 ? "Upper Intermediate" : "Lower Intermediate") :
-                       numSections === 5 ? (instance === 2 ? "Upper Intermediate" : 
-                                          instance === 3 ? "Middle Intermediate" : "Lower Intermediate") :
-                       `Intermediate ${instance - 1}`}
+                {getSectionOrder(numSections).map(section => (
+                  <div key={`${field}_${section.instance}`} className="space-y-1.5">
+                    <Label htmlFor={`${field}_${section.instance}`} className="text-xs text-muted-foreground">
+                      {section.label}
                     </Label>
                     <Input
-                      id={`${field}_${instance}`}
-                      placeholder={`Enter ${field} (${instance})`}
-                      value={formData[`${field}_${instance}`] || ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${instance}`, e.target.value)}
+                      id={`${field}_${section.instance}`}
+                      placeholder={`Enter ${field} (${section.label})`}
+                      value={formData[`${field}_${section.instance}`] || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${section.instance}`, e.target.value)}
                       className="focus:ring-1 focus:ring-primary bg-background/80 border-border"
                     />
                   </div>
@@ -532,22 +567,16 @@ export default function DataInputForm() {
             ) : (
               // Multiple inputs mode
               <div className="space-y-3">
-                {Array.from({ length: numSections }, (_, i) => i + 1).map(instance => (
-                  <div key={`${field}_${instance}`} className="space-y-1.5">
-                    <Label htmlFor={`${field}_${instance}`} className="text-xs text-muted-foreground">
-                      {instance === 1 ? "Production" : 
-                       instance === numSections ? "Surface" : 
-                       numSections === 3 && instance === 2 ? "Intermediate" : 
-                       numSections === 4 ? (instance === 2 ? "Upper Intermediate" : "Lower Intermediate") :
-                       numSections === 5 ? (instance === 2 ? "Upper Intermediate" : 
-                                          instance === 3 ? "Middle Intermediate" : "Lower Intermediate") :
-                       `Intermediate ${instance - 1}`}
+                {getSectionOrder(numSections).map(section => (
+                  <div key={`${field}_${section.instance}`} className="space-y-1.5">
+                    <Label htmlFor={`${field}_${section.instance}`} className="text-xs text-muted-foreground">
+                      {section.label}
                     </Label>
                     <Input
-                      id={`${field}_${instance}`}
-                      placeholder={field === "WOB" ? "Enter WOB in tons" : `Enter ${field} (${instance})`}
-                      value={wellType === 'exploration' && field === 'γ' ? '1.08' : (formData[`${field}_${instance}`] || '')}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${instance}`, e.target.value)}
+                      id={`${field}_${section.instance}`}
+                      placeholder={field === "WOB" ? `Enter WOB in tons (${section.label})` : `Enter ${field} (${section.label})`}
+                      value={wellType === 'exploration' && field === 'γ' ? '1.08' : (formData[`${field}_${section.instance}`] || '')}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(`${field}_${section.instance}`, e.target.value)}
                       className={`focus:ring-1 focus:ring-primary bg-background/80 border-border ${field === "WOB" ? "font-medium" : ""}`}
                       disabled={wellType === 'exploration' && field === 'γ'}
                     />
