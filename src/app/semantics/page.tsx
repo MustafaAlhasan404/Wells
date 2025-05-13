@@ -1441,28 +1441,19 @@ export default function SemanticsPage() {
       updateVcfResults(results);
       updateEquationHTML(equations);
       
-      // --- Sort results: Surface first, then Intermediate(s), then Production last ---
-      const sortedResults = [...results].sort((a, b) => {
-        const getSectionPriority = (r: any) => {
-          // Try to infer section from instance or h value if needed
-          if (r.h && results.length > 2) {
-            // Surface is usually the shallowest (smallest h)
-            // Production is usually the deepest (largest h)
-            // Intermediates are in between
-            const hValues = results.map(x => x.h);
-            const minH = Math.min(...hValues);
-            const maxH = Math.max(...hValues);
-            if (r.h === minH) return 0; // Surface
-            if (r.h === maxH) return 2; // Production
-            return 1; // Intermediate(s)
-          }
-          // Fallback: use instance number
-          if (r.instance === 1) return 2; // Production last
-          if (r.instance === results.length) return 0; // Surface first
-          return 1; // Intermediate(s)
-        };
-        return getSectionPriority(a) - getSectionPriority(b);
-      });
+      // --- Sort results: Surface first, then Intermediate(s) by H ascending, then Production last ---
+      const hValues = results.map(x => x.h ?? Infinity);
+      const minH = Math.min(...hValues);
+      const maxH = Math.max(...hValues);
+      const surface = results.find(r => r.h === minH);
+      const production = results.find(r => r.h === maxH);
+      const intermediates = results.filter(r => r.h !== minH && r.h !== maxH);
+      intermediates.sort((a, b) => (a.h ?? 0) - (b.h ?? 0));
+      const sortedResults = [
+        ...(surface ? [surface] : []),
+        ...intermediates,
+        ...(production ? [production] : []),
+      ];
 
       // Set results HTML
       const resultsTable = `
