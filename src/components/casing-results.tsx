@@ -271,8 +271,8 @@ const CasingResults: React.FC<CasingResultsProps> = ({ results, hadData }) => {
         return [
           result.section,
           result.nearestBitSize,
-          result.dcsg,
           validatedAtBody,
+          result.dcsg,
           showInternalDiameter ? internalDiameter : "-",
           dim
         ];

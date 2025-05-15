@@ -479,12 +479,12 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         });
         
         // Extract atHead value
-        if (result && result.atBody) {
-          const match = result.atBody.match(/(\d+(?:\.\d+)?)/);
+        if (result && result.dcsg) {
+          const match = result.dcsg.match(/(\d+(?:\.\d+)?)/);
           atHeadValues.push(match ? parseFloat(match[1]) : 0);
         } else {
           atHeadValues.push(0);
-          console.warn(`No matching section or atBody value found for ${sectionName}`);
+          console.warn(`No matching section or dcsg value found for ${sectionName}`);
         }
         
         // Extract nearestBitSize value
