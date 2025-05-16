@@ -1123,8 +1123,8 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           const bitSizeIndex = currentSection ? sectionToBitSizeIndex[currentSection] : undefined;
           
           if (bitSizeIndex !== undefined && bitSizeIndex >= 0 && bitSizeIndex < casingValues.nearestBitSizes.length) {
-            dbValue = casingValues.nearestBitSizes[bitSizeIndex] / 1000; // Convert mm to m
-            console.log(`Using DB value ${dbValue} from nearestBitSizes for instance ${instance} (section: ${currentSection})`);
+            dbValue = casingValues.nearestBitSizes[bitSizeIndex]; // Keep in mm
+            console.log(`Using DB value ${dbValue} mm from nearestBitSizes for instance ${instance} (section: ${currentSection})`);
           } else {
             console.warn(`Could not find bit size for instance ${instance} (section: ${currentSection})`);
           }
@@ -1236,9 +1236,10 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           const dec = combinedParams.dec || 0;
           const Dhw = combinedParams.Dhw || 0;
           const n = combinedParams.n || 0;
-          
+          const Dep_m = Dep / 1000;
+          const Dhw_m = Dhw / 1000;
           if (!combinedParams.Np && dα && gamma && Lp && Dep && L0c && dec && Lhw && Dhw && n) {
-            const Np = dα * gamma * (Lp * Math.pow(Dep, 2) + L0c * Math.pow(dec, 2) + Lhw * Math.pow(Dhw, 2)) * Math.pow(n, 1.7);
+            const Np = dα * gamma * (Lp * Math.pow(Dep_m, 2) + L0c * Math.pow(dec, 2) + Lhw * Math.pow(Dhw_m, 2)) * Math.pow(n, 1.7);
             combinedParams.Np = Np;
             console.log(`Calculated Np = ${Np} for instance ${instance}`);
           }
@@ -1899,12 +1900,13 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       output += `Application: ${TecApplication}\n\n`;
       
       // Np calculation with formula and substitution
-      const NpFormula = data.formulas.Np || 'Np = dα * γ * (Lp * Dep²+ L0c * dec² + Lhw * Dhw²) * n^1.7';
+      const NpFormula = data.formulas.Np || 'Np = dα * γ * (Lp * (Dep/1000)² + L0c * dec² + Lhw * (Dhw/1000)²) * n^1.7';
       let NpApplication = '';
-      if (data.dα !== undefined && data.γ !== undefined && data.Lp !== undefined && data.Dep !== undefined && 
-          data.L0c !== undefined && data.dec !== undefined && data.Lhw !== undefined && 
-          data.Dhw !== undefined && data.n !== undefined && data.Np !== undefined) {
-        NpApplication = `Np = ${data.dα?.toFixed(4)} · ${data.γ?.toFixed(2)} · (${data.Lp?.toFixed(2)} · ${data.Dep?.toFixed(2)}² + ${data.L0c?.toFixed(2)} · ${data.dec?.toFixed(2)}² + ${data.Lhw?.toFixed(2)} · ${data.Dhw?.toFixed(2)}²) · ${data.n?.toFixed(2)}^1.7 = ${data.Np?.toFixed(2)}`;
+      if (data.dα !== undefined && data.γ !== undefined && data.Lp !== undefined && 
+          data.Dep !== undefined && data.L0c !== undefined && data.dec !== undefined && 
+          data.Lhw !== undefined && data.Dhw !== undefined && data.n !== undefined && 
+          data.Np !== undefined) {
+        NpApplication = `Np = ${data.dα?.toFixed(4)} · ${data.γ?.toFixed(2)} · (${data.Lp?.toFixed(2)} · (<span style={{color: 'red'}}>{(data.Dep/1000)?.toFixed(2)} m</span>)² + ${data.L0c?.toFixed(2)} · ${data.dec?.toFixed(2)}² + ${data.Lhw?.toFixed(2)} · (<span style={{color: 'red'}}>{(data.Dhw/1000)?.toFixed(2)} m</span>)²) · ${data.n?.toFixed(2)}^1.7 = ${data.Np?.toFixed(2)}`;
       } else if (data.Np !== undefined) {
         NpApplication = `Np = ${data.Np?.toFixed(2)}`;
       } else {
@@ -2288,12 +2290,14 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                       
                       <div className="font-medium">Np:</div>
                       <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        <div className="mb-1">Formula: {data.formulas.Np || 'Not available'}</div>
-                        {data.dα !== undefined && data.γ !== undefined && data.Lp !== undefined && 
-                         data.Dep !== undefined && data.L0c !== undefined && data.dec !== undefined && 
-                         data.Lhw !== undefined && data.Dhw !== undefined && data.n !== undefined && 
+                        <div className="mb-1">Formula: {data.formulas.Np || 'Np = dα * γ * (Lp * (Dep/1000)² + L0c * dec² + Lhw * (Dhw/1000)²) * n^1.7'} <span style={{color: 'red'}}>(Dep, Dhw in m)</span></div>
+                        {data.dα !== undefined && data.γ !== undefined && data.Lp !== undefined &&
+                         data.Dep !== undefined && data.L0c !== undefined && data.dec !== undefined &&
+                         data.Lhw !== undefined && data.Dhw !== undefined && data.n !== undefined &&
                          data.Np !== undefined ? (
-                          <div>Application: {data.dα?.toFixed(4)} · {data.γ?.toFixed(2)} · ({data.Lp?.toFixed(2)} · {data.Dep?.toFixed(2)}² + {data.L0c?.toFixed(2)} · {data.dec?.toFixed(2)}² + {data.Lhw?.toFixed(2)} · {data.Dhw?.toFixed(2)}²) · {data.n?.toFixed(2)}^1.7 = {data.Np?.toFixed(2)}</div>
+                          <div>
+                            Application: {data.dα?.toFixed(4)} · {data.γ?.toFixed(2)} · ({data.Lp?.toFixed(2)} · (<span style={{color: 'red'}}>{(data.Dep/1000).toFixed(2)} m</span>)² + {data.L0c?.toFixed(2)} · {data.dec?.toFixed(2)}² + {data.Lhw?.toFixed(2)} · (<span style={{color: 'red'}}>{(data.Dhw/1000).toFixed(2)} m</span>)²) · {data.n?.toFixed(2)}^1.7 = {data.Np?.toFixed(2)}
+                          </div>
                         ) : (
                           <div>Result: {data.Np?.toFixed(4) || 'N/A'}</div>
                         )}
@@ -2301,9 +2305,11 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                       
                       <div className="font-medium">NB:</div>
                       <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
-                        <div className="mb-1">Formula: {data.formulas.NB || 'Not available'}</div>
+                        <div className="mb-1">Formula: {data.formulas.NB || 'NB = 3.2 · 10^-4 · (WOB^0.5) · ((DB/10)^1.75) · n'} <span style={{color: 'red'}}>(DB in mm)</span></div>
                         {data.WOB !== undefined && data.DB !== undefined && data.n !== undefined && data.NB !== undefined ? (
-                          <div>Application: 3.2 · 10^-4 · ({data.WOB?.toFixed(2)}^0.5) · (({data.DB?.toFixed(2)}/10)^1.75) · {data.n?.toFixed(2)} = {data.NB?.toFixed(2)}</div>
+                          <div>
+                            Application: 3.2 · 10^-4 · ({data.WOB?.toFixed(2)}^0.5) · ((<span style={{color: 'red'}}>{data.DB?.toFixed(2)} mm</span>/10)^1.75) · {data.n?.toFixed(2)} = {data.NB?.toFixed(2)}
+                          </div>
                         ) : (
                           <div>Result: {data.NB?.toFixed(4) || 'N/A'}</div>
                         )}

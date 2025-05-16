@@ -397,11 +397,11 @@ export function calculateDrillCollarData(
       
       let DB = 0;
       if (sectionIndex >= 0 && sectionIndex < nearestBitSizes.length) {
-        DB = nearestBitSizes[sectionIndex] / 1000;
+        DB = nearestBitSizes[sectionIndex];
         console.log(`Using bit size ${DB*1000}mm (${DB}m) for section ${sectionName}`);
       } else {
         // Fallback to direct mapping if section name approach fails
-        DB = nearestBitSizes[i-1] / 1000 || 0;
+        DB = nearestBitSizes[i-1] || 0;
         console.log(`Falling back to bit size ${DB*1000}mm (${DB}m) for instance ${i}`);
       }
       
