@@ -182,10 +182,10 @@ function FormationContent() {
             >
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">
-                  Formation Design
+                  Drill String Design
                 </h1>
                 <p className="mt-2 text-muted-foreground max-w-xl">
-                  Design and analyze drilling parameters for optimal well formation and collar specifications
+                  Design and analyze drilling parameters for optimal drill string and collar specifications
                 </p>
               </div>
               {/* Visual indicator of process step */}
@@ -253,7 +253,7 @@ function FormationContent() {
                         <CardTitle className="text-lg sm:text-xl text-primary/90">Drill Pipes Design</CardTitle>
                       </div>
                       <CardDescription className="mt-1.5">
-                        Enter essential parameters for your formation design
+                        Enter essential parameters for your drill string design
                       </CardDescription>
                     </div>
                   </CardHeader>
@@ -291,7 +291,7 @@ function FormationContent() {
                 <Calculator className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="text-sm font-medium">Formation Design Process</h3>
+                <h3 className="text-sm font-medium">Drill String Design Process</h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   First enter your well parameters in the Parameter section, then proceed to the Drill Collar Design tab to calculate specifications based on your inputs.
                 </p>

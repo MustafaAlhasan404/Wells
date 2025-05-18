@@ -125,6 +125,7 @@ interface DebugCalculationData {
     selectionMethod?: string;
     explanation?: string;
   };
+  bForL0c?: number;
 }
 
 interface DrillCollarCalculatorProps {}
@@ -570,22 +571,17 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
     }
   };
   
-  // Add this helper function after extractCorrectionFactors
-  const getBValueForGamma = (gamma: number): number => {
+  // Update getBValueForGamma to accept a forL0c flag
+  const getBValueForGamma = (gamma: number, forL0c = false): number => {
     try {
-      // Check wellType first - if exploration, always return 1
-      if (wellType === 'exploration') {
+      // For all calculations except L0c, use b=1 for exploration wells
+      if (wellType === 'exploration' && !forL0c) {
         console.log(`Using fixed b value of 1 for exploration well (gamma=${gamma})`);
         return 1;
       }
-      
-      // Default value if all else fails
+      // ...existing code for gamma lookup...
       let defaultB = 0.75;
-      
-      // Log that we're trying to look up b for a specific gamma
       console.log(`Looking up b value for gamma = ${gamma}`);
-      
-      // Try to get b from localStorage if available (for debugging)
       let storedBValues;
       try {
         const storedBValuesStr = localStorage.getItem('gammaTableData');
@@ -596,14 +592,10 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       } catch (error) {
         console.error("Error loading stored gamma table data:", error);
       }
-      
-      // Return value if found in stored data
       if (storedBValues && storedBValues[gamma]) {
         console.log(`Found b value ${storedBValues[gamma]} for gamma ${gamma} in stored data`);
         return storedBValues[gamma];
       }
-      
-      // Hard-coded known values based on gamma
       const knownValues: Record<string, number> = {
         "1.08": 0.862,
         "1.0800": 0.862,
@@ -618,29 +610,21 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
         "1.20": 0.868,
         "1.2000": 0.868
       };
-      
-      // Convert gamma to string and look for exact match
       const gammaStr = gamma.toString();
       if (knownValues[gammaStr]) {
         console.log(`Found exact match b value ${knownValues[gammaStr]} for gamma ${gammaStr}`);
         return knownValues[gammaStr];
       }
-      
-      // If exact match not found, try approximate match
-      // Convert to 2 decimal places and try again
       const roundedGamma = Math.round(gamma * 100) / 100;
       const roundedStr = roundedGamma.toString();
       if (knownValues[roundedStr]) {
         console.log(`Found approximate match b value ${knownValues[roundedStr]} for gamma ${roundedStr} (original: ${gammaStr})`);
         return knownValues[roundedStr];
       }
-      
-      // If still no match, use the closest gamma value
       const gammaValues = Object.keys(knownValues).map(g => parseFloat(g));
       if (gammaValues.length > 0) {
         let closestGamma = gammaValues[0];
         let minDiff = Math.abs(gamma - closestGamma);
-        
         for (const g of gammaValues) {
           const diff = Math.abs(gamma - g);
           if (diff < minDiff) {
@@ -648,12 +632,9 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
             closestGamma = g;
           }
         }
-        
         console.log(`Using closest match b value ${knownValues[closestGamma.toString()]} for gamma ${closestGamma} (original: ${gamma})`);
         return knownValues[closestGamma.toString()];
       }
-      
-      // Last resort: default value
       console.log(`No match found for gamma ${gamma}, using default b value ${defaultB}`);
       return defaultB;
     } catch (error) {
@@ -1174,10 +1155,12 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
           
           // Try to calculate L0c if not already set
           if (!combinedParams.L0c && combinedParams.WOB && combinedParams.C && combinedParams.qc) {
-            // L0c formula: WOB * 1000 / (C * qc * b)
-            const L0c = (combinedParams.WOB * 1000) / (combinedParams.C * combinedParams.qc * b);
+            // Use gamma-based b for L0c
+            const bForL0c = getBValueForGamma(gamma, true);
+            const L0c = (combinedParams.WOB * 1000) / (combinedParams.C * combinedParams.qc * bForL0c);
             combinedParams.L0c = L0c;
-            console.log(`Calculated L0c = ${L0c} for instance ${instance}`);
+            combinedParams.bForL0c = bForL0c;
+            console.log(`Calculated L0c = ${L0c} for instance ${instance} (using bForL0c=${bForL0c})`);
           }
           
           const Lp = combinedParams.H - (combinedParams.Lhw + (combinedParams.L0c || 0)) || 0;
@@ -1395,7 +1378,8 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
             dα: combinedParams.dα,
             source: 'Parameter Data'
           },
-          metalGradeCalculation
+          metalGradeCalculation,
+          bForL0c: combinedParams.bForL0c || tData?.bForL0c,
         });
       }
       
@@ -1856,8 +1840,13 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
       // L0c calculation with formula and substitution
       const L0cFormula = "L0c = (WOB * 1000) / (C * qc * b)";
       let L0cApplication = '';
-      if (data.WOB !== undefined && data.importedData?.C !== undefined && data.qc !== undefined && data.b !== undefined) {
-        L0cApplication = `L0c = (${data.WOB?.toFixed(2)} * 1000) / (${data.importedData.C} * ${data.qc?.toFixed(2)} * ${data.b?.toFixed(4)}) = ${data.L0c?.toFixed(2)}`;
+      if (data.WOB !== undefined && data.importedData?.C !== undefined && data.qc !== undefined) {
+        const bValue = data.bForL0c !== undefined ? data.bForL0c : data.b;
+        if (bValue !== undefined) {
+          L0cApplication = `L0c = (${data.WOB?.toFixed(2)} * 1000) / (${data.importedData.C} * ${data.qc?.toFixed(2)} * ${bValue?.toFixed(4)}) = ${data.L0c?.toFixed(2)}`;
+        } else {
+          L0cApplication = `L0c = ${data.L0c?.toFixed(2)}`;
+        }
       } else {
         L0cApplication = `L0c = ${data.L0c?.toFixed(2)}`;
       }
@@ -2249,8 +2238,8 @@ export default function DrillCollarCalculator({}: DrillCollarCalculatorProps) {
                       <div className="font-medium">L0c:</div>
                       <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded text-xs font-mono">
                         <div className="mb-1">Formula: L0c = (WOB * 1000) / (C * qc * b)</div>
-                        {data.WOB !== undefined && data.importedData?.C !== undefined && data.qc !== undefined && data.b !== undefined ? (
-                          <div>Application: ({data.WOB?.toFixed(2)} * 1000) / ({data.importedData.C} * {data.qc?.toFixed(2)} * {data.b?.toFixed(4)}) = {data.L0c?.toFixed(2)}</div>
+                        {data.WOB !== undefined && data.importedData?.C !== undefined && data.qc !== undefined && data.bForL0c !== undefined ? (
+                          <div>Application: ({data.WOB?.toFixed(2)} * 1000) / ({data.importedData.C} * {data.qc?.toFixed(2)} * {data.bForL0c?.toFixed(4)}) = {data.L0c?.toFixed(2)}</div>
                         ) : (
                           <div>Result: {data.L0c?.toFixed(4) || 'N/A'}</div>
                         )}

@@ -55,7 +55,7 @@ export function NavBar() {
                   pathname === "/formation-design" ? "text-primary" : "text-muted-foreground"
                 )}
               >
-                Formation Design
+                Drill String Design
               </Link>
               <Link 
                 href="/semantics" 
@@ -115,7 +115,7 @@ export function NavBar() {
                 pathname === "/formation-design" ? "text-primary" : "text-muted-foreground"
               )}
             >
-              Formation Design
+              Drill String Design
             </Link>
             <Link 
               href="/semantics" 

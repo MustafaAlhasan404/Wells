@@ -9,8 +9,8 @@ import { WellTypeProvider } from "@/context/WellTypeContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Deep Drill - Well Formation Analysis",
-  description: "Advanced analytics for well engineering and drill collar design",
+  title: "Deep Drill - Drill String Design & Well Analysis",
+  description: "Advanced analytics for well engineering and drill string design",
 };
 
 export default function RootLayout({

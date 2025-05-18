@@ -146,13 +146,13 @@ const generateDebugSummary = (vcfResults: any[], gcResults: any[], pumpResults: 
   // Add timestamp
   summary += `Generated: ${new Date().toISOString()}\n\n`;
 
-  // First add a section showing the source data from Formation Design
-  summary += "=== FORMATION DESIGN DATA (HAC/Hc Values) ===\n";
+  // First add a section showing the source data from Drill String Design
+  summary += "=== DRILL STRING DESIGN DATA (HAC/Hc Values) ===\n";
   try {
     const formationData = localStorage.getItem('wellsAnalyzerData');
     if (formationData) {
       const data = JSON.parse(formationData);
-      summary += "Raw Formation Design data from localStorage (wellsAnalyzerData):\n";
+      summary += "Raw Drill String Design data from localStorage (wellsAnalyzerData):\n";
       
       // Add specific logging for Hc and H values
       for (let i = 1; i <= 5; i++) {
@@ -165,15 +165,15 @@ const generateDebugSummary = (vcfResults: any[], gcResults: any[], pumpResults: 
       summary += `Single H value: ${data.H || 'Not found'}\n`;
       
       // Show the entire wellsAnalyzerData object
-      summary += "\nComplete Formation Design data object:\n";
+      summary += "\nComplete Drill String Design data object:\n";
       Object.keys(data).forEach(key => {
         summary += `${key}: ${data[key]}\n`;
       });
     } else {
-      summary += "No formation design data found in localStorage.\n";
+      summary += "No drill string design data found in localStorage.\n";
     }
   } catch (error) {
-    summary += `Error reading formation design data: ${error}\n`;
+    summary += `Error reading drill string design data: ${error}\n`;
   }
   
   // Add section for all localStorage data
@@ -981,7 +981,7 @@ export default function SemanticsPage() {
           
           debugLog('calculateVcf', 'All possible Hc/H values in formation data:', hcValues);
           
-          // Check for Hc values from Formation Design (for each instance)
+          // Check for Hc values from Drill String Design (for each instance)
           // First try to get any instance-specific values
           for (let i = 1; i <= 5; i++) {
             // First try with the new Hc naming
@@ -1037,11 +1037,11 @@ export default function SemanticsPage() {
             }
           }
         } else {
-          debugLog('calculateVcf', 'ERROR: No formation data found in localStorage. wellsAnalyzerData is null or empty.');
+          debugLog('calculateVcf', 'ERROR: No drill string data found in localStorage. wellsAnalyzerData is null or empty.');
         }
       } catch (error) {
-        console.error('Failed to load Hc from Formation Design data:', error);
-        debugLog('calculateVcf', 'ERROR: Failed to load Hc from Formation Design data', error);
+        console.error('Failed to load Hc from Drill String Design data:', error);
+        debugLog('calculateVcf', 'ERROR: Failed to load Hc from Drill String Design data', error);
       }
       
       debugLog('calculateVcf', 'Final loaded formation Hc values', {
@@ -1094,9 +1094,9 @@ export default function SemanticsPage() {
       
       // Check if at least one Hc value is available
       if (formationHcValues.every(v => v === 0 || isNaN(v))) {
-        console.warn('No H (depth) values found in Formation Design data');
+        console.warn('No H (depth) values found in Drill String Design data');
         showToast('error', "Depth (H) values not found", {
-          description: "Please enter H values in Formation Design - Drill Pipes Design tab first."
+          description: "Please enter H values in Drill String Design - Drill Pipes Design tab first."
         });
         setIsLoading(false);
         return;
@@ -1588,7 +1588,7 @@ export default function SemanticsPage() {
         if (formationData) {
           const data = JSON.parse(formationData);
           
-          // Check for Hc values from Formation Design (for each instance)
+          // Check for Hc values from Drill String Design (for each instance)
           // First try to get any instance-specific values
           for (let i = 1; i <= 5; i++) {
             // First try with the new Hc naming
@@ -1617,7 +1617,7 @@ export default function SemanticsPage() {
           }
         }
       } catch (error) {
-        console.error('Failed to load Hc from Formation Design data:', error);
+        console.error('Failed to load Hc from Drill String Design data:', error);
       }
       
       // Check if we have at least one valid Hc value
@@ -1648,20 +1648,20 @@ export default function SemanticsPage() {
       
       // Check if all Hc values are 0
       if (formationHcValues.every(v => v === 0 || isNaN(v))) {
-        console.warn('No H (depth) values found in Formation Design data');
+        console.warn('No H (depth) values found in Drill String Design data');
         showToast('error', "Depth (H) values not found", {
-          description: "Please enter H values in Formation Design - Drill Pipes Design tab first."
+          description: "Please enter H values in Drill String Design - Drill Pipes Design tab first."
         });
         setIsLoading(false);
         return;
       }
       
-      // Use formation design Hc value
+      // Use drill string design Hc value
       let hc = formationHcValues[0]; // Use the first instance's Hc value
       if (hc === 0) {
-        console.warn('No Hc value found in Formation Design data');
+        console.warn('No Hc value found in Drill String Design data');
         showToast('error', "Height Above Cementation (HAC) value not found", {
-          description: "Please enter HAC value in Formation Design - Drill Pipes Design tab first."
+          description: "Please enter HAC value in Drill String Design - Drill Pipes Design tab first."
         });
         setIsLoading(false);
         return;
@@ -1705,7 +1705,7 @@ export default function SemanticsPage() {
                             <div>
                               <p class="font-medium">Pymax (maximum pressure at yield point):</p>
                               <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(H - h)(γfc - γf)]</p>
-                              <p class="text-xs mt-1">Where H is depth from Formation Design and h is the height parameter from the semantic screen</p>
+                              <p class="text-xs mt-1">Where H is depth from Drill String Design and h is the height parameter from the semantic screen</p>
                             </div>
                             <div>
                               <p class="font-medium">Pc (confining pressure):</p>
@@ -1961,7 +1961,7 @@ export default function SemanticsPage() {
                   <div>
                     <p class="font-medium">Pymax (maximum pressure at yield point):</p>
                     <p class="font-mono text-sm bg-background/80 p-2 rounded">Pymax = 0.1[(H - h)(γfc - γf)]</p>
-                    <p class="text-xs mt-1">Where H is depth from Formation Design and h is the height parameter from the semantic screen</p>
+                    <p class="text-xs mt-1">Where H is depth from Drill String Design and h is the height parameter from the semantic screen</p>
                   </div>
                   <div>
                     <p class="font-medium">Pc (confining pressure):</p>

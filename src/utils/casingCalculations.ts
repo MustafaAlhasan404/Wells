@@ -9,26 +9,48 @@
  * @returns String representation in fractional inches
  */
 export function mmToFractionalInches(mm: number): string {
-  const inches = mm * 0.03937;
+  if (!mm || isNaN(mm)) return "-";
+  const inches = mm / 25.4;
   const wholeInches = Math.floor(inches);
   const fraction = inches - wholeInches;
-  
-  const fractions: Record<number, string> = {
-    0.125: "1/8", 0.250: "1/4", 0.375: "3/8", 0.500: "1/2",
-    0.625: "5/8", 0.750: "3/4", 0.875: "7/8", 0.0625: "1/16",
-    0.1875: "3/16", 0.3125: "5/16", 0.4375: "7/16", 0.5625: "9/16",
-    0.6875: "11/16", 0.8125: "13/16", 0.9375: "15/16"
-  };
-  
-  const closestFraction = Object.keys(fractions).reduce((prev, curr) => {
-    return Math.abs(parseFloat(curr) - fraction) < Math.abs(parseFloat(prev) - fraction) ? curr : prev;
-  }, "0");
-  
-  if (Math.abs(parseFloat(closestFraction) - fraction) < 0.05) {
-    return `${wholeInches} ${fractions[parseFloat(closestFraction)]}`;
+
+  // List of common fractions up to 1/16
+  const fractions: { value: number; label: string }[] = [
+    { value: 0, label: "" },
+    { value: 1/16, label: "1/16" },
+    { value: 1/8, label: "1/8" },
+    { value: 3/16, label: "3/16" },
+    { value: 1/4, label: "1/4" },
+    { value: 5/16, label: "5/16" },
+    { value: 3/8, label: "3/8" },
+    { value: 7/16, label: "7/16" },
+    { value: 1/2, label: "1/2" },
+    { value: 9/16, label: "9/16" },
+    { value: 5/8, label: "5/8" },
+    { value: 11/16, label: "11/16" },
+    { value: 3/4, label: "3/4" },
+    { value: 13/16, label: "13/16" },
+    { value: 7/8, label: "7/8" },
+    { value: 15/16, label: "15/16" },
+  ];
+
+  // Find the closest fraction
+  let closest = fractions[0];
+  let minDiff = Math.abs(fraction - closest.value);
+  for (let i = 1; i < fractions.length; i++) {
+    const diff = Math.abs(fraction - fractions[i].value);
+    if (diff < minDiff) {
+      closest = fractions[i];
+      minDiff = diff;
+    }
   }
-  
-  return `${wholeInches}`;
+
+  // Only show the fraction if it's close enough (within 1/32)
+  if (closest.value > 0 && Math.abs(fraction - closest.value) < 1/32) {
+    return `${wholeInches} ${closest.label}`;
+  } else {
+    return `${wholeInches}`;
+  }
 }
 
 /**
@@ -38,11 +60,9 @@ export function mmToFractionalInches(mm: number): string {
  */
 export function formatMmWithInches(value: number | string): string {
   if (!value) return "-";
-  
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
-  return isNaN(numValue) 
-    ? "-" 
-    : `${numValue} mm (${mmToFractionalInches(numValue)}")`;
+  if (isNaN(numValue)) return "-";
+  return `${numValue} mm (${mmToFractionalInches(numValue)}\")`;
 }
 
 /**
