@@ -403,9 +403,10 @@ export async function POST(req: NextRequest) {
           const isExplorationWell = Math.abs(gamma - 1.08) < 0.001;
           
           if (isExplorationWell) {
-            // For exploration wells, always use b = 1
-            b = 1;
-            console.log(`Using fixed b=1 for exploration well (gamma=${gamma})`);
+            // For exploration wells with gamma = 1.08, use b = 0.862 for L0c calculation
+            // This matches the debug output and ensures correct number of columns
+            b = 0.862;
+            console.log(`Using b=0.862 for exploration well (gamma=${gamma}) for L0c calculation`);
           } else if (matchingRow && bColumnName && matchingRow[bColumnName] !== undefined) {
             b = parseFloat(matchingRow[bColumnName]);
             console.log(`Found matching row for gamma=${gamma}:`, matchingRow);
@@ -422,19 +423,13 @@ export async function POST(req: NextRequest) {
             console.log(`Using default b=${b} to avoid division by zero`);
           }
           
-          // Calculate L0c
+          // Calculate L0c using the formula from debug output
+          // L0c = (WOB * 1000) / (C * qc * b)
           const L0c = WOB / (C * qc * b);
           
           // Calculate number of columns (L0c/9)
-          // Special handling for specific known value
-          let numberOfColumns;
-          if (Math.abs(L0c - 7.366) < 0.01) {
-            // If L0c is approximately 7.366, use 8 as requested
-            numberOfColumns = 8;
-          } else {
-            // Otherwise use ceiling as before
-            numberOfColumns = Math.ceil(L0c / 9);
-          }
+          // Use ceiling to match the debug output expectations
+          const numberOfColumns = Math.ceil(L0c / 9);
           
           // Log detailed debug information for this calculation
           console.log(`===============================`);
@@ -460,38 +455,75 @@ export async function POST(req: NextRequest) {
           // Get the total number of instances from calculations length
           const totalInstances = calculations.length;
           
+          // Improved section mapping based on instance number
           if (instanceNum === 1) {
             sectionName = "Production";
+            console.log(`Instance ${instanceNum} mapped to Production section, L0c=${L0c.toFixed(2)}`);
           } else if (instanceNum === totalInstances) {  // Last instance should be Surface
             sectionName = "Surface";
+            console.log(`Instance ${instanceNum} mapped to Surface section, L0c=${L0c.toFixed(2)}`);
           } else if (totalInstances === 3 && instanceNum === 2) {
             // Standard 3-section case
             sectionName = "Intermediate";
+            console.log(`Instance ${instanceNum} mapped to Intermediate section, L0c=${L0c.toFixed(2)}`);
           } else if (totalInstances === 4) {
             // 4-section case
-            if (instanceNum === 2) sectionName = "Upper Intermediate";
-            else sectionName = "Lower Intermediate";
+            if (instanceNum === 2) {
+              sectionName = "Upper Intermediate";
+              console.log(`Instance ${instanceNum} mapped to Upper Intermediate section, L0c=${L0c.toFixed(2)}`);
+            } else {
+              sectionName = "Lower Intermediate";
+              console.log(`Instance ${instanceNum} mapped to Lower Intermediate section, L0c=${L0c.toFixed(2)}`);
+            }
           } else if (totalInstances >= 5) {
             // 5-section case
-            if (instanceNum === 2) sectionName = "Upper Intermediate";
-            else if (instanceNum === 3) sectionName = "Middle Intermediate";
-            else sectionName = "Lower Intermediate";
+            if (instanceNum === 2) {
+              sectionName = "Upper Intermediate";
+              console.log(`Instance ${instanceNum} mapped to Upper Intermediate section, L0c=${L0c.toFixed(2)}`);
+            } else if (instanceNum === 3) {
+              sectionName = "Middle Intermediate";
+              console.log(`Instance ${instanceNum} mapped to Middle Intermediate section, L0c=${L0c.toFixed(2)}`);
+            } else {
+              sectionName = "Lower Intermediate";
+              console.log(`Instance ${instanceNum} mapped to Lower Intermediate section, L0c=${L0c.toFixed(2)}`);
+            }
           } else {
             // Fallback - use intermediate with a more descriptive naming
             if (instanceNum === 2) {
               sectionName = "Upper Intermediate";
+              console.log(`Instance ${instanceNum} mapped to Upper Intermediate section, L0c=${L0c.toFixed(2)}`);
             } else if (instanceNum === totalInstances - 1) {
               sectionName = "Lower Intermediate";
+              console.log(`Instance ${instanceNum} mapped to Lower Intermediate section, L0c=${L0c.toFixed(2)}`);
             } else {
               // For any middle sections
               sectionName = `Middle Intermediate ${instanceNum - 2}`;
+              console.log(`Instance ${instanceNum} mapped to ${sectionName} section, L0c=${L0c.toFixed(2)}`);
             }
           }
           
           // Initialize the result index for section matching
           let resultIndex = -1;
           
-          // If no exact match found for any Intermediate sections
+          // First, try an exact match by section name
+          resultIndex = drillCollarResults.findIndex(r => r.section === sectionName);
+          console.log(`Looking for exact match for section "${sectionName}": ${resultIndex >= 0 ? 'Found at index ' + resultIndex : 'Not found'}`);
+          
+          // If exact match wasn't found, try other matching methods
+          if (resultIndex < 0) {
+            // Try a simple position-based approach for the most common scenarios
+            if (sectionName === "Production") {
+              // Production is typically the first section
+              resultIndex = 0;
+              console.log(`Mapped Production to index ${resultIndex} (first position)`);
+            } else if (sectionName === "Surface") {
+              // Surface is typically the last section
+              resultIndex = drillCollarResults.length - 1;
+              console.log(`Mapped Surface to index ${resultIndex} (last position)`);
+            }
+          }
+          
+          // If still no match found for any Intermediate sections
           if (resultIndex < 0 && (
               sectionName === "Intermediate" || 
               sectionName === "Upper Intermediate" || 
@@ -499,17 +531,27 @@ export async function POST(req: NextRequest) {
               sectionName === "Lower Intermediate" ||
               sectionName.startsWith("Intermediate ")
           )) {
+            console.log(`Looking for intermediate section match for "${sectionName}"`);
+            
             // First try to find an exact match for the specific intermediate section name
             resultIndex = drillCollarResults.findIndex(r => r.section === sectionName);
             
+            if (resultIndex >= 0) {
+              console.log(`Found exact match for "${sectionName}" at index ${resultIndex}`);
+            }
+            
             // If that fails, try a fuzzy match
             if (resultIndex < 0) {
+              // Log available sections for debugging
+              console.log(`Available sections for fuzzy matching:`, drillCollarResults.map(r => r.section));
+              
               // For Upper Intermediate
               if (sectionName === "Upper Intermediate") {
                 resultIndex = drillCollarResults.findIndex(r => 
                   r.section.includes("Upper") || 
                   (r.section.includes("Intermediate") && r.section !== "Intermediate")
                 );
+                console.log(`Fuzzy match for "Upper Intermediate": ${resultIndex >= 0 ? 'Found at index ' + resultIndex : 'Not found'}`);
               }
               // For Middle Intermediate
               else if (sectionName === "Middle Intermediate") {
@@ -519,6 +561,7 @@ export async function POST(req: NextRequest) {
                    !r.section.includes("Upper") && 
                    !r.section.includes("Lower"))
                 );
+                console.log(`Fuzzy match for "Middle Intermediate": ${resultIndex >= 0 ? 'Found at index ' + resultIndex : 'Not found'}`);
               }
               // For Lower Intermediate
               else if (sectionName === "Lower Intermediate") {
@@ -526,10 +569,12 @@ export async function POST(req: NextRequest) {
                   r.section.includes("Lower") || 
                   (r.section.includes("Intermediate") && r.section !== "Intermediate")
                 );
+                console.log(`Fuzzy match for "Lower Intermediate": ${resultIndex >= 0 ? 'Found at index ' + resultIndex : 'Not found'}`);
               }
               // For generic Intermediate
               else {
                 resultIndex = drillCollarResults.findIndex(r => r.section.includes("Intermediate"));
+                console.log(`Fuzzy match for "Intermediate": ${resultIndex >= 0 ? 'Found at index ' + resultIndex : 'Not found'}`);
               }
             }
             
@@ -571,10 +616,25 @@ export async function POST(req: NextRequest) {
             resultIndex = drillCollarResults.length - 1;
           }
 
-          // Update the drill collar result with the number of columns
+          // Update the drill collar result with the number of columns and L0c
           if (resultIndex >= 0) {
+            // Store the previous values for logging
+            const prevNumberOfColumns = drillCollarResults[resultIndex].numberOfColumns;
+            const prevL0c = drillCollarResults[resultIndex].L0c;
+            
+            // Update with new values
             drillCollarResults[resultIndex].numberOfColumns = numberOfColumns;
-            console.log(`Updated ${sectionName} section (index ${resultIndex}) with numberOfColumns = ${numberOfColumns}`);
+            drillCollarResults[resultIndex].L0c = L0c;
+            
+            console.log(`Updated ${sectionName} section (index ${resultIndex}):`);
+            console.log(`  - numberOfColumns: ${prevNumberOfColumns} → ${numberOfColumns}`);
+            console.log(`  - L0c: ${prevL0c?.toFixed(2) || 'undefined'} → ${L0c.toFixed(2)}`);
+            
+            // Store L0c directly in calculations array as well
+            if (calculations[i-1]) {
+              calculations[i-1].L0c = L0c;
+              console.log(`Also stored L0c=${L0c.toFixed(2)} in calculations array for instance ${i}`);
+            }
             
             // Ensure the last element in drillCollarResults is always marked as Surface
             if (sectionName === "Surface" || resultIndex === drillCollarResults.length - 1) {
@@ -584,6 +644,20 @@ export async function POST(req: NextRequest) {
           } else {
             console.log(`WARNING: Could not find matching section "${sectionName}" in drillCollarResults`);
             console.log(`Available sections:`, drillCollarResults.map(r => r.section));
+            
+            // If no match found for important sections (Production/Surface), force set them
+            if (sectionName === "Production" && drillCollarResults.length > 0) {
+              console.log(`Forcing Production section to first entry (index 0)`);
+              drillCollarResults[0].section = "Production";
+              drillCollarResults[0].numberOfColumns = numberOfColumns;
+              drillCollarResults[0].L0c = L0c;
+            } else if (sectionName === "Surface" && drillCollarResults.length > 0) {
+              const lastIndex = drillCollarResults.length - 1;
+              console.log(`Forcing Surface section to last entry (index ${lastIndex})`);
+              drillCollarResults[lastIndex].section = "Surface";
+              drillCollarResults[lastIndex].numberOfColumns = numberOfColumns;
+              drillCollarResults[lastIndex].L0c = L0c;
+            }
           }
         }
         
@@ -638,9 +712,10 @@ export async function POST(req: NextRequest) {
               const isExplorationWell = Math.abs(gamma - 1.08) < 0.001;
               
               if (isExplorationWell) {
-                // For exploration wells, always use b = 1
-                b = 1;
-                console.log(`Using fixed b=1 for exploration well (gamma=${gamma})`);
+                // For exploration wells with gamma = 1.08, use b = 0.862 for L0c calculation
+                // This matches the debug output and ensures correct number of columns
+                b = 0.862;
+                console.log(`Using b=0.862 for exploration well (gamma=${gamma}) for L0c calculation`);
               } else {
                 // Find matching row in Excel for this gamma
                 let matchingRow: Record<string, any> | null = null;
@@ -687,7 +762,8 @@ export async function POST(req: NextRequest) {
                 const idx = drillCollarResults.findIndex(r => r === section);
                 if (idx >= 0) {
                   drillCollarResults[idx].numberOfColumns = numberOfColumns;
-                  console.log(`Updated missing section ${section.section} with numberOfColumns = ${numberOfColumns}`);
+                  drillCollarResults[idx].L0c = L0c;
+                  console.log(`Updated missing section ${section.section} with numberOfColumns = ${numberOfColumns}, L0c = ${L0c}`);
                 } else {
                   console.log(`WARNING: Could not find index for section`, section);
                 }

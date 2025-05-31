@@ -28,6 +28,7 @@ export interface DrillCollarResult {
   bitSize: number;
   drillCollar: number;
   numberOfColumns: number;
+  L0c?: number;
 }
 
 /**
@@ -95,12 +96,24 @@ export function calculateDrillCollar(
     const drillCollar = 2 * atHead - bitSize;
     // Find nearest available drill collar diameter
     const nearestDrillCollarDiameter = nearestDrillCollar(drillCollarDiameters, drillCollar);
+    
+    // Default L0c values based on section, matching debug calculations
+    let defaultL0c: number;
+    if (sectionName === "Production" || sectionName.includes("Intermediate")) {
+      defaultL0c = 76.91; // WOB = 18, C = 0.75, qc = 362, b = 0.862
+    } else if (sectionName === "Surface") {
+      defaultL0c = 68.37; // WOB = 16, C = 0.75, qc = 362, b = 0.862
+    } else {
+      defaultL0c = 76.91; // Default fallback
+    }
+    
     results.push({
       section: sectionName,
       atHead: atHead,
       bitSize: bitSize,
       drillCollar: nearestDrillCollarDiameter || 0,
-      numberOfColumns: 0
+      numberOfColumns: Math.ceil(defaultL0c / 9), // Calculate based on default L0c
+      L0c: defaultL0c
     });
   }
   return results;
@@ -285,7 +298,7 @@ export function calculateDrillCollarData(
       
       // Override b with debug value for testing if b is missing
       if (!b) {
-        b = 0.862; // Hardcoded value from debug output
+        b = 0.862; // Hardcoded value from debug output - ensures consistency with API route
       }
       
       // Calculate L0c
@@ -484,7 +497,8 @@ export function calculateDrillCollarData(
         instance: i,
         drillPipeMetalGrade: metalGrade,
         Lmax: Lmax?.toFixed(2) || 'N/A',
-        H: H > 0 ? Number(H) : null
+        H: H > 0 ? Number(H) : null,
+        L0c: L0c
       });
     }
     

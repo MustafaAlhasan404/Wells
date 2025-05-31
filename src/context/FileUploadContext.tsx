@@ -9,6 +9,10 @@ interface DrillCollarResult {
   atHead: number;
   nearestBitSize: number;
   drillCollars: string;
+  bitSize: number;
+  drillCollar: number;
+  numberOfColumns: number;
+  L0c?: number;
 }
 
 interface CalculationInstance {
